@@ -133,6 +133,23 @@ for (const route of ['methods', 'calibration']) {
     await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Pages' }).locator('[aria-current="page"]')).toBeVisible();
   });
+
+  test(`at 390px the ${route} page renders, and its contents open and lead to a section`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`./#/${route}`);
+    await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
+    // On a phone the contents start folded, so the text starts on the first screen.
+    const toc = page.getByRole('navigation', { name: 'On this page' });
+    const last = toc.getByRole('link').last();
+    await expect(last).toBeHidden();
+    await toc.getByText('On this page').click();
+    await expect(last).toBeVisible();
+    const section = new URLSearchParams(((await last.getAttribute('href')) ?? '').split('?')[1]).get('section');
+    expect(section).toBeTruthy();
+    await last.click();
+    await expect(page).toHaveURL(new RegExp(`section=${section}`));
+    await expect(page.locator(`h2[id="${section}"]`)).toBeInViewport();
+  });
 }
 
 test('the footer shows a version and the repository link', async ({ page }) => {
