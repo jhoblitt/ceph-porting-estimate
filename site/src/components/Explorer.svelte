@@ -6,6 +6,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
+  import { testComponentNotes } from '../lib/counterfactual';
   import type { Derived } from '../lib/derived.svelte';
   import {
     type AreaMode,
@@ -59,6 +60,8 @@
   const level = $derived(explorerLevel(d.report, d.root, componentId, mode));
   const rootLevel = $derived(componentId === null ? level : explorerLevel(d.report, d.root, null, mode));
   const range = $derived(perLineRange(level));
+  /** For each component of ported tests, the headline without it: one more run of the model each. */
+  const testNotes = $derived(testComponentNotes(d.report, d.root, d.target, d.modelId, d.params));
 
   const component = $derived(
     d.root.children.find((c): c is GroupEstimate => c.kind !== 'feature' && c.id === componentId),
@@ -196,6 +199,7 @@
     selectedId={featureId}
     highlightId={hoverId}
     {query}
+    {testNotes}
     label={mapLabel}
     onopen={open}
     onhover={(id) => (hoverId = id)}
@@ -227,6 +231,7 @@
         roots={componentInfo?.root ?? []}
         {scopes}
         dependencies={isDependencies}
+        testNote={testNotes.get(componentId)}
         onshowdependencies={showDependencies}
       />
     </div>
@@ -241,6 +246,7 @@
       bind:query
       selectedId={featureId}
       highlightId={hoverId}
+      {testNotes}
       onopen={open}
       onhover={(id) => (hoverId = id)}
     />

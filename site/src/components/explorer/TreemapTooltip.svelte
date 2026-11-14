@@ -4,6 +4,7 @@
   cell's own accessible name carries the short figures.
 -->
 <script lang="ts">
+  import { type TestComponentNote, testNoteText } from '../../lib/counterfactual';
   import { type Row, costPerThousandLines } from '../../lib/explorer';
   import { countExact, percent, usd, usdExact } from '../../lib/format';
   import { DIFFICULTY_LABELS, KIND_LABELS, SCOPE_LABELS } from '../../lib/labels';
@@ -11,6 +12,8 @@
   interface Props {
     row: Row;
     groupName: string | null;
+    /** For a component of ported tests, what leaving it out would do to the headline. */
+    testNote?: TestComponentNote | undefined;
     /** The point to sit beside, in the map's coordinates. */
     x: number;
     y: number;
@@ -18,7 +21,7 @@
     frameHeight: number;
   }
 
-  let { row, groupName, x, y, frameWidth, frameHeight }: Props = $props();
+  let { row, groupName, testNote, x, y, frameWidth, frameHeight }: Props = $props();
 
   let width = $state(0);
   let height = $state(0);
@@ -62,6 +65,10 @@
       <dd>{countExact(notPorted)} lines</dd>
     {/if}
   </dl>
+  {#if testNote}
+    {@const text = testNoteText(testNote)}
+    <p class="tests">{text.lead} {text.effect}</p>
+  {/if}
 </div>
 
 <style>
@@ -96,6 +103,13 @@
   }
 
   .group {
+    color: var(--text-muted);
+  }
+
+  .tests {
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--grid);
     color: var(--text-muted);
   }
 

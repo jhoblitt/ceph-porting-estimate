@@ -193,7 +193,7 @@ export interface LabelFit {
 }
 
 /** The label's metrics in TreemapCell.svelte: padding, line heights, and an average character's width. */
-const LABEL = { padX: 12, padY: 8, line: 16.25, figure: 15, char: 7.2, maxLines: 3, minChars: 6 };
+const LABEL = { padX: 12, padY: 8, line: 16.25, figure: 15, char: 7.2, figureChar: 6.6, maxLines: 3, minChars: 6 };
 
 /** Lines a greedy word wrap needs; a word longer than a line takes one, clipped. */
 function wrappedLines(name: string, perLine: number): number {
@@ -208,6 +208,11 @@ function wrappedLines(name: string, perLine: number): number {
     }
   }
   return lines;
+}
+
+/** True when a figure line of this text fits the cell's width whole, without an ellipsis. */
+export function figureFits(r: Rect, text: string): boolean {
+  return text.length * LABEL.figureChar <= r.w - LABEL.padX;
 }
 
 export function labelFit(r: Rect, name: string): LabelFit {

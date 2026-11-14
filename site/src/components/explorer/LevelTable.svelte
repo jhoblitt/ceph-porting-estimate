@@ -5,6 +5,7 @@
   of every row, whatever the filter hides. Choosing a row is choosing its cell.
 -->
 <script lang="ts">
+  import { type TestComponentNote, testNoteText } from '../../lib/counterfactual';
   import { type Level, type Row, type Sort, type SortKey, filterGroups, sortRows } from '../../lib/explorer';
   import { countExact, percent, usdExact } from '../../lib/format';
   import { DIFFICULTY_LABELS, KIND_LABELS, SCOPE_LABELS } from '../../lib/labels';
@@ -17,11 +18,23 @@
     query: string;
     selectedId: string | null;
     highlightId: string | null;
+    /** What leaving out each component of ported tests would do to the headline. */
+    testNotes: Map<string, TestComponentNote>;
     onopen: (row: Row, fromKeyboard: boolean) => void;
     onhover: (id: string | null) => void;
   }
 
-  let { level, caption, sort = $bindable(), query = $bindable(), selectedId, highlightId, onopen, onhover }: Props = $props();
+  let {
+    level,
+    caption,
+    sort = $bindable(),
+    query = $bindable(),
+    selectedId,
+    highlightId,
+    testNotes,
+    onopen,
+    onhover,
+  }: Props = $props();
 
   const atRoot = $derived(level.componentId === null);
   const groups = $derived(filterGroups(level.groups, query).map((g) => ({ ...g, rows: sortRows(g.rows, sort) })));
@@ -112,6 +125,10 @@
                 {#if r.scope && r.scope !== 'headline'}<span class="pill" class:np={notPorted}>{SCOPE_LABELS[r.scope]}</span>{/if}
                 {tags(r)}
               </span>
+              {#if r.kind === 'component' && testNotes.has(r.id)}
+                {@const text = testNoteText(testNotes.get(r.id) as TestComponentNote)}
+                <span class="test-note">{text.lead} {text.effect}</span>
+              {/if}
             </th>
             <td>{countExact(r.figures.code)}</td>
             {#if notPorted}
@@ -279,6 +296,15 @@
   .tags {
     display: block;
     font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .test-note {
+    display: block;
+    max-width: 24rem;
+    margin-top: var(--space-1);
+    font-size: 0.8125rem;
+    line-height: 1.4;
     color: var(--text-muted);
   }
 

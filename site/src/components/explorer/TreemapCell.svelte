@@ -8,7 +8,7 @@
   import type { AreaMode, Row } from '../../lib/explorer';
   import { count, usd } from '../../lib/format';
   import type { Scope } from '../../lib/report';
-  import type { CellBox, LabelFit } from '../../lib/treemap';
+  import { type CellBox, type LabelFit, figureFits } from '../../lib/treemap';
 
   interface Props {
     cell: CellBox;
@@ -18,6 +18,8 @@
     fit: LabelFit;
     area: AreaMode;
     name: string;
+    /** A word on what the cell is, printed after its figure where there is room, e.g. "ported tests". */
+    tag?: string | undefined;
     active: boolean;
     selected: boolean;
     highlighted: boolean;
@@ -28,15 +30,18 @@
     onhover: (hovering: boolean, event: PointerEvent) => void;
   }
 
-  let { cell, row, steps, fit, area, name, active, selected, highlighted, dimmed, onactivate, onfocus, onhover }: Props =
+  let { cell, row, steps, fit, area, name, tag, active, selected, highlighted, dimmed, onactivate, onfocus, onhover }: Props =
     $props();
 
   /** The label sits on the first, largest part, so it takes that part's ink. */
   const firstScope = $derived(cell.parts[0]?.scope);
   const inkStep = $derived(firstScope ? (steps[firstScope] ?? 0) : 0);
-  const figure = $derived(
-    area === 'cost' ? usd(row.figures.usd) : `${count(row.figures.code)} lines`,
-  );
+  /** The figure, with the tag only where the whole line fits; the accessible name carries it either way. */
+  const figure = $derived.by(() => {
+    const value = area === 'cost' ? usd(row.figures.usd) : `${count(row.figures.code)} lines`;
+    const tagged = tag ? `${value} · ${tag}` : value;
+    return figureFits(cell.rect, tagged) ? tagged : value;
+  });
 </script>
 
 <button

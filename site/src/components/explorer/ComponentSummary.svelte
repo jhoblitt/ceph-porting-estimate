@@ -1,5 +1,6 @@
 <!-- The component the explorer has zoomed into: what it is, and its lines and cost in each scope. -->
 <script lang="ts">
+  import { type TestComponentNote, testNoteText } from '../../lib/counterfactual';
   import type { ComponentScopes } from '../../lib/explorer';
   import { percent } from '../../lib/format';
   import { SCOPE_LABELS } from '../../lib/labels';
@@ -17,10 +18,12 @@
     scopes: ComponentScopes;
     /** True for the dependency work, whose lines are lines of work. */
     dependencies: boolean;
+    /** For a component of ported tests, what leaving it out would do to the headline. */
+    testNote?: TestComponentNote | undefined;
     onshowdependencies: () => void;
   }
 
-  let { ceph, name, groupName, description, roots, scopes, dependencies, onshowdependencies }: Props = $props();
+  let { ceph, name, groupName, description, roots, scopes, dependencies, testNote, onshowdependencies }: Props = $props();
 
   const unit = $derived(dependencies ? 'lines of work' : 'code lines');
 </script>
@@ -30,6 +33,10 @@
     <p class="kicker">{groupName}</p>
     <h3>{name}</h3>
     <p class="description">{description}</p>
+    {#if testNote}
+      {@const text = testNoteText(testNote)}
+      <p class="tests"><strong>Ported tests.</strong> {text.lead} {text.effect}</p>
+    {/if}
     {#if roots.length > 0}
       <p class="roots">
         In the tree:
@@ -105,6 +112,12 @@
 
   .description {
     color: var(--text-muted);
+  }
+
+  .tests {
+    padding: var(--space-2) var(--space-3);
+    border-inline-start: 3px solid var(--accent);
+    background: var(--accent-wash);
   }
 
   .roots,
