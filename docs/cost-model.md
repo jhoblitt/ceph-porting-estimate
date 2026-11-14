@@ -148,7 +148,7 @@ params:
   clean_break_discount: <quantity>
   long_cache_write_share: <quantity>
   long_context_share: { uncached: <quantity>, cache_write: ..., cache_read: ..., output: ... }
-  model_efficiency: { fable-5-2: <quantity>, opus-5-5: <quantity>, gpt-6-astra: <quantity> }
+  model_efficiency: { <model id>: <quantity>, ... }   # one per model in models.yaml
   sloc_equivalent_bytes_per_line: <quantity>
   adjacent_uplift: { uncached: <quantity>, cache_write: ..., cache_read: ..., output: ... }
 toggles: { include_adjacent: false, clean_break: false }
@@ -163,7 +163,7 @@ default_scenario: calibrated
 
 # models.yaml
 models:
-  - id: fable-5-2 | opus-5-5 | gpt-6-astra
+  - id: <model id>                                     # e.g. opus-5-5
     name, vendor, source (URL), read_on (YYYY-MM-DD)
     usd_per_mtok: { input, cache_write_short, cache_write_long, cache_read, output }
     cache_write_ttl: { short: "5m", long: "1h" }       # labels shown in the UI

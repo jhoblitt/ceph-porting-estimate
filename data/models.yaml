@@ -11,6 +11,10 @@
 #   OpenAI: the Batch and Flex rows for gpt-6-astra are 0.5x the standard row in
 #     every column. Fast (formerly Priority, renamed 2026-07-30) is 2x and
 #     Ultrafast is 6x the standard row in every column.
+#   Moonshot AI: Batch API inference for kimi-k3 is "billed at 60% of the
+#     standard price", and batch jobs are also charged Cache Write fees. The
+#     China platform (platform.kimi.com) prices in CNY: its context-caching
+#     guide lists kimi-k3 at ¥20 input, ¥20 and ¥40 cache writes, ¥2 cache hit.
 models:
   - id: fable-5-2
     name: Claude Fable 5.2
@@ -67,3 +71,24 @@ models:
       cache_write_long: 50       # "Long context 12h write"
       cache_read: 2              # "Long context cached input"
       output: 75                 # "Long context output"
+
+  - id: kimi-k3
+    name: Kimi K3
+    vendor: Moonshot AI
+    # Input and cache prices from the context-caching guide (source); output
+    # from https://www.kimi.ai/resources/kimi-k3-pricing ("Updated:
+    # 2026-10-27"), with the launch post kimi.com/blog/kimi-k3 an older
+    # agreeing source. The pages show "$", taken as USD by comparison with the
+    # China platform's ¥ copy of the same table.
+    source: https://platform.kimi.ai/docs/guide/context-caching
+    read_on: "2026-11-14"
+    usd_per_mtok:
+      input: 3                # "Input (cache miss)"
+      cache_write_short: 3    # "Cache Write (5m)", billed separately, 1x input
+      cache_write_long: 6     # "Cache Write (1h)", 2x input
+      cache_read: 0.30        # "Cached Input (cache hit)"
+      output: 15              # "Output Price", kimi-k3-pricing page
+    cache_write_ttl: { short: "5m", long: "1h" }
+    # The K3 quickstart says it "uses flat pay-as-you-go pricing — there is no
+    # tiering by context length" across its 1,048,576-token window.
+    long_context: null
