@@ -45,6 +45,33 @@ export interface RawState {
 const OVERRIDE_PREFIX = 'o.';
 const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i;
 
+/** A query component decoded as URLSearchParams decodes it, or null for a broken escape. */
+function decodeComponent(s: string): string | null {
+  try {
+    return decodeURIComponent(s.replaceAll('+', ' '));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The `path` parameter's segments. They are split on a literal slash before
+ * each is decoded, so an id holding an escaped slash stays one segment;
+ * URLSearchParams would decode the whole value first. A broken escape drops
+ * the path rather than guessing at it.
+ */
+function pathSegments(query: string): string[] {
+  for (const part of query.split('&')) {
+    const eq = part.indexOf('=');
+    if (eq === -1 || decodeComponent(part.slice(0, eq)) !== 'path') continue;
+    const value = part.slice(eq + 1);
+    if (value === '') return [];
+    const segments = value.split('/').map(decodeComponent);
+    return segments.every((s): s is string => s !== null) ? segments : [];
+  }
+  return [];
+}
+
 export function parseHash(hash: string): RawState {
   const body = hash.startsWith('#') ? hash.slice(1) : hash;
   const q = body.indexOf('?');
@@ -56,8 +83,7 @@ export function parseHash(hash: string): RawState {
     const value = params.get(key);
     if (value !== null) raw[key] = value;
   }
-  const path = params.get('path');
-  if (path) raw.path = path.split('/');
+  raw.path = pathSegments(q === -1 ? '' : body.slice(q + 1));
 
   const overrides = new Map<string, string>();
   for (const [key, value] of params) {
