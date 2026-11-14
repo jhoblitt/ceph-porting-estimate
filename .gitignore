@@ -2,6 +2,11 @@
 /dist/
 coverage.out
 
+# The site: dependencies, build output, and the report.json rollup writes.
+/site/node_modules/
+/site/dist/
+/site/src/generated/
+
 # Local agent scratch and harness state.
 /.superpowers/
 /.claude/
