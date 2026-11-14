@@ -26,6 +26,14 @@ function headline(page: Page): Locator {
   return page.getByRole('region', { name: 'The estimate' }).locator('.hero data');
 }
 
+/**
+ * The headline's unrounded model output. The page prints two significant
+ * figures, so a change can leave the printed text as it was; compare this.
+ */
+async function headlineValue(page: Page): Promise<string> {
+  return (await headline(page).getAttribute('value')) ?? '';
+}
+
 async function open(page: Page, hash = ''): Promise<void> {
   await page.goto(hash === '' ? './' : `./${hash}`);
   await expect(headline(page)).toBeVisible();
@@ -38,9 +46,9 @@ test('the headline shows a dollar figure', async ({ page }) => {
 
 test('choosing a matrix cell changes the headline', async ({ page }) => {
   await open(page);
-  const before = await headline(page).textContent();
+  const before = await headlineValue(page);
   await page.getByRole('button', { name: /^Rust with Claude Fable 5\.2:/ }).click();
-  await expect(headline(page)).not.toHaveText(before ?? '');
+  await expect(headline(page)).not.toHaveAttribute('value', before);
   await expect(page).toHaveURL(/target=rust&model=fable-5-2/);
 });
 
@@ -72,26 +80,26 @@ test('choosing a treemap cell zooms in, and a feature opens its detail', async (
 
 test('moving a slider changes the headline and the URL, and that URL restores it', async ({ page, context }) => {
   await open(page);
-  const before = await headline(page).textContent();
+  const before = await headlineValue(page);
   const slider = page.locator('[data-param-path="overhead"] input[type="range"]');
   await slider.focus();
   for (let i = 0; i < 5; i++) await slider.press('ArrowRight');
-  await expect(headline(page)).not.toHaveText(before ?? '');
+  await expect(headline(page)).not.toHaveAttribute('value', before);
   await expect(page).toHaveURL(/o\.overhead=/);
-  const changed = await headline(page).textContent();
+  const changed = await headlineValue(page);
 
   const again = await context.newPage();
   await again.goto(page.url());
-  await expect(headline(again)).toHaveText(changed ?? '');
+  await expect(headline(again)).toHaveAttribute('value', changed);
   await expect(again.locator('[data-param-path="overhead"]')).toContainText('Reset');
   await again.close();
 });
 
 test('an unknown model in the URL falls back to the defaults', async ({ page }) => {
   await open(page);
-  const defaults = await headline(page).textContent();
+  const defaults = await headlineValue(page);
   await open(page, '#/?model=no-such-model');
-  await expect(headline(page)).toHaveText(defaults ?? '');
+  await expect(headline(page)).toHaveAttribute('value', defaults);
   await expect(page).toHaveURL(/model=opus-5-5/);
 });
 
