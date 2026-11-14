@@ -6,6 +6,7 @@ coverage.out
 /site/node_modules/
 /site/dist/
 /site/src/generated/
+/site/test-results/
 
 # Local agent scratch and harness state.
 /.superpowers/

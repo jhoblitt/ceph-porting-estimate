@@ -123,7 +123,7 @@ jobs:
 
   site:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: site
@@ -158,3 +158,19 @@ jobs:
       - name: Build from the data
         working-directory: .
         run: make site-build
+
+      # Chromium only, with the system libraries it needs; downloaded fresh
+      # on every run rather than cached.
+      - name: Install Chromium for the smoke test
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser smoke test against the build
+        run: npm run e2e
+
+      - name: Upload the smoke test's traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-traces
+          path: site/test-results
+          retention-days: 7

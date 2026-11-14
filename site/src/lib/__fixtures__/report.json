@@ -57,6 +57,17 @@
             "cpp": { "files": 97, "code": 52310, "comment": 2204, "blank": 8890, "bytes": 2210448 },
             "python": { "files": 11, "code": 4022, "comment": 310, "blank": 802, "bytes": 160337 }
           }
+        },
+        {
+          "id": "rgw-lua",
+          "name": "Lua scripting",
+          "description": "A taxonomy entry whose globs match no file at this commit.",
+          "globs": ["src/rgw/rgw_lua*"],
+          "scope": "headline",
+          "kind": "product",
+          "difficulty": "standard",
+          "why": "Kept so the taxonomy stays stable across Ceph releases.",
+          "langs": {}
         }
       ]
     },
