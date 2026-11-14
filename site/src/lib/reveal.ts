@@ -12,13 +12,3 @@ export function revealAssumptions(doc: Document = document): void {
   heading?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   heading?.focus({ preventScroll: true });
 }
-
-/** Opens the group holding a param, then scrolls to the param and focuses its number box. */
-export function revealParam(path: string, doc: Document = document): void {
-  const param = [...doc.querySelectorAll<HTMLElement>('[data-param-path]')].find((el) => el.dataset['paramPath'] === path);
-  if (!param) return;
-  const group = param.closest('details');
-  if (group) group.open = true;
-  param.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  param.querySelector<HTMLInputElement>('input[type="number"]')?.focus({ preventScroll: true });
-}

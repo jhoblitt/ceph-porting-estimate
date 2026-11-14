@@ -126,8 +126,10 @@ func validateFeatures(p *Problems, component string, features []Feature) {
 			p.Addf("%s: feature %q is defined twice", component, f.ID)
 		}
 		seen[f.ID] = true
-		if f.Name == "" {
-			p.Addf("%s: name is empty", where)
+		for _, field := range [][2]string{{"name", f.Name}, {"description", f.Description}, {"why", f.Why}} {
+			if field[1] == "" {
+				p.Addf("%s: %s is empty", where, field[0])
+			}
 		}
 		if len(f.Globs) == 0 {
 			p.Addf("%s: globs is empty", where)
@@ -255,6 +257,7 @@ func validateModels(p *Problems, models []Model, a *Assumptions) {
 			p.Addf("%s: read_on %q is not a YYYY-MM-DD date", where, m.ReadOn)
 		}
 		validatePrices(p, where, "usd_per_mtok", &m.USDPerMTok)
+		validatePriceSources(p, where, m.PriceSources)
 		if m.CacheWriteTTL.Short == "" || m.CacheWriteTTL.Long == "" {
 			p.Addf("%s: cache_write_ttl needs both short and long labels", where)
 		}
@@ -270,6 +273,50 @@ func validateModels(p *Problems, models []Model, a *Assumptions) {
 	for _, id := range slices.Sorted(maps.Keys(a.Params.ModelEfficiency)) {
 		if !seen[id] {
 			p.Addf("%s: params.model_efficiency.%s names no model in %s", AssumptionsFile, id, ModelsFile)
+		}
+	}
+}
+
+// priceNames are the usd_per_mtok keys, in file order.
+var priceNames = []string{"input", "cache_write_short", "cache_write_long", "cache_read", "output"}
+
+// validatePriceSources checks that, when a model lists the pages its prices
+// were read from, each entry names a page, a date and known prices, and
+// every price has exactly one page.
+func validatePriceSources(p *Problems, where string, sources []PriceSource) {
+	if len(sources) == 0 {
+		return
+	}
+	sourcedBy := map[string]int{}
+	for i := range sources {
+		s := &sources[i]
+		at := fmt.Sprintf("%s: price_sources[%d]", where, i)
+		if len(s.Prices) == 0 {
+			p.Addf("%s: prices is empty", at)
+		}
+		for _, name := range s.Prices {
+			switch prev, seen := sourcedBy[name]; {
+			case !slices.Contains(priceNames, name):
+				p.Addf("%s: %q is not one of %s", at, name, strings.Join(priceNames, ", "))
+			case seen:
+				p.Addf("%s: %q is already sourced by price_sources[%d]", at, name, prev)
+			default:
+				sourcedBy[name] = i
+			}
+		}
+		if s.Source == "" {
+			p.Addf("%s: source is empty", at)
+		}
+		switch _, err := time.Parse(time.DateOnly, s.ReadOn); {
+		case s.ReadOn == "":
+			p.Addf("%s: read_on is empty", at)
+		case err != nil:
+			p.Addf("%s: read_on %q is not a YYYY-MM-DD date", at, s.ReadOn)
+		}
+	}
+	for _, name := range priceNames {
+		if _, ok := sourcedBy[name]; !ok {
+			p.Addf("%s: price_sources: %q has no source; list every price once", where, name)
 		}
 	}
 }
@@ -322,6 +369,11 @@ func validateAssumptions(p *Problems, a *Assumptions, sloc *SLOC) {
 	for _, path := range slices.Sorted(maps.Keys(params)) {
 		q := params[path]
 		validateQuantity(p, "params."+path, &q)
+		if q.Value != nil {
+			if why := outOfRange(path, *q.Value); why != "" {
+				p.Addf("%s: params.%s: value is %g; %s", AssumptionsFile, path, *q.Value, why)
+			}
+		}
 	}
 
 	for _, id := range slices.Sorted(maps.Keys(a.Scenarios)) {
@@ -381,6 +433,26 @@ func validateQuantity(p *Problems, path string, q *Quantity) {
 	}
 }
 
+// isShare reports whether the param at path is a share (λ, σ), which the
+// cost model holds between 0 and 1; the site's model/params.ts isShare
+// names the same set.
+func isShare(path string) bool {
+	return path == "long_cache_write_share" || strings.HasPrefix(path, "long_context_share.")
+}
+
+// outOfRange says why v is not a value the param at path can take, or ""
+// when it is one. The browser clamps a value outside the range, so check
+// rejects it rather than let the page show a figure the data does not say.
+func outOfRange(path string, v float64) string {
+	switch {
+	case v < 0:
+		return "it must be at least 0"
+	case isShare(path) && v > 1:
+		return "it is a share, at most 1"
+	}
+	return ""
+}
+
 func validateScenario(p *Problems, id string, sc Scenario, params map[string]Quantity) {
 	where := fmt.Sprintf("%s: scenarios.%s", AssumptionsFile, id)
 	if sc.Label == "" {
@@ -390,8 +462,11 @@ func validateScenario(p *Problems, id string, sc Scenario, params map[string]Qua
 		p.Addf("%s: description is empty", where)
 	}
 	for _, path := range slices.Sorted(maps.Keys(sc.Overrides)) {
+		v := sc.Overrides[path]
 		if _, ok := params[path]; !ok {
 			p.Addf("%s.overrides: %q is not a param", where, path)
+		} else if why := outOfRange(path, v); why != "" {
+			p.Addf("%s.overrides: %q is %g; %s", where, path, v, why)
 		}
 		if _, ok := sc.Scale[path]; ok {
 			p.Addf("%s: %q is in both overrides and scale", where, path)
@@ -399,11 +474,16 @@ func validateScenario(p *Problems, id string, sc Scenario, params map[string]Qua
 	}
 	for _, path := range slices.Sorted(maps.Keys(sc.Scale)) {
 		q, ok := params[path]
+		f := sc.Scale[path]
 		switch {
 		case !ok:
 			p.Addf("%s.scale: %q is not a param", where, path)
 		case q.Value != nil && *q.Value == 0:
 			p.Addf("%s.scale: %q scales a baseline of 0, which stays 0; set it in overrides", where, path)
+		case q.Value != nil:
+			if why := outOfRange(path, *q.Value*f); why != "" {
+				p.Addf("%s.scale: %q is %g, which makes it %g; %s", where, path, f, *q.Value*f, why)
+			}
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(sc.Toggles)) {

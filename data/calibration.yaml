@@ -56,7 +56,10 @@ measurement:
   known_gaps:
     - compaction and advisor calls may be absent from the transcripts
     - server-side web tools are not counted
-    - role assignment is by keyword
+    - >-
+      roles (controller, implementation, review and the rest) were assigned by
+      agent type and the keywords in each dispatch description, and review fix
+      rounds count as implementation (the session's report)
   notes:
     source: >-
       rgw-go session, aggregated by script from its Claude Code transcripts, cut

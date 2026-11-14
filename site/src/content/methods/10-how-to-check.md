@@ -13,7 +13,7 @@ Calibrate on one of rgw-go's phases alone and predict the next, from the phase t
 ::: end
 ::: if computed.backTestUnder
 
-Phase {{computed.backTest.early | countExact}}'s rates under-predict phase {{computed.backTest.late | countExact}}: the prediction is {{computed.backTest.outputGap | signedPercent}} against what was used in output tokens, and {{computed.backTest.usdGap | signedPercent}} in dollars at {{computed.model.name}}'s list prices. Phase {{computed.backTest.late | countExact}} is unfinished, more review-heavy by the session's account, and builds a different kind of feature, and the session reports that the port's ratios rise from phase to phase; that is why the {{computed.role.high.label}} scenario takes phase {{computed.backTest.late | countExact}}'s rates. A model calibrated on rgw-go's phase {{computed.backTest.early | countExact}} alone would have been too low for the next.
+Phase {{computed.backTest.early | countExact}}'s rates under-predict phase {{computed.backTest.late | countExact}}: the prediction is {{computed.backTest.outputGap | signedPercent}} against what was used in output tokens, and {{computed.backTest.usdGap | signedPercent}} in dollars at {{computed.model.name}}'s list prices. By the session's account phase {{computed.backTest.late | countExact}} is unfinished and more review-heavy, and it builds a different kind of feature; the session also reports that the port's ratios rise from phase to phase, and that is why the {{computed.role.high.label}} scenario takes phase {{computed.backTest.late | countExact}}'s rates. A model calibrated on rgw-go's phase {{computed.backTest.early | countExact}} alone would have been too low for the next.
 
 ::: end
 ::: if computed.backTestOver

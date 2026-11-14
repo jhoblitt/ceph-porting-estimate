@@ -15,6 +15,14 @@ Every price in the estimate is one of these.
 
 ::: prices
 
+::: if computed.hasPriceSources
+
+Some models' prices were read from more than one page. For each, which page gave which price:
+
+::: price-sources
+
+::: end
+
 ::: if computed.hasLongContext
 
 Some models charge more for calls whose prompt is longer than a threshold. The central scenario bills no call at that rate: an agent run against such a sheet would be configured to stay under it. The share billed in the comparison below is the share of each token category that rgw-go sent in calls whose prompt exceeded {{calibration.measurement_detail.prompt_size_tokens.threshold | count}} tokens, measured at that one threshold and applied unchanged to each such model, whatever its own threshold. See [What could make this wrong](#/methods?section=what-could-make-this-wrong).

@@ -103,9 +103,9 @@ func (c *calibration) checkPort(a *Assumptions, sz rgwSizes) {
 		c.num("measurement.review_passes")/c.positive("measurement.tasks", c.num("measurement.tasks")),
 		"measurement.review_passes ÷ measurement.tasks", reportedTolerancePct)
 	const comments = "sizes.rgw_go.product_go_comments"
-	c.recordWithin(comments+".share_of_product_go_bytes",
+	c.record(comments+".share_of_product_go_bytes",
 		c.num(comments+".bytes")/c.num("sizes.rgw_go.product_go.bytes"),
-		comments+".bytes ÷ sizes.rgw_go.product_go.bytes", reportedTolerancePct)
+		comments+".bytes ÷ sizes.rgw_go.product_go.bytes")
 
 	for _, d := range []struct {
 		param string
@@ -216,10 +216,11 @@ func (c *calibration) checkCoverage(a *Assumptions, sz rgwSizes) {
 // checkDifficulty checks the difficulty scale against the mix of classes
 // rgw-go ported: each multiplier is its relative value over the mix's mean,
 // so the model applied to that mix reproduces rgw-go's measured cost, and
-// the mix's shares are those of the features it lists.
-func (c *calibration) checkDifficulty(a *Assumptions) {
+// the mix's shares are those of the features it lists, each the taxonomy's
+// own headline product feature at the taxonomy's own class.
+func (c *calibration) checkDifficulty(a *Assumptions, components []Component) {
 	const mix = "ported_mix"
-	c.checkMixFeatures()
+	c.checkMixFeatures(components)
 	shares := c.mapping(mix + ".share_by_difficulty")
 	mean := c.positive(mix+".mean_relative_difficulty", c.num(mix+".mean_relative_difficulty"))
 	params := a.Params.Quantities()
@@ -260,8 +261,10 @@ func (c *calibration) checkDifficulty(a *Assumptions) {
 }
 
 // checkMixFeatures recomputes the mix's shares, and the byte
-// classification's ported bytes, from the features the mix lists.
-func (c *calibration) checkMixFeatures() {
+// classification's ported bytes, from the features the mix lists, and
+// resolves each against the taxonomy, so that re-rating or renaming one
+// there fails the check until the mix is redone.
+func (c *calibration) checkMixFeatures(components []Component) {
 	const mix = "ported_mix"
 	byClass := map[Difficulty]float64{}
 	total := 0.0
@@ -270,12 +273,14 @@ func (c *calibration) checkMixFeatures() {
 		bytes := c.numAt(f, base, "bytes", false)
 		v, path, ok := c.at(f, base, "difficulty")
 		d, isString := v.(string)
+		valid := ok && isString && slices.Contains(Difficulties, Difficulty(d))
 		switch {
 		case !ok:
 			c.problem(path, "is missing")
-		case !isString || !slices.Contains(Difficulties, Difficulty(d)):
+		case !valid:
 			c.problem(path, "is %v, not one of %s", v, difficultyNames())
 		}
+		c.checkMixFeature(components, f, base, Difficulty(d), valid)
 		byClass[Difficulty(d)] += bytes
 		total += bytes
 	}
@@ -286,6 +291,46 @@ func (c *calibration) checkMixFeatures() {
 		if _, _, listed := c.at(c.doc, "", path); listed || byClass[d] > 0 {
 			c.record(path, byClass[d]/total, fmt.Sprintf("%s.features: bytes in %s features ÷ all", mix, d))
 		}
+	}
+}
+
+// checkMixFeature resolves one entry of the mix, "<component>/<feature>",
+// against the taxonomy: the feature must exist, be a headline product
+// feature, as the mix's method says all of it is, and carry the class the
+// entry copies (checked only when the entry's class is itself valid).
+func (c *calibration) checkMixFeature(components []Component, entry any, base string, class Difficulty, classValid bool) {
+	v, path, ok := c.at(entry, base, "feature")
+	id, isString := v.(string)
+	switch {
+	case !ok:
+		c.problem(path, "is missing")
+		return
+	case !isString:
+		c.problem(path, "is not a string")
+		return
+	}
+	component, feature, _ := strings.Cut(id, "/")
+	var found *Feature
+	var file string
+	for i := range components {
+		if components[i].ID != component {
+			continue
+		}
+		for j := range components[i].Features {
+			if components[i].Features[j].ID == feature {
+				found, file = &components[i].Features[j], components[i].File
+			}
+		}
+	}
+	switch {
+	case found == nil:
+		c.problem(path, "%q names no feature in the taxonomy", id)
+	case found.Scope != ScopeHeadline || found.Kind != KindProduct:
+		c.p.Addf("%s: %s: feature %q has scope %s and kind %s in %s; the mix lists headline product features only",
+			CalibrationFile, base, id, found.Scope, found.Kind, file)
+	case classValid && found.Difficulty != class:
+		c.p.Addf("%s: %s: feature %q is %s here but %s in %s; copy the taxonomy's class, then recompute the shares and the mean",
+			CalibrationFile, base, id, class, found.Difficulty, file)
 	}
 }
 

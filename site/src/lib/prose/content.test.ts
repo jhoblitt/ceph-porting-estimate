@@ -71,11 +71,13 @@ describe('checkContent', () => {
     const parts = [
       "In this report's judgement the figure is more likely too low than too high.",
       'The measured evidence for that is thin: one port, and a test of the calibration rather than of the estimate',
-      "rgw-go's output per byte of Go added has risen in each phase so far, 2.06, 2.70, and 3.71 output tokens per byte in phases 0, 1, and 2, " +
-        "and the central scenario reflects the average so far, 3.10 on the phase table's basis.",
+      "rgw-go's output per byte of Go added has risen from phase to phase so far, 2.06, 2.70, and 3.71 output tokens per byte in phases 0, 1, and 2, " +
+        "and the central scenario reflects the average so far, 3.10 on the phase table's basis " +
+        // The fixture's Go bytes per token.
+        '(that table gives output per Go token; these rates per byte are its rates divided by 3.9, the Go bytes-per-token value).',
       "The work still to be done has only to run above that average, not as high as phase 2, for rgw-go's finished rate to end above it; " +
-        'then, with input per output token no lower than measured, this figure is too low.',
-      "Phase 2 is unfinished, more review-heavy by the session's account, and builds a different kind of feature, so the rise may not continue; " +
+        'then, with input per output token no lower than measured and the other calibrated parameters as measured, this figure is too low.',
+      "By the session's account phase 2 is unfinished and more review-heavy, and it builds a different kind of feature, so the rise may not continue; " +
         'its Go is also read slightly before its tokens end',
       'That is why this is a judgement, not a finding.',
       'The sized items that can only lower the figure are choices a port could make.',
@@ -83,7 +85,84 @@ describe('checkContent', () => {
     const at = parts.map((p) => methods.indexOf(p));
     expect(at.every((i) => i >= 0)).toBe(true);
     expect(at).toEqual([...at].sort((a, b) => a - b));
-    expect(methods).not.toMatch(/account, and a different kind of feature|The evidence for it is one test|that its ratios rise/);
+    expect(methods).not.toMatch(/account, and a different kind of feature|The evidence for it is one test|that its ratios rise|risen in each phase/);
+  });
+
+  /** The fixture with the latest phase's Go read on `day`; its tokens end on 2026-11-14. */
+  function readOn(day: string): typeof report {
+    const r = structuredClone(report);
+    const rows = (r.calibration as { phases: { rows: { go_bytes_at: string }[] } }).phases.rows;
+    (rows.at(-1) as { go_bytes_at: string }).go_bytes_at = day;
+    return r;
+  }
+
+  it("gives the judgement's caveat with the Go read days before the tokens end", () => {
+    const methods = pageHtml('methods', readOn('2026-11-10'));
+    expect(methods).toContain(
+      "By the session's account phase 2 is unfinished and more review-heavy, and it builds a different kind of feature, so the rise may not continue; " +
+        'its Go is also read four days before its tokens end (<a href="#/calibration?section=the-measurement">The measurement</a>). ' +
+        'That is why this is a judgement, not a finding.',
+    );
+    expect(methods).not.toContain('read slightly before its tokens end');
+  });
+
+  it("gives the judgement's caveat with the Go read when the tokens end", () => {
+    const methods = pageHtml('methods', readOn('2026-11-14'));
+    expect(methods).toContain(
+      "By the session's account phase 2 is unfinished and more review-heavy, and it builds a different kind of feature, so the rise may not continue. " +
+        'That is why this is a judgement, not a finding.',
+    );
+    expect(methods).not.toMatch(/its Go is also read/);
+  });
+
+  it('makes no judgement, and says so, when the rate has not risen from phase to phase', () => {
+    const r = structuredClone(report);
+    const rows = (r.calibration as { phases: { rows: { output: number }[] } }).phases.rows;
+    (rows.at(-1) as { output: number }).output = (rows[0] as { output: number }).output;
+    const methods = pageHtml('methods', r);
+    expect(methods).toContain(
+      '<p>On these items alone the figure could be too low or too high; this report does not judge which is more likely.</p>',
+    );
+    expect(methods).not.toMatch(/judgement the figure is more likely|That is why this is a judgement/);
+  });
+
+  it('attributes the two review counts and says no more about why they differ', () => {
+    const sentence =
+      "475 is the role breakdown's count of review agents, in its review row above; 455 is the session's count of review passes. " +
+      "Both are the session's figures; the data does not say why they differ.";
+    expect(pageHtml('calibration', report)).toContain(sentence);
+    const same = structuredClone(report);
+    (same.calibration as { measurement: { review_passes: number } }).measurement.review_passes = 475;
+    expect(checkContent(same)).toEqual([]);
+    expect(pageHtml('calibration', same)).not.toContain('count of review agents');
+  });
+
+  it('says what keyword roles mean for the review share the clean-break item quotes', () => {
+    const calibration = pageHtml('calibration', report);
+    expect(calibration).toContain(
+      "By the session's report, the split between controller, implementation, review and the rest comes from each agent's type",
+    );
+    expect(calibration).toMatch(
+      /so the review role's \d+% of the port's cost, which the clean-break item under .* quotes, is on that assignment a floor for the cost of review-driven work\./,
+    );
+    const cleanBreak = PAGE_DOCS.methods
+      .flatMap((d) => renderDoc(d, report, facts))
+      .flatMap((s) => (s.kind === 'limitations' ? s.items : []))
+      .find((i) => i.id === 'clean-break');
+    expect(cleanBreak?.html).toContain("a floor for review-driven work since, by the session's report, review fix rounds count as implementation");
+  });
+
+  it('shows where each price was read only when some model says', () => {
+    const ids = (r: typeof report) =>
+      PAGE_DOCS.methods.flatMap((d) => renderDoc(d, r, proseFacts(r))).flatMap((s) => (s.kind === 'table' ? [s.id] : []));
+    expect(ids(report)).not.toContain('price-sources');
+    const r = structuredClone(report);
+    (r.models.at(-1) as (typeof r.models)[number]).price_sources = [
+      { prices: ['input', 'cache_write_short', 'cache_write_long', 'cache_read', 'output'], source: 'https://example.com/p', read_on: '2026-11-14' },
+    ];
+    expect(checkContent(r)).toEqual([]);
+    expect(ids(r)).toContain('price-sources');
+    expect(pageHtml('methods', r)).toContain("Some models' prices were read from more than one page.");
   });
 
   it('says where each phase table counts Go, and when phase 2 reads it, on both pages', () => {

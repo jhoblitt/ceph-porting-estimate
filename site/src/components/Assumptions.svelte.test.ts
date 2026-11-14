@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import fixture from '../lib/__fixtures__/report.json';
 import { Derived } from '../lib/derived.svelte';
 import { parseReport } from '../lib/report';
-import { revealAssumptions, revealParam } from '../lib/reveal';
+import { revealAssumptions } from '../lib/reveal';
 import { type AppState, defaultState } from '../lib/state';
 import Assumptions from './Assumptions.svelte';
 
@@ -38,16 +38,6 @@ describe('Assumptions', () => {
     const { group } = setup();
     const paths = [...group('models').querySelectorAll<HTMLElement>('[data-param-path]')].map((el) => el.dataset['paramPath']);
     expect(paths).toEqual(report.models.map((m) => `model_efficiency.${m.id}`));
-  });
-
-  it('opens a closed group when the reader is sent to one of its params', () => {
-    const { group } = setup();
-    group('pricing').open = false;
-    revealParam('long_context_share.output');
-    expect(group('pricing').open).toBe(true);
-    expect(document.activeElement).toBe(
-      group('pricing').querySelector('[data-param-path="long_context_share.output"] input[type="number"]'),
-    );
   });
 
   it('says what else the estimate rests on, and what "measured" means', () => {

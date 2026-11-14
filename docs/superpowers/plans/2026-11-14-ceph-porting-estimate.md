@@ -1,5 +1,21 @@
 # Ceph Porting Estimate Implementation Plan
 
+> **Status: historical.** This is the plan as written before the estimate
+> was built and its calibration re-anchored. Where it differs from
+> [`docs/cost-model.md`](../../cost-model.md), the data under `data/` or the
+> published pages, those are authoritative. The largest differences:
+>
+> - Four scenarios with roles (optimistic, calibrated, pessimistic,
+>   naive), not three; the optimistic and pessimistic ones take rgw-go's
+>   phase rates and the ends of the coverage range.
+> - Four models, not three: Kimi K3 was added.
+> - Coverage is this project's classification of the ported source by
+>   bytes, with a narrower range than planned, and the difficulty scale is
+>   normalised over what rgw-go ported rather than used as written.
+> - `assumptions.yaml` holds the cost model's parameters as quantities
+>   under `params`, with scenarios that override or scale them, not the
+>   per-target shape sketched here.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Publish an interactive GitHub Pages report estimating the tokens and
@@ -23,9 +39,9 @@ code. Code blocks are sketches; behaviour, seams and values bind.
 ## Global Constraints
 
 - Ceph snapshot: `ec322a5e95ebcb46dec7d6a9d7813a34543c64ad` (`main`), read
-  from `/home/jhoblitt/github/ceph` through git objects, never the working
+  from `<ceph clone>` through git objects, never the working
   tree (it is dirty). Never write to that clone.
-- Do not read `/home/jhoblitt/github/rgw-go/tokens.md`.
+- Do not read `<rgw-go clone>/tokens.md`.
 - Repository `jhoblitt/ceph-porting-estimate`, public. Pages base path
   `/ceph-porting-estimate/`.
 - Any Go work: load `go-conventions:go-conventions` first. Any workflow,
@@ -211,7 +227,7 @@ fixture; a roll-up invariant that feature sums equal the `sloc.json` total.
 
 This is the analysis the report exists for. Fan out up to 4 read-only
 Explore agents (`model: opus`), one per group, each reading ceph at the
-pinned SHA via `git -C /home/jhoblitt/github/ceph show|ls-tree` and
+pinned SHA via `git -C <ceph clone> show|ls-tree` and
 returning a YAML fragment plus a two-line justification per feature:
 
 1. RADOS core: `osd`, `os` (BlueStore, BlueFS, kstore/memstore), `crimson`,
@@ -263,7 +279,7 @@ returning a YAML fragment plus a two-line justification per feature:
   writing the two cache-write prices and the long-context row.
 - [ ] `calibration.yaml`: copy the spec's "Calibration measurement" table
   verbatim, plus rgw-go sizes measured at `239f789` with
-  `git -C /home/jhoblitt/github/rgw-go ls-tree -r -l 239f789` (bytes of
+  `git -C <rgw-go clone> ls-tree -r -l 239f789` (bytes of
   product Go under `internal/` + `cmd/` excluding `_test.go`; test Go;
   tooling; Markdown) and the source size of `src/rgw` + RGW object classes
   at ceph `v19.2.7` (bytes and lines).

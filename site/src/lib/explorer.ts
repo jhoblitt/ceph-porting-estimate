@@ -236,6 +236,17 @@ export function explorerLevel(report: Report, root: GroupEstimate, componentId: 
   return level(null, groups, headlineUsd);
 }
 
+/**
+ * The root level's code lines as the two quantities they add up from:
+ * Ceph's own, in the scope the level was built for, and the dependency
+ * work. Null at a component.
+ */
+export function rootLines(level: Level): { ceph: number; dependencies: number } | null {
+  if (level.componentId !== null) return null;
+  const dependencies = level.groups.find((g) => g.id === DEPENDENCY_GROUP_ID)?.subtotal.code ?? 0;
+  return { ceph: level.total.code - dependencies, dependencies };
+}
+
 const MODE_ORDER: readonly ScopeMode[] = ['headline', 'costed', 'all'];
 
 /** The wider of two scope modes. */

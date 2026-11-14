@@ -15,3 +15,6 @@ models:
     usd_per_mtok: {input: 10, cache_write_short: 12.5, cache_write_long: 25, cache_read: 1, output: 50}
     cache_write_ttl: {short: "5m", long: "1h"}
     long_context: {threshold_tokens: 272000, input: 20, cache_write_short: 25, cache_write_long: 50, cache_read: 2, output: 75}
+    price_sources:
+      - {prices: [input, cache_read, output], source: https://developers.openai.com/api/docs/pricing, read_on: 2026-11-13}
+      - {prices: [cache_write_short, cache_write_long], source: https://developers.openai.com/api/docs/models/gpt-6-astra, read_on: 2026-11-12, note: The write prices are on the model page.}

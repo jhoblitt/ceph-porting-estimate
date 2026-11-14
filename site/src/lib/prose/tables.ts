@@ -2,7 +2,7 @@
 // the computed facts. Formatting only: every figure is either a value in
 // report.json or one of facts.ts's outputs.
 
-import { decimal, count, countExact, multiplier, paramValue, percent, usd, usdExact } from '../format';
+import { cardinal, decimal, count, countExact, list, multiplier, paramValue, percent, usd, usdExact } from '../format';
 import { describeParams } from '../model';
 import { provenance, toggleText } from '../assumptions';
 import { calibrationFacts } from '../interpret';
@@ -197,7 +197,8 @@ function scenarios(report: Report, facts: ProseFacts): Table {
       const changes = [
         ...inOrder(Object.entries(s.overrides ?? {}))
           .filter(([path, v]) => info.get(path)?.baseline !== v)
-          .map(([path, v]) => `${label(path)} ${paramValue(info.get(path)?.baseline ?? Number.NaN)} → ${paramValue(v)}`),
+          // To the data's own precision, as the parameter table prints the baseline.
+          .map(([path, v]) => `${label(path)} ${decimal(info.get(path)?.baseline ?? Number.NaN)} → ${decimal(v)}`),
         ...inOrder(Object.entries(s.scale ?? {})).map(([path, f]) => `${label(path)} × ${scaleFigure(f)}`),
         ...Object.entries(s.toggles ?? {})
           .filter(([t, on]) => report.assumptions.toggles[t as keyof typeof report.assumptions.toggles] !== on)
@@ -237,10 +238,39 @@ function prices(report: Report): Table {
         `${price(m.usd_per_mtok.cache_write_long)} (${m.cache_write_ttl.long})`,
         price(m.usd_per_mtok.cache_read),
         price(m.usd_per_mtok.output),
-        { text: `${m.vendor} pricing, ${m.read_on}`, href: m.source },
+        m.price_sources?.length
+          ? `${m.vendor}, ${cardinal(m.price_sources.length)} pages: see where each price was read, below`
+          : { text: `${m.vendor} pricing, ${m.read_on}`, href: m.source },
       ),
     ),
     note: "In brackets, the vendor's own label for each of the two cache-write tiers the data records. A vendor with a single cache-write price has it in both.",
+  };
+}
+
+const PRICE_NAMES: Readonly<Record<keyof Prices, string>> = {
+  input: 'input',
+  cache_write_short: 'short-tier cache write',
+  cache_write_long: 'long-tier cache write',
+  cache_read: 'cache read',
+  output: 'output',
+};
+
+function priceSources(report: Report): Table {
+  const rows = report.models.flatMap((m) =>
+    (m.price_sources ?? []).map((s) =>
+      row(
+        m.name,
+        list(s.prices.map((p) => PRICE_NAMES[p] ?? p)),
+        { text: `${s.source.replace(/^https?:\/\//, '')}, ${s.read_on}`, href: s.source },
+        s.note ?? '',
+      ),
+    ),
+  );
+  if (rows.length === 0) throw new Error('table price-sources: no model lists price_sources');
+  return {
+    caption: 'Where each price was read, for models priced from more than one page',
+    columns: [{ label: 'Model' }, { label: 'Prices' }, { label: 'Page, and the day it was read' }, { label: 'Note', wide: true }],
+    rows,
   };
 }
 
@@ -637,7 +667,7 @@ function submoduleSizes(report: Report): Table {
 function bindingsByTarget(report: Report): Table {
   return {
     caption: 'Dependencies each target uses through bindings',
-    columns: [{ label: 'Target' }, { label: 'Kept, through bindings', wide: true }],
+    columns: [{ label: 'Target' }, { label: 'Used through bindings', wide: true }],
     rows: TARGETS.map((t) => {
       const kept = report.dependencies.filter((d) => d.targets[t].strategy === 'bindings').map((d) => d.name);
       return row(TARGET_LABELS[t], kept.length > 0 ? kept.join(', ') : 'None');
@@ -657,6 +687,7 @@ export const TABLES: Readonly<Record<string, Builder>> = Object.freeze({
   'bytes-per-token': bytesPerToken,
   scenarios,
   prices,
+  'price-sources': priceSources,
   'long-context-prices': longContextPrices,
   'long-context-effect': longContextEffect,
   'port-by-role': portByRole,

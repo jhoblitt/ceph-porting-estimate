@@ -1,18 +1,6 @@
-// Scales the charts place marks on: linear from 0 where the marks are
-// outcomes a reader compares by size, logarithmic where values span orders
-// of magnitude.
-
-export interface LogScale {
-  /** The domain, in whole decades around the values. */
-  min: number;
-  max: number;
-  /** Every decade from min to max. */
-  ticks: number[];
-  /** 0 at min, 1 at max; anything not positive sits at 0, so check onScale first. */
-  position(value: number): number;
-  /** False for zero, negative and non-finite values, which a log scale cannot place. */
-  onScale(value: number): boolean;
-}
+// Scales the charts place marks on, linear from 0 where the marks are
+// outcomes a reader compares by size, and a shading step taken by
+// logarithm where values span orders of magnitude.
 
 /** Round ticks from 0 to at most `max`, about four or five of them, stepping by 1, 2 or 5 × 10^k. */
 export function linearTicks(max: number): number[] {
@@ -58,35 +46,6 @@ export function linearScale(values: number[]): LinearScale {
     position(value) {
       if (!Number.isFinite(value)) return 0;
       return Math.min(1, Math.max(0, value / max));
-    },
-  };
-}
-
-export function logScale(values: number[]): LogScale {
-  const positive = values.filter((v) => Number.isFinite(v) && v > 0);
-  let lo = 0;
-  let hi = 1;
-  if (positive.length > 0) {
-    lo = Math.floor(Math.log10(Math.min(...positive)));
-    hi = Math.ceil(Math.log10(Math.max(...positive)));
-    // Values on one decade would leave no domain; give them a decade either side.
-    if (lo === hi) {
-      lo -= 1;
-      hi += 1;
-    }
-  }
-  const ticks: number[] = [];
-  for (let e = lo; e <= hi; e++) ticks.push(10 ** e);
-  return {
-    min: 10 ** lo,
-    max: 10 ** hi,
-    ticks,
-    position(value) {
-      if (!(Number.isFinite(value) && value > 0)) return 0;
-      return Math.min(1, Math.max(0, (Math.log10(value) - lo) / (hi - lo)));
-    },
-    onScale(value) {
-      return Number.isFinite(value) && value > 0;
     },
   };
 }

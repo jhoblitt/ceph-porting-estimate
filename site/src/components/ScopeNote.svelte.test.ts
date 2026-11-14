@@ -39,6 +39,16 @@ describe('ScopeNote', () => {
     expect(text).toMatch(/This code is costed for reference and is not part of the headline\.$/);
   });
 
+  it('counts the dependencies whose bindings or port leave work, not every one that uses bindings or a port', () => {
+    const d = new Derived(report, () => defaultState(report));
+    const { container } = render(ScopeNote, { d });
+    const dt = [...container.querySelectorAll('dt')].find((x) => x.textContent === 'Ported and counted');
+    const text = dt?.nextElementSibling?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    const n = d.scope.dependenciesWithWork;
+    expect(n).toBeGreaterThan(0);
+    expect(text).toMatch(new RegExp(`lines on the ${n === 1 ? 'dependency whose bindings or port leaves work' : `${n} dependencies whose bindings or port leave work`} for Go\\.$`));
+  });
+
   it('names a single one alone', () => {
     expect(shownText(report)).toMatch(/lines in Integration suites\. This code is costed/);
   });

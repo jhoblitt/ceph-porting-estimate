@@ -512,6 +512,27 @@
       "vendor": "Moonshot AI",
       "source": "https://platform.kimi.ai/docs/guide/context-caching",
       "read_on": "2026-11-14",
+      "price_sources": [
+        {
+          "prices": [
+            "input",
+            "cache_write_short",
+            "cache_write_long",
+            "cache_read"
+          ],
+          "source": "https://platform.kimi.ai/docs/guide/context-caching",
+          "read_on": "2026-11-14",
+          "note": "The guide shows \"$\", taken as US dollars by comparison with the China platform's ¥ copy of the same table."
+        },
+        {
+          "prices": [
+            "output"
+          ],
+          "source": "https://www.kimi.ai/resources/kimi-k3-pricing",
+          "read_on": "2026-11-14",
+          "note": "Read from this pricing page rather than the context-caching guide; the page says \"Updated: 2026-10-27\", and the launch post kimi.com/blog/kimi-k3 is an older source that agrees. It shows \"$\", taken as US dollars as for the other prices."
+        }
+      ],
       "usd_per_mtok": {
         "input": 3,
         "cache_write_short": 3,

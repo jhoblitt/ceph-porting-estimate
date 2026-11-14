@@ -22,22 +22,22 @@ The estimate is conditional on every component port succeeding. Nothing here is 
 
 ::: if computed.judgement.made
 
-In this report's judgement the figure is more likely too low than too high. The measured evidence for that is thin: one port, and a test of the calibration rather than of the estimate ([How to check this estimate](#/methods?section=how-to-check-this-estimate)). rgw-go's output per byte of Go added has risen in each phase so far, {{computed.judgement.rates | text}}, and the central scenario reflects the average so far, {{computed.judgement.average | rate}} on the phase table's basis. The work still to be done has only to run above that average, not as high as phase {{computed.judgement.latest | countExact}}, for rgw-go's finished rate to end above it; then, with input per output token no lower than measured, this figure is too low.
+In this report's judgement the figure is more likely too low than too high. The measured evidence for that is thin: one port, and a test of the calibration rather than of the estimate ([How to check this estimate](#/methods?section=how-to-check-this-estimate)). rgw-go's output per byte of Go added has risen from phase to phase so far, {{computed.judgement.rates | text}}, and the central scenario reflects the average so far, {{computed.judgement.average | rate}} on the phase table's basis (that table gives output per Go token; these rates per byte are its rates divided by {{assumptions.bytes_per_token.go.value | ratio}}, the Go bytes-per-token value). The work still to be done has only to run above that average, not as high as phase {{computed.judgement.latest | countExact}}, for rgw-go's finished rate to end above it; then, with input per output token no lower than measured and the other calibrated parameters as measured, this figure is too low.
 
 ::: end
 ::: if computed.judgement.readSlight
 
-Phase {{computed.judgement.latest | countExact}} is unfinished, more review-heavy by the session's account, and builds a different kind of feature, so the rise may not continue; its Go is also read slightly before its tokens end ([The measurement](#/calibration?section=the-measurement)). That is why this is a judgement, not a finding.
+By the session's account phase {{computed.judgement.latest | countExact}} is unfinished and more review-heavy, and it builds a different kind of feature, so the rise may not continue; its Go is also read slightly before its tokens end ([The measurement](#/calibration?section=the-measurement)). That is why this is a judgement, not a finding.
 
 ::: end
 ::: if computed.judgement.readFar
 
-Phase {{computed.judgement.latest | countExact}} is unfinished, more review-heavy by the session's account, and builds a different kind of feature, so the rise may not continue; its Go is also read {{computed.judgement.readDays | cardinal}} days before its tokens end ([The measurement](#/calibration?section=the-measurement)). That is why this is a judgement, not a finding.
+By the session's account phase {{computed.judgement.latest | countExact}} is unfinished and more review-heavy, and it builds a different kind of feature, so the rise may not continue; its Go is also read {{computed.judgement.readDays | cardinal}} days before its tokens end ([The measurement](#/calibration?section=the-measurement)). That is why this is a judgement, not a finding.
 
 ::: end
 ::: if computed.judgement.readOnTime
 
-Phase {{computed.judgement.latest | countExact}} is unfinished, more review-heavy by the session's account, and builds a different kind of feature, so the rise may not continue. That is why this is a judgement, not a finding.
+By the session's account phase {{computed.judgement.latest | countExact}} is unfinished and more review-heavy, and it builds a different kind of feature, so the rise may not continue. That is why this is a judgement, not a finding.
 
 ::: end
 ::: if computed.judgement.lowers

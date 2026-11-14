@@ -19,6 +19,7 @@
     largestRow,
     perLineRange,
     requiredMode,
+    rootLines,
     widerMode,
   } from '../lib/explorer';
   import { count, percent, usd } from '../lib/format';
@@ -62,6 +63,7 @@
   const level = $derived(explorerLevel(d.report, d.root, componentId, mode));
   const rootLevel = $derived(componentId === null ? level : explorerLevel(d.report, d.root, null, mode));
   const range = $derived(perLineRange(level));
+  const lines = $derived(rootLines(level));
   /** For each component of ported tests, the headline without it: one more run of the model each. */
   const testNotes = $derived(testComponentNotes(d.report, d.root, d.target, d.modelId, d.params));
 
@@ -192,7 +194,8 @@
     <Breadcrumb {crumbs} />
     <p class="level-total">
       <strong>{usd(level.total.usd)}</strong> for {count(level.total.code)} lines {scopeWords[mode]}{#if componentId !== null},
-        {percent(level.share)} of the headline{:else}, dependency work included{/if}
+        {percent(level.share)} of the headline{:else if lines && lines.dependencies > 0}: {count(lines.ceph)} lines of Ceph's own code
+        plus {count(lines.dependencies)} lines of dependency work{/if}
     </p>
   </div>
 

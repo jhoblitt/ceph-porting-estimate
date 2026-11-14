@@ -1,35 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linearScale, linearTicks, logScale, positiveRange, sequentialStep } from './scale';
-
-describe('logScale', () => {
-  it('spans whole decades around the values', () => {
-    const s = logScale([689, 298_782, 510_191]);
-    expect(s.min).toBe(100);
-    expect(s.max).toBe(1_000_000);
-    expect(s.ticks).toEqual([100, 1_000, 10_000, 100_000, 1_000_000]);
-  });
-
-  it('places values by their logarithm', () => {
-    const s = logScale([100, 10_000]);
-    expect(s.position(100)).toBe(0);
-    expect(s.position(1_000)).toBeCloseTo(0.5, 12);
-    expect(s.position(10_000)).toBe(1);
-  });
-
-  it('keeps a value on a decade inside the domain', () => {
-    expect(logScale([1_000, 1_000])).toMatchObject({ min: 100, max: 10_000 });
-  });
-
-  it('pins zero, negative and non-finite values to the left edge', () => {
-    const s = logScale([0, 100, 1_000]);
-    expect(s.min).toBe(100);
-    for (const v of [0, -5, Number.NaN]) expect(s.position(v)).toBe(0);
-  });
-
-  it('falls back to one decade when nothing is positive', () => {
-    expect(logScale([0, 0])).toMatchObject({ min: 1, max: 10, ticks: [1, 10] });
-  });
-});
+import { linearScale, linearTicks, positiveRange, sequentialStep } from './scale';
 
 describe('sequentialStep', () => {
   it('maps the low end to step 1 and the high end to the last step', () => {
@@ -64,14 +34,6 @@ describe('positiveRange', () => {
     const values = [0, 100, 10_000];
     const r = positiveRange(values)!;
     expect(values.map((v) => sequentialStep(v, r.min, r.max, 7))).toEqual([0, 1, 7]);
-  });
-});
-
-describe('logScale off-scale values', () => {
-  it('says which values it cannot place', () => {
-    const s = logScale([0, 683, 503_644]);
-    expect(s.onScale(683)).toBe(true);
-    for (const v of [0, -1, Number.NaN]) expect(s.onScale(v)).toBe(false);
   });
 });
 

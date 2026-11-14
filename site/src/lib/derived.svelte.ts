@@ -83,7 +83,7 @@ export interface ScopeSummary {
   ceph: CephSloc;
   /** The synthetic component holding dependency work for the current target. */
   dependencies: GroupEstimate | undefined;
-  /** How many dependencies need bindings or a port for the current target. */
+  /** How many dependencies' bindings or port leave lines of work for the current target. */
   dependenciesWithWork: number;
   /** Components with work that is costed but kept out of the headline, in report order, with that work's cost. */
   shown: { id: string; name: string; usd: number }[];

@@ -43,8 +43,8 @@ coverage:
   scenario_end: {pessimistic: low}
 ported_mix:
   features:
-    - {feature: rgw/frontend, difficulty: standard, bytes: 541200}
-    - {feature: rgw/admin, difficulty: hard, bytes: 135300}
+    - {feature: mon/core, difficulty: standard, bytes: 541200}
+    - {feature: mon/paxos, difficulty: hard, bytes: 135300}
   share_by_difficulty: {standard: 0.8, hard: 0.2}
   relative_difficulty: {config: 0.1, glue: 0.5, standard: 1, hard: 1.5, extreme: 2}
   mean_relative_difficulty: 1.1
