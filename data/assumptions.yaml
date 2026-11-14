@@ -123,9 +123,10 @@ params:
     cache_read:  { value: 0.797, measured: true, source: calibration.yaml, reason: "Share of cache-read tokens in rgw-go calls whose prompt exceeds 272K; rgw-go's 1M-context distribution applied unchanged to Astra" }
     output:      { value: 0.699, measured: true, source: calibration.yaml, reason: "Share of output tokens in rgw-go calls whose prompt exceeds 272K; rgw-go's 1M-context distribution applied unchanged to Astra" }
   model_efficiency:
-    fable-5-2:   { value: 1.0, measured: false, source: assumption, reason: "No measurement of Fable 5.2's token use against Opus 5.5 on this work; same volumes, different price sheet" }
+    fable-5-2:   { value: 1.0, measured: false, source: assumption, reason: "No measurement of Fable 5.2's token use on this work; the same volumes are priced on its sheet. A model that needs more or less rework to reach the same result would cost more or less than shown" }
     opus-5-5:    { value: 1.0, measured: false, source: assumption, reason: "The calibration model (98% of rgw-go's calls), so 1 by definition" }
-    gpt-6-astra: { value: 1.0, measured: false, source: assumption, reason: "No measurement of GPT-6 Astra on this work; same volumes, different price sheet" }
+    gpt-6-astra: { value: 1.0, measured: false, source: assumption, reason: "No measurement of GPT-6 Astra's token use on this work; the same volumes are priced on its sheet. A model that needs more or less rework to reach the same result would cost more or less than shown" }
+    kimi-k3:     { value: 1.0, measured: false, source: assumption, reason: "No measurement of Kimi K3's token use on this work; the same volumes are priced on its sheet. A model that needs more or less rework to reach the same result would cost more or less than shown" }
   sloc_equivalent_bytes_per_line:
     value: 39.58
     measured: true

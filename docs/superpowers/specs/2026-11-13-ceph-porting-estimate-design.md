@@ -66,6 +66,7 @@ public repository `jhoblitt/ceph-porting-estimate`.
 - **Repository** is public. The owner granted permission to create it, open
   and merge PRs, manage its configuration, and run and change its CI.
 - **Versioning and deploy** follow `jhoblitt/tmelevation`.
+- **Kimi K3** (Moonshot AI) was added to the model matrix by the owner on 2026-11-14.
 
 ## Decisions made by the builder (open to correction)
 
