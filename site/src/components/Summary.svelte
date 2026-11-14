@@ -124,6 +124,8 @@
 
   .made-of {
     grid-area: split;
+    /* The split sits on the page, not on a card. */
+    --bar-gap: var(--page);
   }
 
   .made-of {
