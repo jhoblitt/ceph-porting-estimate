@@ -12,6 +12,7 @@
     type Row,
     type ScopeMode,
     type Sort,
+    componentScopes,
     explorerLevel,
     perLineRange,
     requiredMode,
@@ -25,6 +26,8 @@
   import Section from './Section.svelte';
   import Segmented from './Segmented.svelte';
   import Breadcrumb, { type Crumb } from './explorer/Breadcrumb.svelte';
+  import ComponentSummary from './explorer/ComponentSummary.svelte';
+  import FeatureDetail from './explorer/FeatureDetail.svelte';
   import LevelTable from './explorer/LevelTable.svelte';
   import Treemap from './explorer/Treemap.svelte';
   import TreemapLegend from './explorer/TreemapLegend.svelte';
@@ -37,6 +40,7 @@
 
   let { d, selection, onselect }: Props = $props();
 
+  const DETAIL_HEADING = 'explorer-detail-title';
   const DEPENDENCY_GROUP_NAME = 'Dependencies';
 
   let area = $state<AreaMode>('code');
@@ -66,25 +70,44 @@
     isDependencies ? DEPENDENCY_GROUP_NAME : (d.report.groups.find((g) => g.id === groupId)?.name ?? ''),
   );
   const componentName = $derived(level.groups[0]?.name ?? component?.name ?? '');
+  const scopes = $derived(componentId === null ? null : componentScopes(d.root, componentId));
 
   const feature = $derived(
     component?.children.find((f): f is FeatureEstimate => f.kind === 'feature' && f.id === featureId),
   );
+  const featureSource = $derived.by(() => {
+    if (!feature) return null;
+    if (isDependencies) {
+      const dependency = d.report.dependencies.find((x) => x.id === feature.id);
+      return dependency ? { dependency } : null;
+    }
+    const f = componentInfo?.features.find((x) => x.id === feature.id);
+    return f ? { feature: f } : null;
+  });
+  const featureShare = $derived(level.groups[0]?.rows.find((r) => r.id === featureId)?.share ?? 0);
 
-  type Focus = { cell: string | null } | null;
+  const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  type Focus = { cell: string | null } | { detail: true } | null;
 
   /** Moves to a place, then puts focus where the reader's attention goes. */
   async function go(next: string[], focus: Focus) {
     onselect({ ...selection, path: next });
     await tick();
     if (!focus) return;
-    await treemap?.focusCell(focus.cell);
+    if ('cell' in focus) {
+      await treemap?.focusCell(focus.cell);
+      return;
+    }
+    const heading = document.getElementById(DETAIL_HEADING);
+    heading?.focus({ preventScroll: true });
+    heading?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
   }
 
   function open(row: Row) {
     if (componentId === null) void go([row.id], { cell: null });
     else if (row.id === featureId) void go([componentId], { cell: row.id });
-    else void go([componentId, row.id], null);
+    else void go([componentId, row.id], { detail: true });
   }
 
   function up() {
@@ -99,6 +122,12 @@
     if (widerMode(m, requiredMode(d.root, path)) === m) return;
     if (componentId !== null && widerMode(m, requiredMode(d.root, [componentId])) === m) void go([componentId], null);
     else void go([], null);
+  }
+
+  function showDependencies() {
+    const heading = document.getElementById('dependencies-title');
+    heading?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
+    heading?.focus({ preventScroll: true });
   }
 
   const crumbs: Crumb[] = $derived.by(() => {
@@ -174,6 +203,35 @@
   />
   <TreemapLegend {area} {mode} {range} />
 
+  {#if feature && featureSource}
+    <div class="detail">
+      <FeatureDetail
+        report={d.report}
+        params={d.params}
+        target={d.target}
+        estimate={feature}
+        source={featureSource}
+        componentName={componentName}
+        modelName={d.model.name}
+        share={featureShare}
+        headingId={DETAIL_HEADING}
+      />
+    </div>
+  {:else if componentId !== null && scopes}
+    <div class="detail">
+      <ComponentSummary
+        ceph={d.report.ceph}
+        name={componentName}
+        {groupName}
+        description={componentInfo?.description ?? level.groups[0]?.description ?? ''}
+        roots={componentInfo?.root ?? []}
+        {scopes}
+        dependencies={isDependencies}
+        onshowdependencies={showDependencies}
+      />
+    </div>
+  {/if}
+
   <div class="table">
     <h3>{componentId === null ? 'Every component' : `The features of ${levelNoun}`}</h3>
     <LevelTable
@@ -216,6 +274,10 @@
   .level-total strong {
     color: var(--text);
     font-size: var(--text-base);
+  }
+
+  .detail {
+    margin-top: var(--space-5);
   }
 
   .table {
