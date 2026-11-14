@@ -39,7 +39,8 @@ const RULES: readonly GroupRule[] = [
   {
     id: 'difficulty',
     title: 'Difficulty',
-    description: 'How much work a line of each difficulty class takes, relative to standard code.',
+    description:
+      'How much work a line of each difficulty class takes, relative to the average line of the code the measured port ported, which counts as 1.',
     matches: prefixed('difficulty'),
   },
   {

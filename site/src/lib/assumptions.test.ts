@@ -85,6 +85,12 @@ describe('groupParams', () => {
     for (const g of groupParams(info)) expect(`${g.title} ${g.description}`).not.toMatch(/measured on|rgw-go/i);
   });
 
+  it('says what the difficulty scale is relative to, which is not standard code', () => {
+    const difficulty = groupParams(info).find((g) => g.id === 'difficulty');
+    expect(difficulty?.description).toMatch(/relative to the average line of the code the measured port ported/);
+    expect(difficulty?.description).not.toMatch(/relative to standard/);
+  });
+
   it('leaves out empty groups', () => {
     expect(groupParams([param('rust_factor', 1.15)]).map((g) => g.id)).toEqual(['target']);
   });
