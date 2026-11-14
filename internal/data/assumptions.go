@@ -1,5 +1,13 @@
 package data
 
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"maps"
+	"slices"
+)
+
 // Quantity is a number that is an assumption or a measurement, with its
 // provenance.
 type Quantity struct {
@@ -18,6 +26,65 @@ type Assumptions struct {
 	Toggles         Toggles             `yaml:"toggles"          json:"toggles"`
 	Scenarios       map[string]Scenario `yaml:"scenarios"        json:"scenarios"`
 	DefaultScenario string              `yaml:"default_scenario" json:"default_scenario"`
+
+	// scenarioOrder is the scenarios' order in the file, which Load records
+	// because the map above cannot.
+	scenarioOrder []string
+}
+
+// ScenarioIDs lists the scenarios in file order; any not in the file's
+// order, as when Assumptions was built in code, follow in sorted order.
+func (a *Assumptions) ScenarioIDs() []string {
+	ids := make([]string, 0, len(a.Scenarios))
+	for _, id := range a.scenarioOrder {
+		if _, ok := a.Scenarios[id]; ok {
+			ids = append(ids, id)
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(a.Scenarios)) {
+		if !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// MarshalJSON writes the scenarios in file order, the order the site
+// presents them in, where encoding/json would sort a map's keys.
+func (a *Assumptions) MarshalJSON() ([]byte, error) {
+	type plain Assumptions
+	return json.Marshal(struct {
+		*plain
+		Scenarios orderedScenarios `json:"scenarios"`
+	}{(*plain)(a), orderedScenarios{ids: a.ScenarioIDs(), byID: a.Scenarios}})
+}
+
+type orderedScenarios struct {
+	ids  []string
+	byID map[string]Scenario
+}
+
+func (o orderedScenarios) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	for i, id := range o.ids {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		k, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+		v, err := json.Marshal(o.byID[id])
+		if err != nil {
+			return nil, fmt.Errorf("scenario %q: %w", id, err)
+		}
+		buf.Write(k)
+		buf.WriteByte(':')
+		buf.Write(v)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }
 
 // DefaultLang is the bytes_per_token key used for a language with no entry
@@ -114,14 +181,29 @@ type Toggles struct {
 // ToggleNames lists the keys a scenario's toggles may set.
 var ToggleNames = []string{"include_adjacent", "clean_break"}
 
-// ScenarioIDs lists the scenario presets the site knows.
-var ScenarioIDs = []string{"naive", "calibrated", "pessimistic"}
+// CalibratedID is the scenario that applies the baseline params unchanged.
+const CalibratedID = "calibrated"
+
+// Role says what a scenario stands for in the report's range.
+type Role string
+
+// The roles a scenario may carry.
+const (
+	RoleLow       Role = "low"
+	RoleCentral   Role = "central"
+	RoleHigh      Role = "high"
+	RoleReference Role = "reference"
+)
+
+// Roles lists every valid Role.
+var Roles = []Role{RoleLow, RoleCentral, RoleHigh, RoleReference}
 
 // Scenario is a preset: the baseline params with some values replaced
 // (Overrides) or multiplied (Scale), both keyed by the dotted paths
 // Params.Quantities returns. Load turns an absent map into an empty one.
 type Scenario struct {
 	Label       string             `yaml:"label"       json:"label"`
+	Role        Role               `yaml:"role"        json:"role"`
 	Description string             `yaml:"description" json:"description"`
 	Overrides   map[string]float64 `yaml:"overrides"   json:"overrides"`
 	Scale       map[string]float64 `yaml:"scale"       json:"scale"`

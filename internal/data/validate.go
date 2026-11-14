@@ -19,6 +19,7 @@ func Validate(s *Set) Problems {
 	validateDependencies(&p, s.Dependencies, &s.SLOC)
 	validateModels(&p, s.Models, &s.Assumptions)
 	validateAssumptions(&p, &s.Assumptions, &s.SLOC)
+	validateCalibration(&p, s)
 	validateSLOC(&p, &s.SLOC)
 	return p
 }
@@ -324,18 +325,47 @@ func validateAssumptions(p *Problems, a *Assumptions, sloc *SLOC) {
 	}
 
 	for _, id := range slices.Sorted(maps.Keys(a.Scenarios)) {
-		if !slices.Contains(ScenarioIDs, id) {
-			p.Addf("%s: scenarios: %q is not one of %s", AssumptionsFile, id, strings.Join(ScenarioIDs, ", "))
-		}
 		validateScenario(p, id, a.Scenarios[id], params)
 	}
-	for _, id := range ScenarioIDs {
-		if _, ok := a.Scenarios[id]; !ok {
-			p.Addf("%s: scenarios: %q is missing", AssumptionsFile, id)
-		}
+	if _, ok := a.Scenarios[CalibratedID]; !ok {
+		p.Addf("%s: scenarios: %q is missing", AssumptionsFile, CalibratedID)
 	}
 	if _, ok := a.Scenarios[a.DefaultScenario]; !ok {
 		p.Addf("%s: default_scenario %q is not a scenario", AssumptionsFile, a.DefaultScenario)
+	}
+	validateRoles(p, a)
+}
+
+// validateRoles checks that every scenario has a role, that no two share
+// one, and that the one central scenario is the default.
+func validateRoles(p *Problems, a *Assumptions) {
+	holder := map[Role]string{}
+	for _, id := range a.ScenarioIDs() {
+		where := fmt.Sprintf("%s: scenarios.%s", AssumptionsFile, id)
+		switch r := a.Scenarios[id].Role; {
+		case r == "":
+			p.Addf("%s: role is empty", where)
+		case !slices.Contains(Roles, r):
+			checkEnum(p, where, "role", r, Roles)
+		case holder[r] != "":
+			p.Addf("%s: role %s is already held by scenarios.%s", where, r, holder[r])
+		default:
+			holder[r] = id
+		}
+	}
+	central, ok := holder[RoleCentral]
+	if !ok {
+		p.Addf("%s: scenarios: no scenario has role %s", AssumptionsFile, RoleCentral)
+	}
+	def, isScenario := a.Scenarios[a.DefaultScenario]
+	switch {
+	case !isScenario || def.Role == RoleCentral || !slices.Contains(Roles, def.Role):
+	case ok:
+		p.Addf("%s: default_scenario %q has role %s; it must name the central scenario %q",
+			AssumptionsFile, a.DefaultScenario, def.Role, central)
+	default:
+		p.Addf("%s: default_scenario %q has role %s; it must name the central scenario",
+			AssumptionsFile, a.DefaultScenario, def.Role)
 	}
 }
 
@@ -368,8 +398,12 @@ func validateScenario(p *Problems, id string, sc Scenario, params map[string]Qua
 		}
 	}
 	for _, path := range slices.Sorted(maps.Keys(sc.Scale)) {
-		if _, ok := params[path]; !ok {
+		q, ok := params[path]
+		switch {
+		case !ok:
 			p.Addf("%s.scale: %q is not a param", where, path)
+		case q.Value != nil && *q.Value == 0:
+			p.Addf("%s.scale: %q scales a baseline of 0, which stays 0; set it in overrides", where, path)
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(sc.Toggles)) {

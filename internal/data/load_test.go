@@ -1,6 +1,9 @@
 package data_test
 
 import (
+	"encoding/json"
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -95,10 +98,15 @@ var _ = Describe("Load", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(s.Assumptions.Scenarios["pessimistic"]).To(Equal(data.Scenario{
 			Label:       "Pessimistic",
+			Role:        data.RoleHigh,
 			Description: "Hard code is harder and adjacent work counts.",
-			Overrides:   map[string]float64{"difficulty.extreme": 3, "long_context_share.cache_read": 0.5},
-			Scale:       map[string]float64{"overhead": 1.25},
-			Toggles:     map[string]bool{"include_adjacent": true},
+			Overrides: map[string]float64{
+				"difficulty.extreme": 3, "expansion": 2.381,
+				"long_context_share.uncached": 0.5, "long_context_share.cache_write": 0.5,
+				"long_context_share.cache_read": 0.5, "long_context_share.output": 0.5,
+			},
+			Scale:   map[string]float64{"overhead": 1.25, "cache_read_per_output": 1.1, "cache_write_per_output": 1.2},
+			Toggles: map[string]bool{"include_adjacent": true},
 		}))
 		calibrated := s.Assumptions.Scenarios["calibrated"]
 		Expect(calibrated.Overrides).To(Equal(map[string]float64{}))
@@ -150,14 +158,30 @@ var _ = Describe("Load", func() {
 	It("carries calibration.yaml as JSON with its key order and literal dates", func() {
 		s, err := data.Load(fixture())
 		Expect(err).NotTo(HaveOccurred())
-		Expect(string(s.Calibration)).To(Equal(`{"project":"rgw-go","measured_on":"2026-11-13",` +
-			`"tokens":{"output":45010000,"cache_read":56213600000},` +
-			`"sizes":[{"lang":"go","kind":"product","bytes":1200000},{"lang":"go","kind":"test","bytes":800000}]}`))
+		Expect(string(s.Calibration)).To(HavePrefix(`{"project":"rgw-go","measured_on":"2026-11-13",` +
+			`"measurement":{"model_id":"opus-5-5","port":{"uncached":0.0304,"cache_write":76,"cache_read":3800,"output":3.04},` +
+			`"adjacent":[{"scope":"reproduction",`))
+	})
+
+	It("carries the scenarios into JSON in file order, not sorted", func() {
+		s, err := data.Load(fixture())
+		Expect(err).NotTo(HaveOccurred())
+		b, err := json.Marshal(&s.Assumptions)
+		Expect(err).NotTo(HaveOccurred())
+		var top struct {
+			Scenarios json.RawMessage `json:"scenarios"`
+		}
+		Expect(json.Unmarshal(b, &top)).To(Succeed())
+		text := string(top.Scenarios)
+		naive, calibrated, pessimistic := strings.Index(text, `"naive":`), strings.Index(text, `"calibrated":`), strings.Index(text, `"pessimistic":`)
+		Expect(naive).To(BeNumerically(">", 0), text)
+		Expect(naive).To(BeNumerically("<", calibrated), text)
+		Expect(calibrated).To(BeNumerically("<", pessimistic), text)
 	})
 
 	It("rejects calibration.yaml content JSON cannot carry", func() {
 		_, err := data.Load(fixture(edit{File: "calibration.yaml", Old: "project: rgw-go", New: "project: .inf"}))
-		Expect(err).To(MatchError(ContainSubstring("converting calibration.yaml to JSON: line 2:")))
+		Expect(err).To(MatchError(ContainSubstring("converting calibration.yaml to JSON: line 3:")))
 	})
 
 	DescribeTable("a missing required file",

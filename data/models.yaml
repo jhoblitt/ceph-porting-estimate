@@ -55,8 +55,12 @@ models:
     # $50.00 | cached input $1.00 | 30m write $12.50 | 12h write $25.00 |
     # Long context input $20.00 | output $75.00 | cached input $2.00 |
     # 30m write $25.00 | 12h write $50.00. Footnote: "Short context: ≤272K
-    # input tokens. Long context: >272K input tokens." The page does not define
-    # the write columns any further.
+    # input tokens. Long context: >272K input tokens." The model page,
+    # https://developers.openai.com/api/docs/models/gpt-6-astra (read
+    # 2026-11-14), says how the long-context columns apply: "Prompts with more
+    # than 272K input tokens are priced at 2x input and cache rates and 1.5x
+    # output for the full request." It also gives "Maximum input tokens:
+    # 922,000".
     usd_per_mtok:
       input: 10
       cache_write_short: 12.50   # "Short context 30m write"

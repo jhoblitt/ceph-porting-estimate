@@ -255,6 +255,15 @@
         "blank": 450,
         "bytes": 239000,
         "unavailable_nested": 1
+      },
+      "submodule_own": {
+        "available": true,
+        "files": 12,
+        "code": 5300,
+        "comment": 520,
+        "blank": 410,
+        "bytes": 209000,
+        "unavailable_nested": 0
       }
     },
     {
@@ -296,6 +305,15 @@
         "blank": 50,
         "bytes": 25000,
         "unavailable_nested": 0
+      },
+      "submodule_own": {
+        "available": false,
+        "files": 4,
+        "code": 800,
+        "comment": 60,
+        "blank": 50,
+        "bytes": 25000,
+        "unavailable_nested": 0
       }
     },
     {
@@ -326,7 +344,8 @@
           "note": "not needed in wasm"
         }
       },
-      "submodule_size": null
+      "submodule_size": null,
+      "submodule_own": null
     }
   ],
   "models": [
@@ -399,8 +418,8 @@
     },
     "params": {
       "expansion": {
-        "value": 1.4,
-        "measured": true,
+        "value": 1.9048,
+        "measured": false,
         "source": "calibration.yaml",
         "reason": "rgw-go product Go over replaced C++"
       },
@@ -411,25 +430,25 @@
         "reason": "rgw-go test Go over product Go"
       },
       "overhead": {
-        "value": 3.1,
+        "value": 4,
         "measured": true,
         "source": "calibration.yaml",
         "reason": "output tokens over surviving Go"
       },
       "uncached_per_output": {
-        "value": 0.008,
+        "value": 0.01,
         "measured": true,
         "source": "calibration.yaml",
         "reason": "rgw-go uncached input ratio"
       },
       "cache_write_per_output": {
-        "value": 25.3,
+        "value": 25,
         "measured": true,
         "source": "calibration.yaml",
         "reason": "rgw-go cache write ratio"
       },
       "cache_read_per_output": {
-        "value": 1249,
+        "value": 1250,
         "measured": true,
         "source": "calibration.yaml",
         "reason": "rgw-go cache read ratio"
@@ -442,31 +461,31 @@
       },
       "difficulty": {
         "config": {
-          "value": 0.1,
+          "value": 0.09091,
           "measured": false,
           "source": "assumption",
           "reason": "config is mostly copied"
         },
         "glue": {
-          "value": 0.5,
+          "value": 0.4545,
           "measured": false,
           "source": "assumption",
           "reason": "glue is thin"
         },
         "standard": {
-          "value": 1,
+          "value": 0.9091,
           "measured": false,
           "source": "assumption",
           "reason": "the calibration baseline"
         },
         "hard": {
-          "value": 1.5,
+          "value": 1.3636,
           "measured": false,
           "source": "assumption",
           "reason": "subtle invariants"
         },
         "extreme": {
-          "value": 2,
+          "value": 1.8182,
           "measured": false,
           "source": "assumption",
           "reason": "wire and disk formats"
@@ -573,16 +592,11 @@
       "include_adjacent": false,
       "clean_break": false
     },
+    "default_scenario": "calibrated",
     "scenarios": {
-      "calibrated": {
-        "label": "Calibrated",
-        "description": "The rgw-go measurement applied as measured.",
-        "overrides": {},
-        "scale": {},
-        "toggles": {}
-      },
       "naive": {
         "label": "Naive",
+        "role": "reference",
         "description": "One pass over the source.",
         "overrides": {
           "difficulty.hard": 1,
@@ -592,41 +606,218 @@
         "scale": {},
         "toggles": {}
       },
+      "calibrated": {
+        "label": "Calibrated",
+        "role": "central",
+        "description": "The rgw-go measurement applied as measured.",
+        "overrides": {},
+        "scale": {},
+        "toggles": {}
+      },
       "pessimistic": {
         "label": "Pessimistic",
+        "role": "high",
         "description": "Hard code is harder and adjacent work counts.",
         "overrides": {
           "difficulty.extreme": 3,
-          "long_context_share.cache_read": 0.5
+          "expansion": 2.381,
+          "long_context_share.cache_read": 0.5,
+          "long_context_share.cache_write": 0.5,
+          "long_context_share.output": 0.5,
+          "long_context_share.uncached": 0.5
         },
         "scale": {
+          "cache_read_per_output": 1.1,
+          "cache_write_per_output": 1.2,
           "overhead": 1.25
         },
         "toggles": {
           "include_adjacent": true
         }
       }
-    },
-    "default_scenario": "calibrated"
+    }
   },
   "calibration": {
     "project": "rgw-go",
     "measured_on": "2026-11-13",
-    "tokens": {
-      "output": 45010000,
-      "cache_read": 56213600000
-    },
-    "sizes": [
-      {
-        "lang": "go",
-        "kind": "product",
-        "bytes": 1200000
+    "measurement": {
+      "model_id": "opus-5-5",
+      "port": {
+        "uncached": 0.0304,
+        "cache_write": 76,
+        "cache_read": 3800,
+        "output": 3.04
       },
-      {
-        "lang": "go",
-        "kind": "test",
-        "bytes": 800000
+      "adjacent": [
+        {
+          "scope": "reproduction",
+          "uncached": 0.00304,
+          "cache_write": 5.6,
+          "cache_read": 300,
+          "output": 0.204
+        },
+        {
+          "scope": "hook",
+          "uncached": null,
+          "cache_write": 2,
+          "cache_read": 80,
+          "output": 0.1
+        }
+      ]
+    },
+    "measurement_detail": {
+      "cache_write_ttl_tokens": {
+        "total": 1000,
+        "long_1h": 500,
+        "long_share": 0.5
+      },
+      "prompt_size_tokens": {
+        "share_over_threshold": {
+          "uncached": 0.5,
+          "cache_write": 0.5,
+          "cache_read": 0.5,
+          "output": 0.5
+        },
+        "long_context_scenarios": [
+          "pessimistic"
+        ]
       }
-    ]
+    },
+    "sizes": {
+      "rgw_go": {
+        "product_go": {
+          "bytes": 1400000
+        },
+        "test_go": {
+          "bytes": 1050000
+        },
+        "tooling_go": {
+          "bytes": 210000
+        }
+      },
+      "source": {
+        "by_language": {
+          "src_rgw": {
+            "cpp": 1280000,
+            "other": 35000
+          },
+          "src_cls": {
+            "python": 38000
+          }
+        },
+        "tokens": 420000
+      }
+    },
+    "coverage": {
+      "value": 0.5,
+      "low": 0.4,
+      "high": 0.625,
+      "byte_classification": {
+        "ported_bytes": 676500,
+        "ported_share_bytes": 0.5
+      },
+      "scenario_end": {
+        "pessimistic": "low"
+      }
+    },
+    "ported_mix": {
+      "features": [
+        {
+          "feature": "rgw/frontend",
+          "difficulty": "standard",
+          "bytes": 541200
+        },
+        {
+          "feature": "rgw/admin",
+          "difficulty": "hard",
+          "bytes": 135300
+        }
+      ],
+      "share_by_difficulty": {
+        "standard": 0.8,
+        "hard": 0.2
+      },
+      "relative_difficulty": {
+        "config": 0.1,
+        "glue": 0.5,
+        "standard": 1,
+        "hard": 1.5,
+        "extreme": 2
+      },
+      "mean_relative_difficulty": 1.1
+    },
+    "phases": {
+      "rows": [
+        {
+          "phase": 0,
+          "uncached_tokens": 1000,
+          "cache_write": 20,
+          "cache_read": 250,
+          "output": 3,
+          "go_bytes": {
+            "product": 150000,
+            "test": 200000
+          }
+        },
+        {
+          "phase": 1,
+          "uncached_tokens": 2000,
+          "cache_write": 60,
+          "cache_read": 550,
+          "output": 5,
+          "go_bytes": {
+            "product": 300000,
+            "test": 400000
+          }
+        }
+      ],
+      "derived": {
+        "phase_0": {
+          "go_bytes_added": 350000,
+          "output_per_go_token": 30,
+          "cache_read_per_output": 83.333,
+          "cache_write_per_output": 6.6667
+        },
+        "phase_1": {
+          "go_bytes_added": 350000,
+          "output_per_go_token": 50,
+          "cache_read_per_output": 110,
+          "cache_write_per_output": 12
+        },
+        "all_phases": {
+          "go_bytes_added": 700000,
+          "output_per_go_token": 40,
+          "cache_read_per_output": 100,
+          "cache_write_per_output": 10
+        }
+      },
+      "scenario_phase": {
+        "pessimistic": 1
+      }
+    },
+    "derived": {
+      "bytes_per_token_go": 3.5,
+      "product_go_tokens": 400000,
+      "test_go_tokens": 300000,
+      "tooling_go_tokens": 60000,
+      "surviving_go_tokens": 760000,
+      "uncached_per_output": 0.01,
+      "cache_write_per_output": 25,
+      "cache_read_per_output": 1250,
+      "test_ratio": 0.9,
+      "overhead": 4,
+      "expansion": {
+        "central": 1.9048,
+        "at_low_coverage": 2.381,
+        "at_high_coverage": 1.5238
+      },
+      "adjacent_uplift": {
+        "uncached": 0.1,
+        "cache_write": 0.1,
+        "cache_read": 0.1,
+        "output": 0.1
+      },
+      "long_cache_write_share": 0.5
+    }
   }
 }
