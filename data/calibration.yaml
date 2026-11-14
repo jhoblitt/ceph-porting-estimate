@@ -1,0 +1,174 @@
+# calibration.yaml — the rgw-go measurements the calibrated preset is derived
+# from. Free-form (docs/cost-model.md, "YAML shapes"). Token volumes are in millions
+# unless a key says otherwise. Every derived ratio carries its arithmetic.
+
+project:
+  name: rgw-go
+  repo: jhoblitt/rgw-go
+  commit: 239f789
+  commit_date: "2026-11-13"
+  ports: { repo: ceph/ceph, tag: v19.2.7, paths: [src/rgw, "src/cls (RGW classes, see source)"] }
+
+measurement:
+  source: >-
+    aggregated by script from Claude Code transcripts by the rgw-go session,
+    2026-09-25 to 2026-11-13; 98% of the port's calls ran on Claude Opus 5.5
+  supplied_on: "2026-11-13"
+  unit: millions of tokens
+  # Columns: calls, uncached input, cache write, cache read, output.
+  # null = "—" in the supplied table; approx: true = values given with "~".
+  port:
+    scope: "The port: controller + 984 subagents"
+    calls: 163109
+    uncached: 0.35
+    cache_write: 1137.2
+    cache_read: 56213.6
+    output: 45.01
+  roles:
+    - { scope: controller,                                  calls: 15574, uncached: 0.04, cache_write: 82.8,  cache_read: 7881.0,  output: 14.60 }
+    - { scope: "implementation (411 agents)",               calls: 99341, uncached: 0.20, cache_write: 785.2, cache_read: 37650.4, output: 22.27 }
+    - { scope: "review (475 agents)",                       calls: 35605, uncached: 0.08, cache_write: 171.4, cache_read: 6733.0,  output: 5.79 }
+    - { scope: "research, planning, triage (47 agents)",    calls: 4712,  uncached: 0.02, cache_write: 31.9,  cache_read: 1451.6,  output: 1.36 }
+    - { scope: "upstream-defect triage (39 agents)",        calls: 5410,  uncached: 0.01, cache_write: 23.6,  cache_read: 1558.4,  output: 0.73 }
+    - { scope: "unclassified (12 agents)",                  calls: 2467,  uncached: 0.01, cache_write: 42.3,  cache_read: 939.3,   output: 0.25 }
+  adjacent:
+    - { scope: "defect reproduction",     calls: 24559, uncached: 0.05, cache_write: 114.4, cache_read: 4788.2, output: 9.36 }
+    - { scope: "security-review hook",    calls: 6700,  uncached: null, cache_write: 61,    cache_read: 217,    output: 4.2, approx: true }
+    - { scope: "upstream PR servicing",   calls: 509,   uncached: null, cache_write: 2.1,   cache_read: 74.9,   output: 0.26 }
+    - { scope: "feasibility study",       calls: 1250,  uncached: null, cache_write: 4.1,   cache_read: 286.1,  output: 0.62 }
+  tasks: 268
+  review_passes: 455
+  review_passes_per_task: 1.70   # 455 / 268 = 1.698
+  known_gaps:
+    - compaction and advisor calls may be absent from the transcripts
+    - server-side web tools are not counted
+    - role assignment is by keyword
+
+# Second aggregation by the rgw-go session, relayed by the coordinator on
+# 2026-11-14. Provenance: "rgw-go session, aggregated by script from its Claude
+# Code transcripts, cut at 2026-11-14T00:31Z, 163,112 calls; cache-write total
+# 1,137,169,701 tokens reproduces the first aggregation".
+measurement_detail:
+  source: >-
+    rgw-go session, aggregated by script from its Claude Code transcripts, cut at
+    2026-11-14T00:31Z, 163,112 calls
+  calls: 163112
+  cache_write_ttl_tokens:            # exact token counts, not millions
+    total: 1137169701
+    short_5m: 1054369614             # 92.7%
+    long_1h: 82800087                # 7.3%
+    long_share: 0.0728               # 82,800,087 / 1,137,169,701 = 0.07281
+  prompt_size_tokens:                # prompt = uncached + cache write + cache read, per call
+    threshold: 272000                # GPT-6 Astra's long-context threshold
+    calls_over_threshold: 87888      # of 163,112 = 53.9%
+    share_over_threshold:            # share of each category's tokens in calls over the threshold
+      uncached: 0.550
+      cache_write: 0.748
+      cache_read: 0.797
+      output: 0.699
+    distribution: { median: 297152, p90: 701003, p99: 924089, max: 968956, mean: 351608 }
+    # Cross-check: 57.35B input-side tokens / 163,109 calls = 351,605, against 351,608.
+    caveat: >-
+      Measured on a 1M-context Claude harness. A harness tuned to stay under
+      272K would have a different distribution.
+
+sizes:
+  method: >-
+    git objects only (ls-tree -r -l and cat-file --batch); bytes = blob size;
+    lines = newline count plus one for an unterminated last line, which matches
+    `git grep -c ''`
+  rgw_go:                            # at 239f789
+    product_go:  { bytes: 4681813,  lines: 124396, files: 516,   rule: "internal/ + cmd/ *.go, not *_test.go, no testdata/ component" }
+    test_go:     { bytes: 8820726,  lines: 189103, files: 654,   rule: "*_test.go anywhere, no testdata/ component" }
+    tooling_go:  { bytes: 898622,   lines: 25277,  files: 86,    rule: "hack/ *.go, not *_test.go, no testdata/ component" }
+    testdata:    { bytes: 15010530, lines: 332131, files: 14568, rule: "any file with a testdata/ path component" }
+    markdown:    { bytes: 8493606,  lines: 114984, files: 68,    rule: "*.md anywhere" }
+    other_go:    { bytes: 101002,   lines: 3453,   files: 15,    rule: "Go in none of the above (test/bench, test/gate, docs/benchmarks, .github/tools); not in H" }
+    # Cross-check with the session's figures:
+    # - product 124,396 matches exactly (git grep -I -c gives 516 files, 124,396 lines).
+    #   It includes internal/testutil (6,773 lines; the fake RADOS emulator
+    #   internal/testutil/fakerados is 6,362 of them) and internal/memstore (3,458).
+    # - test: the session's ~161k is the internal/ tests only (161,434). The brief's
+    #   rule adds hack/ 19,045, test/ 8,419 and docs/benchmarks 205 lines.
+    # - tooling 25,277 against ~25k.
+    # - 124,396 + 161,434 + 25,277 = 311,107 against the session's 311,194: an 87-line gap, unexplained.
+  source:                            # ceph v19.2.7
+    tag: v19.2.7
+    cls_classes: [rgw, rgw_gc, user, otp, lock, version, refcount, log, fifo, queue, 2pc_queue, timeindex, cmpomap]
+    cls_classes_reason: >-
+      The rgw-go session's list. It covers every class rgw-go has a client for
+      (rgw, rgw_gc, user, otp, lock, version, refcount) and the other classes
+      radosgw calls.
+    src_rgw: { bytes: 8919104, lines: 277907, files: 546, gitlinks: 0 }
+    src_cls: { bytes: 725987,  lines: 25231 }
+    total:   { bytes: 9645091, lines: 303138 }   # matches the session's 303,138 lines
+    by_language:                     # bytes
+      src_rgw: { cpp: 8838935, shell: 34597, cmake: 19527, other: 12481, python: 8004, markdown: 5560 }   # cpp = 6,181,711 sources + 2,657,224 headers
+      src_cls: { cpp: 725713, cmake: 274 }                                                               # cpp = 469,979 sources + 255,734 headers
+    cpp_bytes_per_line:              # src/rgw .cc/.cpp/.h/.hh, physical lines
+      value: 32.10                   # 8,838,935 B / 275,377 lines
+    tokens: 2756184                  # Σ bytes ÷ bytes_per_token (assumptions.yaml): cpp and other 3.5, shell 3.3, cmake 3.4, python 3.7, markdown 4.0
+
+coverage:
+  value: 0.40
+  low: 0.35
+  high: 0.47
+  measured: false
+  source: rgw-go session's classification
+  reason: >-
+    The rgw-go session classified the 303,138-line source file by file against
+    its exclusions list and phase plan: about 40% is ported at 239f789. About
+    39–41% is excluded by design and about 6.6% is phase 3, not started. Of the
+    in-scope ~51%, phase 2 has 143 of 176 tasks merged. The low end counts the
+    SAL layers rgw-go replaced with a smaller design as unported. The high end
+    counts them as covered, and the class emulator as a partial port.
+  breakdown:
+    excluded_by_design: "~39–41%: multisite 12.6% (+~1.5% misfiled in-scope); non-RADOS SAL drivers 12.2% (+dbstore glue); radosgw-admin 4.5%; librgw/NFS 2.2%; Swift 2.2%; Lua, Keystone/LDAP, KMS, Kafka/AMQP, reshard worker, cloud transition, S3 Select, D3N ~4%; jwt-cpp + picojson 1.0%"
+    phase_3_not_started: "~6.6%: IAM/STS/roles/OIDC 3.6%, notifications 2.4%, ops log/counters/ratelimit 0.6%"
+    in_scope_phases_0_to_2: "~51%; phase 2 143 of 176 tasks merged (~81%); ~21k in-scope lines are OSD-side class code, of which rgw-go ports the client side and encodings"
+  caution: >-
+    Most of the ~40% that rgw-go excludes is multisite and the other storage
+    drivers, which a full Ceph port could not skip. E is calibrated on the
+    ported share only.
+  cross_check:
+    by: data-draft author, independent per-file rules (see NOTES.md); not averaged in
+    ported_share_bytes: 0.370
+    ported_share_lines: 0.384
+    agreement: "inside the session's 0.35–0.47 range, 2–3 points under its central 0.40"
+
+derived:
+  bytes_per_token_go: 3.5            # assumptions.yaml bytes_per_token.go
+  product_go_tokens: 1337661         # 4,681,813 / 3.5
+  test_go_tokens: 2520207            # 8,820,726 / 3.5
+  tooling_go_tokens: 256749          # 898,622 / 3.5
+  surviving_go_tokens: 4114617       # 1,337,661 + 2,520,207 + 256,749
+  # u, w, r: each input category ÷ output, port row
+  uncached_per_output: 0.007776      # 0.35 / 45.01
+  cache_write_per_output: 25.266     # 1,137.2 / 45.01 = 25.2655
+  cache_read_per_output: 1248.91     # 56,213.6 / 45.01 = 1,248.914
+  # T = (test + tooling Go tokens) ÷ product Go tokens
+  test_ratio: 2.0760                 # (2,520,207 + 256,749) / 1,337,661 = 2.07598
+  # H = output ÷ all surviving Go tokens
+  overhead: 10.939                   # 45.01e6 / 4,114,617 = 10.9390
+  # E = product Go tokens ÷ (source tokens × coverage)
+  expansion:
+    central: 1.2133                  # 1,337,661 / (2,756,184 × 0.40) = 1.21332
+    at_low_coverage: 1.3867          # 1,337,661 / (2,756,184 × 0.35) = 1.38665
+    at_high_coverage: 1.0326         # 1,337,661 / (2,756,184 × 0.47) = 1.03261
+  # adjacent_uplift = Σ adjacent rows ÷ port row; "—" counted as 0, "~" values used as given
+  adjacent_uplift:
+    uncached: 0.1429                 # 0.05 / 0.35
+    cache_write: 0.1597              # (114.4 + 61 + 2.1 + 4.1 = 181.6) / 1,137.2
+    cache_read: 0.0955               # (4,788.2 + 217 + 74.9 + 286.1 = 5,366.2) / 56,213.6
+    output: 0.3208                   # (9.36 + 4.2 + 0.26 + 0.62 = 14.44) / 45.01
+  long_cache_write_share: 0.0728     # 82,800,087 / 1,137,169,701
+  sanity_opus_5_5_usd:               # port row at Opus 5.5 list prices (models.yaml, read 2026-11-14)
+    # uncached 0.35 × $4 = 1.40; cache read 56,213.6 × $0.20 = 11,242.72;
+    # output 45.01 × $20 = 900.20; cache write 1,137.2 × $5 = 5,686.00 (5m) or × $8 = 9,097.60 (1h)
+    measured_ttl_split: 18079        # cache write at (0.9272 × $5 + 0.0728 × $8) = $5.218/MTok → 5,934.6
+    all_5m: 17830
+    all_1h: 21242
+    per_product_go_line:             # ÷ 124,396 lines
+      measured_ttl_split: 0.1453
+      all_5m: 0.1433
+      all_1h: 0.1708

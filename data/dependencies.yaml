@@ -1,0 +1,1580 @@
+# dependencies.yaml — what a port does about each library Ceph leans on.
+#
+# One entry per vendored submodule (or group of them) and per significant
+# system or Python dependency. For each target:
+#   strategy         native   a maintained package in the target ecosystem (or its
+#                             standard library) covers what Ceph uses; costs nothing
+#                    bindings the library is kept and called through cgo/FFI
+#                    port     the needed part is rewritten in the target language
+#                    drop     a rewrite does not carry it, or the target cannot host it
+#   package          the package, crate or binding relied on, where there is one
+#   sloc_equivalent  lines of work the strategy leaves; this is what the model costs
+#   difficulty       how hard that work is (same scale as the taxonomy)
+#   note             the reasoning, including anything not verified
+# wasm is a Rust port constrained to build for WASM/WASI.
+dependencies:
+  - id: rocksdb
+    name: RocksDB
+    used_for: BlueStore metadata KV store (via BlueFS/BlueRocksEnv) and monitor store
+    submodules:
+      - src/rocksdb
+    targets:
+      go:
+        strategy: bindings
+        package: github.com/linxGnu/grocksdb
+        sloc_equivalent: 2500
+        difficulty: hard
+        note: grocksdb is a maintained cgo binding; ~2.5k lines of glue to expose a custom Env/FileSystem
+          over BlueFS, merge operators and column-family sharding. cockroachdb/pebble is native but not
+          RocksDB-format compatible with existing OSDs.
+      rust:
+        strategy: bindings
+        package: rocksdb (rust-rocksdb)
+        sloc_equivalent: 2500
+        difficulty: hard
+        note: Maintained binding, but a custom Env/FileSystem for BlueFS is not exposed by the crate;
+          ~2.5k lines of FFI glue to add it.
+      wasm:
+        strategy: native
+        package: fjall
+        sloc_equivalent: 0
+        difficulty: hard
+        note: RocksDB does not build for WASI (threads, mmap); a pure-Rust LSM (fjall, WASI support unverified)
+          replaces it at the cost of on-disk compatibility, and BlueFS on raw block is lost.
+  - id: seastar
+    name: Seastar
+    used_for: Shard-per-core async runtime for the Crimson OSD (futures, reactor, networking, DPDK/io_uring)
+    submodules:
+      - src/seastar
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: extreme
+        note: Crimson async model maps to goroutines; no shard-per-core reactor is carried, the cost lives
+          in the Crimson port itself.
+      rust:
+        strategy: native
+        package: compio
+        sloc_equivalent: 0
+        difficulty: extreme
+        note: compio, a maintained thread-per-core io_uring runtime, is the nearest equivalent (glommio
+          has had no release since 2024-03); tokio is the conservative fallback.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: extreme
+        note: No reactor or io_uring under WASI; Crimson would run on a single-threaded async executor
+          with host-provided I/O.
+  - id: spdk
+    name: SPDK
+    used_for: User-space NVMe driver backend for BlueStore (NVMEDevice)
+    submodules:
+      - src/spdk
+    targets:
+      go:
+        strategy: bindings
+        package: null
+        sloc_equivalent: 1000
+        difficulty: hard
+        note: No maintained Go SPDK binding known; cgo glue for the ~1k-line NVMEDevice surface (probe,
+          qpairs, submit/complete).
+      rust:
+        strategy: bindings
+        package: null
+        sloc_equivalent: 1000
+        difficulty: hard
+        note: No established crate, only young SPDK FFI crates first released in 2026 (ironspdk, spdk-io);
+          ~1k lines of FFI glue over spdk_nvme.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: Kernel-bypass NVMe is impossible under WASI; capability lost.
+  - id: isa-l
+    name: Intel ISA-L
+    used_for: Erasure-code plugin (isa) Reed-Solomon/Cauchy kernels
+    submodules:
+      - src/isa-l
+    targets:
+      go:
+        strategy: port
+        package: github.com/klauspost/reedsolomon
+        sloc_equivalent: 400
+        difficulty: hard
+        note: klauspost/reedsolomon supplies SIMD GF(2^8) kernels; ISA-L matrix generation (gf_gen_rs/cauchy1)
+          must be reproduced (~400 lines) for chunk compatibility and passed in via WithCustomMatrix.
+      rust:
+        strategy: port
+        package: null
+        sloc_equivalent: 1500
+        difficulty: hard
+        note: No usable crate (reed-solomon-erasure unmaintained since 2022; reed-solomon-simd uses
+          GF(2^16) codes, not chunk-compatible); a GF(2^8) region-multiply core plus ISA-L matrix
+          generation must be written.
+      wasm:
+        strategy: port
+        package: null
+        sloc_equivalent: 1500
+        difficulty: hard
+        note: Same port as Rust with scalar or wasm simd128 kernels; throughput well below AVX2/GFNI.
+  - id: jerasure
+    name: Jerasure + GF-Complete
+    used_for: 'Erasure-code plugin (jerasure) techniques: reed_sol_van, reed_sol_r6_op, cauchy_orig/good,
+      liberation, blaum_roth, liber8tion'
+    submodules:
+      - src/erasure-code/jerasure/jerasure
+      - src/erasure-code/jerasure/gf-complete
+    targets:
+      go:
+        strategy: port
+        package: github.com/klauspost/reedsolomon
+        sloc_equivalent: 5000
+        difficulty: hard
+        note: The WithJerasureMatrix option reproduces jerasure's reed_sol_van matrix only;
+          Cauchy and bit-matrix techniques with their packet schedules must be ported bit-exact (~5k of
+          jerasure.c/cauchy.c/liberation.c plus GF w8/w16/w32 paths).
+      rust:
+        strategy: port
+        package: null
+        sloc_equivalent: 5500
+        difficulty: hard
+        note: No crate implements jerasure bit-matrix techniques; port the jerasure core and the GF-Complete
+          word sizes Ceph uses.
+      wasm:
+        strategy: port
+        package: null
+        sloc_equivalent: 5500
+        difficulty: hard
+        note: As Rust, scalar kernels only.
+  - id: zstd
+    name: Zstandard
+    used_for: Compressor plugin (BlueStore, messenger and RGW compression)
+    submodules:
+      - src/zstd
+    targets:
+      go:
+        strategy: native
+        package: github.com/klauspost/compress/zstd
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure-Go encoder/decoder, maintained.
+      rust:
+        strategy: bindings
+        package: zstd
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained crate binding libzstd; ruzstd is a pure-Rust alternative.
+      wasm:
+        strategy: native
+        package: ruzstd
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Pure Rust; decoder mature, encoder limited (coverage of the levels Ceph uses unverified);
+          zstd-sys may also compile to wasm32-wasi (unverified).
+  - id: xxhash
+    name: xxHash
+    used_for: BlueStore checksums (xxhash32/64) and RGW checksum digests
+    submodules:
+      - src/xxHash
+    targets:
+      go:
+        strategy: native
+        package: github.com/cespare/xxhash/v2
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Stable pure-Go XXH64 (feature-complete, no commits since 2024-07); XXH3 via zeebo/xxh3; no
+          maintained XXH32 package exists, so XXH32 (~100 lines) is written in-tree.
+      rust:
+        strategy: native
+        package: xxhash-rust
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure-Rust XXH32/64/3.
+      wasm:
+        strategy: native
+        package: xxhash-rust
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust, WASI-safe.
+  - id: blake3
+    name: BLAKE3
+    used_for: RGW checksum algorithm (x-amz-checksum / cksum)
+    submodules:
+      - src/BLAKE3
+    targets:
+      go:
+        strategy: native
+        package: lukechampine.com/blake3
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure-Go implementation (last release 2025-05; zeebo/blake3 is a more recently active
+          alternative).
+      rust:
+        strategy: native
+        package: blake3
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official crate.
+      wasm:
+        strategy: native
+        package: blake3
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official crate builds for wasm32.
+  - id: isa-l-crypto
+    name: Intel ISA-L crypto
+    used_for: Accelerated AES (crypto plugin) for RGW server-side encryption
+    submodules:
+      - src/crypto/isa-l/isa-l_crypto
+    targets:
+      go:
+        strategy: native
+        package: crypto/aes
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Standard library AES uses AES-NI.
+      rust:
+        strategy: native
+        package: aes / aes-gcm (RustCrypto)
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Hardware-accelerated where available.
+      wasm:
+        strategy: native
+        package: aes / aes-gcm (RustCrypto)
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Software AES only; slower.
+  - id: qat
+    name: Intel QAT (qatlib, QATzip) and UADK
+    used_for: Hardware offload for compression and encryption
+    submodules:
+      - src/qatlib
+      - src/qatzip
+    targets:
+      go:
+        strategy: bindings
+        package: null
+        sloc_equivalent: 600
+        difficulty: standard
+        note: No maintained Go binding known; ~600 lines of cgo over the QATzip/qatlib session API mirroring
+          QatAccel.
+      rust:
+        strategy: bindings
+        package: null
+        sloc_equivalent: 600
+        difficulty: standard
+        note: No QAT or QATzip crate on crates.io; ~600 lines of FFI.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Hardware accelerator unavailable under WASI; capability lost.
+  - id: fmt
+    name: '{fmt}'
+    used_for: C++ string formatting used throughout
+    submodules:
+      - src/fmt
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: fmt package covers it.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: format! covers it.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: format! covers it.
+  - id: googletest
+    name: GoogleTest / GoogleMock
+    used_for: C++ unit-test framework
+    submodules:
+      - src/googletest
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: go test; gomock/testify for mocks.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: cargo test; mockall for mocks.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: cargo test under a WASI runtime.
+  - id: breakpad
+    name: Breakpad + linux-syscall-support
+    used_for: Minidump crash reporting
+    submodules:
+      - src/breakpad
+      - src/lss
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Go runtime tracebacks replace it.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Panic hooks and backtraces replace it.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Host runtime reports traps.
+  - id: blkin
+    name: blkin
+    used_for: Zipkin-style trace annotations over LTTng (WITH_BLKIN, off by default)
+    submodules:
+      - src/blkin
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Superseded by OpenTelemetry.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Superseded by OpenTelemetry.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Superseded by OpenTelemetry.
+  - id: opentelemetry
+    name: OpenTelemetry C++
+    used_for: Distributed tracing of OSD and RGW ops (jaeger tracing, WITH_JAEGER on)
+    submodules:
+      - src/jaegertracing/opentelemetry-cpp
+    targets:
+      go:
+        strategy: native
+        package: go.opentelemetry.io/otel
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official SDK.
+      rust:
+        strategy: native
+        package: opentelemetry
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official crates.
+      wasm:
+        strategy: native
+        package: opentelemetry
+        sloc_equivalent: 0
+        difficulty: standard
+        note: API works on WASI; exporters need wasi-http or a host shim (unverified).
+  - id: c-ares
+    name: c-ares
+    used_for: Async DNS resolution for Seastar/Crimson
+    submodules:
+      - src/c-ares
+    targets:
+      go:
+        strategy: native
+        package: net (Resolver)
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Standard library resolver.
+      rust:
+        strategy: native
+        package: hickory-resolver
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained async resolver.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: No raw DNS sockets assumed under WASI; resolution goes through the host (wasi-sockets ip-name-lookup).
+  - id: s3select
+    name: s3select
+    used_for: RGW S3 Select SQL engine over CSV/JSON/Parquet (Ceph-authored, header-only, Boost.Spirit
+      grammar)
+    submodules:
+      - src/s3select
+    targets:
+      go:
+        strategy: port
+        package: null
+        sloc_equivalent: 11000
+        difficulty: standard
+        note: Ceph-specific SQL dialect and semantics; port parser, operators, functions and CSV/JSON
+          readers (~11k lines); Parquet side via arrow-go.
+      rust:
+        strategy: port
+        package: sqlparser
+        sloc_equivalent: 9000
+        difficulty: standard
+        note: sqlparser-rs can replace the Spirit grammar (dialect fit unverified); evaluator, functions
+          and readers are still ported.
+      wasm:
+        strategy: port
+        package: sqlparser
+        sloc_equivalent: 9000
+        difficulty: standard
+        note: As Rust; pure computation, WASI-friendly.
+  - id: arrow-parquet
+    name: Apache Arrow / Parquet (with Thrift, RE2, utf8proc)
+    used_for: Parquet object reads for S3 Select; Arrow Flight in RGW (optional)
+    submodules:
+      - src/arrow
+      - src/utf8proc
+    targets:
+      go:
+        strategy: native
+        package: github.com/apache/arrow-go/v18
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Includes parquet (module path carries the /v18 major suffix); utf8proc normalisation via
+          golang.org/x/text.
+      rust:
+        strategy: native
+        package: arrow + parquet (arrow-rs)
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official Rust implementation.
+      wasm:
+        strategy: native
+        package: arrow + parquet (arrow-rs)
+        sloc_equivalent: 0
+        difficulty: standard
+        note: arrow-rs builds for wasm32 (some codecs feature-gated, unverified).
+  - id: libkmip
+    name: libkmip
+    used_for: KMIP client for RGW SSE-KMS key retrieval
+    submodules:
+      - src/libkmip
+    targets:
+      go:
+        strategy: native
+        package: github.com/ovh/kmip-go
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Maintained pure-Go KMIP client; ThalesGroup/kmip-go (formerly gemalto) is an alternative.
+      rust:
+        strategy: port
+        package: null
+        sloc_equivalent: 1500
+        difficulty: standard
+        note: kmip-protocol exists but is a self-described work-in-progress partial KMIP 1.0-1.2 client,
+          so it is not relied on; port TTLV encode/decode plus the Locate/Get/Create operations Ceph uses
+          (~1.5k lines).
+      wasm:
+        strategy: port
+        package: null
+        sloc_equivalent: 1500
+        difficulty: standard
+        note: As Rust; TLS socket via wasi-sockets or a host shim.
+  - id: librdkafka
+    name: librdkafka
+    used_for: Kafka push endpoint for RGW bucket notifications
+    submodules:
+      - src/librdkafka
+    targets:
+      go:
+        strategy: native
+        package: github.com/twmb/franz-go
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure-Go client; confluent-kafka-go is the cgo alternative.
+      rust:
+        strategy: bindings
+        package: rdkafka
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained binding.
+      wasm:
+        strategy: port
+        package: rskafka
+        sloc_equivalent: 800
+        difficulty: standard
+        note: librdkafka does not target WASI; pure-Rust rskafka (SASL/TLS coverage unverified) plus producer
+          glue.
+  - id: lancedb
+    name: LanceDB C bindings
+    used_for: Vector index store backing RGW S3 Vectors (optional)
+    submodules:
+      - src/rgw/lancedb-c
+    targets:
+      go:
+        strategy: bindings
+        package: github.com/lancedb/lancedb-go
+        sloc_equivalent: 500
+        difficulty: standard
+        note: A pre-1.0 official Go SDK (cgo over a prebuilt native library) exists; its coverage of what S3
+          Vectors needs is unchecked, so ~500 lines of cgo glue are kept as the estimate.
+      rust:
+        strategy: native
+        package: lancedb
+        sloc_equivalent: 0
+        difficulty: glue
+        note: LanceDB is written in Rust; use the crate directly.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: standard
+        note: LanceDB on WASI unverified (threads, object-store I/O); feature lost or host-shimmed.
+  - id: rook-client-python
+    name: rook-client-python
+    used_for: Generated Python types for Rook CRDs used by mgr/rook
+    submodules:
+      - src/pybind/mgr/rook/rook-client-python
+    targets:
+      go:
+        strategy: native
+        package: github.com/rook/rook/pkg/apis
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Rook publishes Go API types; use with client-go.
+      rust:
+        strategy: native
+        package: kube + kopium-generated types
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Types generated from the CRDs, not hand-written.
+      wasm:
+        strategy: native
+        package: kube + kopium-generated types
+        sloc_equivalent: 0
+        difficulty: standard
+        note: kube-rs transport on WASI needs wasi-http (unverified).
+  - id: nvmeof-gateway
+    name: ceph-nvmeof gateway
+    used_for: Separate NVMe-oF gateway project (Python + SPDK) carried for builds and containers
+    submodules:
+      - src/nvmeof/gateway
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Separate product reached over gRPC; not part of a Ceph core port.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Separate product reached over gRPC.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Separate product; SPDK not hostable.
+  - id: test-corpora
+    name: ceph-object-corpus and ceph-erasure-code-corpus
+    used_for: Encoded-object and EC-chunk corpora for encoding non-regression tests
+    submodules:
+      - ceph-object-corpus
+      - ceph-erasure-code-corpus
+    targets:
+      go:
+        strategy: native
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: 'Data, not code: reused unchanged to prove the port decodes existing encodings.'
+      rust:
+        strategy: native
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Data reused unchanged.
+      wasm:
+        strategy: native
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Data reused unchanged.
+  - id: boost-asio-beast
+    name: Boost.Asio / Boost.Beast
+    used_for: Async I/O for neorados, RGW Beast HTTP frontend, timers and strands
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: net, net/http
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Goroutines plus net/http replace Asio/Beast; RGW frontend semantics are re-expressed, not
+          bound.
+      rust:
+        strategy: native
+        package: tokio + hyper
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Maintained async runtime and HTTP stack.
+      wasm:
+        strategy: native
+        package: wstd / wasi-http
+        sloc_equivalent: 0
+        difficulty: hard
+        note: WASI p2 provides HTTP and sockets via the host; a server frontend must be hosted by the
+          runtime (maturity unverified).
+  - id: boost-context-coroutine
+    name: Boost.Context / Coroutine / spawn
+    used_for: Stackful coroutines for RGW request handling (optional_yield) and async helpers
+    submodules: []
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Goroutines are stackful; yield contexts disappear.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: standard
+        note: async/await replaces stackful coroutines; call sites are restructured in the RGW port.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: standard
+        note: async/await on a single-threaded executor.
+  - id: boost-misc
+    name: Boost (program_options, regex, date_time, iostreams, url, container, intrusive, lockfree, random,
+      spirit, etc.)
+    used_for: General utilities across all daemons; Spirit grammars in json_spirit and s3select
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: standard library (flag, regexp, time, net/url) + spf13/pflag
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Equivalents in the standard library or common packages; Spirit grammars are rewritten with
+          the code that uses them.
+      rust:
+        strategy: native
+        package: std + clap, regex, chrono, url, smallvec, crossbeam
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained crates cover each component.
+      wasm:
+        strategy: native
+        package: std + clap, regex, chrono, url, smallvec
+        sloc_equivalent: 0
+        difficulty: glue
+        note: All pure Rust; lock-free/threaded pieces become single-threaded.
+  - id: openssl
+    name: OpenSSL
+    used_for: TLS (RGW frontend, HTTP clients), msgr2 AES-GCM, hashing (MD5/SHA/HMAC) in ceph_crypto and
+      RGW auth
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: crypto/tls, crypto/*
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Standard library covers TLS, AES-GCM, SHA, HMAC, MD5.
+      rust:
+        strategy: native
+        package: rustls + RustCrypto (aes-gcm, sha2, hmac, md-5)
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained pure-Rust stack; openssl crate if FIPS is required.
+      wasm:
+        strategy: native
+        package: RustCrypto (aes-gcm, sha2, hmac, md-5) + rustls
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Primitives fine on WASI; TLS termination may move to the host.
+  - id: compression-libs
+    name: LZ4, Snappy, zlib, Brotli
+    used_for: Compressor plugins and RGW compression
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/pierrec/lz4/v4, github.com/klauspost/compress (snappy, zlib/flate), github.com/andybalholm/brotli
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure-Go and maintained; output must stay decodable by the C libraries (format-level compatible).
+      rust:
+        strategy: native
+        package: lz4_flex, snap, flate2, brotli
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure-Rust implementations.
+      wasm:
+        strategy: native
+        package: lz4_flex, snap, flate2 (miniz_oxide), brotli
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust, WASI-safe.
+  - id: rdma
+    name: RDMA verbs (libibverbs, librdmacm)
+    used_for: RDMA transport for the async messenger (WITH_RDMA on by default)
+    submodules: []
+    targets:
+      go:
+        strategy: bindings
+        package: null
+        sloc_equivalent: 1500
+        difficulty: hard
+        note: No maintained Go verbs binding known (unverified); cgo glue for QP/CQ/MR management and
+          rdmacm connection setup, ~1.5k lines.
+      rust:
+        strategy: bindings
+        package: sideway
+        sloc_equivalent: 1200
+        difficulty: hard
+        note: sideway wraps ibverbs and rdmacm (rdma-sys is unmaintained since 2023); safe wrapper plus
+          messenger glue ~1.2k lines.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: RDMA is unavailable under WASI; capability lost.
+  - id: dpdk
+    name: DPDK
+    used_for: User-space networking for the messenger and Seastar (off by default)
+    submodules: []
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: Experimental path; kernel TCP only.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: Experimental path; kernel TCP only.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: Kernel-bypass networking impossible under WASI; capability lost.
+  - id: liburing
+    name: liburing
+    used_for: io_uring block I/O backend for BlueStore KernelDevice and Seastar
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: golang.org/x/sys/unix
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Pread/pwrite with O_DIRECT from goroutines replaces io_uring batching; Go io_uring packages
+          (go-uring, iouring-go, giouring) have had no commits since 2025-05 or earlier.
+      rust:
+        strategy: native
+        package: io-uring
+        sloc_equivalent: 0
+        difficulty: standard
+        note: tokio-rs io-uring crate, maintained.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: io_uring is a kernel interface not exposed by WASI; block I/O needs a host shim.
+  - id: libaio
+    name: libaio
+    used_for: Default Linux AIO backend for BlueStore KernelDevice
+    submodules: []
+    targets:
+      go:
+        strategy: port
+        package: golang.org/x/sys/unix
+        sloc_equivalent: 400
+        difficulty: standard
+        note: No maintained package known; ~400 lines of io_setup/io_submit/io_getevents syscall wrappers
+          (no cgo), or reuse the goroutine pread path.
+      rust:
+        strategy: native
+        package: io-uring
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Substitute io_uring for Linux AIO rather than binding libaio.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: Kernel AIO unavailable under WASI; block I/O needs a host shim.
+  - id: fuse
+    name: FUSE (libfuse3)
+    used_for: ceph-fuse, rbd-fuse and FuseStore user-space mounts
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/hanwen/go-fuse/v2
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Maintained pure-Go FUSE protocol implementation with a low-level API.
+      rust:
+        strategy: native
+        package: fuser
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Maintained pure-Rust FUSE implementation.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: /dev/fuse is a kernel interface; mounts lost or require a host shim.
+  - id: libcryptsetup
+    name: libcryptsetup
+    used_for: LUKS1/LUKS2 header format and load for librbd client-side encryption
+    submodules: []
+    targets:
+      go:
+        strategy: port
+        package: null
+        sloc_equivalent: 1200
+        difficulty: hard
+        note: anatol/luks.go opens LUKS volumes but a pure-Go header writer is unverified; port header
+          parse/format, PBKDF2/Argon2 key slots and AF splitter (~1.2k lines) using x/crypto.
+      rust:
+        strategy: bindings
+        package: libcryptsetup-rs
+        sloc_equivalent: 0
+        difficulty: hard
+        note: libcryptsetup-rs is a maintained binding to the same C library librbd uses today, so the
+          LUKS header code is called, not rewritten. A pure-Rust route would mean porting it (~1.2k lines),
+          as the luks2 crate has been unmaintained since 2021.
+      wasm:
+        strategy: port
+        package: null
+        sloc_equivalent: 1200
+        difficulty: hard
+        note: As Rust; pure computation over image bytes, WASI-safe.
+  - id: libnbd
+    name: libnbd
+    used_for: NBD source for librbd live migration
+    submodules: []
+    targets:
+      go:
+        strategy: bindings
+        package: libguestfs.org/libnbd
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Upstream libnbd ships Go bindings (cgo).
+      rust:
+        strategy: bindings
+        package: libnbd (in-tree rust/ crate, not on crates.io)
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Upstream libnbd ships Rust bindings in its source tree; they are not published on crates.io, so
+          they are consumed as a git or path dependency.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Requires native library; migration-from-NBD lost or provided by host.
+  - id: linux-system
+    name: Linux system libraries (libudev, libblkid, keyutils, libnuma, libcap/libcap-ng, xfsprogs headers,
+      libnl, smartmontools)
+    used_for: Device discovery and properties, kernel keyring for krbd/mount secrets, NUMA pinning, privilege
+      drop, XFS ioctls
+    submodules: []
+    targets:
+      go:
+        strategy: port
+        package: golang.org/x/sys/unix
+        sloc_equivalent: 800
+        difficulty: standard
+        note: keyctl, ioctls, capabilities and sched_setaffinity are in x/sys/unix; udev/blkid queries
+          are reimplemented over sysfs and /run/udev (~800 lines).
+      rust:
+        strategy: native
+        package: nix, udev, linux-keyutils, caps
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Crates cover each (udev last released 2025-01); libblkid-sys and blkid crates are unmaintained,
+          so blkid lookups come from udev properties or sysfs.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Kernel and device interfaces not available under WASI; needs host shim.
+  - id: lttng
+    name: LTTng-UST, Babeltrace, systemtap SDT
+    used_for: Static tracepoints (OSD, BlueStore, librados, librbd) and rbd-replay trace parsing
+    submodules: []
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Replaced by OpenTelemetry/pprof; rbd-replay would need a different trace source.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Replaced by the tracing crate (usdt crate if SDT probes are wanted).
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: No user-space tracer under WASI.
+  - id: allocators
+    name: tcmalloc (gperftools) / jemalloc
+    used_for: Memory allocator and heap profiling for OSD/MON (heap admin commands)
+    submodules: []
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Go GC runtime; pprof replaces heap profiling. Memory-target autotuning must be redesigned
+          against GC.
+      rust:
+        strategy: native
+        package: tikv-jemallocator
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained jemalloc binding with profiling hooks.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: WASM linear memory with the default allocator.
+  - id: libcurl
+    name: libcurl
+    used_for: RGW outbound HTTP (multisite sync, Keystone, Vault, OPA, HTTP notifications)
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: net/http
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Standard library.
+      rust:
+        strategy: native
+        package: reqwest
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained HTTP client.
+      wasm:
+        strategy: native
+        package: wstd (wasi:http)
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Outbound HTTP via the WASI p2 host interface through wstd (waki has been inactive since
+          2024-12).
+  - id: expat
+    name: Expat (+ libxml2)
+    used_for: RGW S3 XML request parsing (RGWXMLParser)
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: encoding/xml
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Standard library streaming parser.
+      rust:
+        strategy: native
+        package: quick-xml
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained pure-Rust parser.
+      wasm:
+        strategy: native
+        package: quick-xml
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust.
+  - id: json-libs
+    name: RapidJSON, nlohmann/json, json_spirit
+    used_for: JSON parsing in RGW (S3 Select, policies, notifications) and common
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: encoding/json
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Standard library.
+      rust:
+        strategy: native
+        package: serde_json
+        sloc_equivalent: 0
+        difficulty: glue
+        note: De facto standard.
+      wasm:
+        strategy: native
+        package: serde_json
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust.
+  - id: lua
+    name: Lua 5.3+ (+ LuaRocks)
+    used_for: RGW request scripting, cls_lua object class and MDS Mantle balancer
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/yuin/gopher-lua
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Pure-Go VM implements Lua 5.1 only; scripts relying on 5.3+ semantics (integers, bit ops)
+          break and LuaRocks C modules are lost.
+      rust:
+        strategy: bindings
+        package: mlua
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained binding that can vendor Lua 5.3/5.4.
+      wasm:
+        strategy: bindings
+        package: mlua
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Vendored Lua C compiled to wasm32-wasi (unverified); C rock packages lost.
+  - id: liboath
+    name: liboath
+    used_for: RGW MFA (TOTP) verification
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/pquerna/otp
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained TOTP/HOTP package.
+      rust:
+        strategy: native
+        package: totp-rs
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained crate.
+      wasm:
+        strategy: native
+        package: totp-rs
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust.
+  - id: openldap
+    name: OpenLDAP (+ GSSAPI/Kerberos optional)
+    used_for: RGW LDAP authentication
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/go-ldap/ldap/v3
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained pure-Go client.
+      rust:
+        strategy: native
+        package: ldap3
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained async client.
+      wasm:
+        strategy: native
+        package: ldap3
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Needs TCP via wasi-sockets (unverified on WASI).
+  - id: rabbitmq-c
+    name: rabbitmq-c (librabbitmq)
+    used_for: AMQP push endpoint for RGW bucket notifications
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/rabbitmq/amqp091-go
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained by the RabbitMQ team.
+      rust:
+        strategy: native
+        package: lapin
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained AMQP 0.9.1 client.
+      wasm:
+        strategy: native
+        package: lapin
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Needs TCP via wasi-sockets (unverified on WASI).
+  - id: redis
+    name: Redis client (boost::redis)
+    used_for: RGW D4N cache directory and policy state
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/redis/go-redis/v9
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official client.
+      rust:
+        strategy: native
+        package: redis
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained crate.
+      wasm:
+        strategy: native
+        package: redis
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Needs TCP via wasi-sockets (unverified on WASI).
+  - id: sqlite
+    name: SQLite3
+    used_for: libcephsqlite (SQLite VFS on RADOS, used by mgr) and RGW DBStore backend
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: modernc.org/sqlite
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Pure-Go SQLite; custom VFS registration for RADOS-backed files is supported via its vfs
+          layer (unverified for the API libcephsqlite needs).
+      rust:
+        strategy: bindings
+        package: rusqlite
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Maintained binding (bundled SQLite); a VFS is implemented through the raw sqlite3_vfs FFI.
+      wasm:
+        strategy: bindings
+        package: rusqlite
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Bundled SQLite compiles to wasm32-wasi (unverified); VFS over the RADOS client works without
+          threads.
+  - id: lmdb
+    name: LMDB
+    used_for: RGW POSIX driver bucket-listing cache
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: go.etcd.io/bbolt
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Embedded B+tree KV replaces LMDB (cache only, no compatibility need).
+      rust:
+        strategy: bindings
+        package: heed
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained LMDB binding; redb is a pure-Rust alternative.
+      wasm:
+        strategy: native
+        package: redb
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust; mmap-free mode on WASI unverified.
+  - id: foundationdb
+    name: FoundationDB client
+    used_for: Experimental RGW metadata backend (WITH_RADOSGW_FDB, off by default)
+    submodules: []
+    targets:
+      go:
+        strategy: bindings
+        package: github.com/apple/foundationdb/bindings/go
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official cgo binding over libfdb_c.
+      rust:
+        strategy: bindings
+        package: foundationdb
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained crate over libfdb_c.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: libfdb_c cannot run under WASI; experimental backend lost.
+  - id: daos
+    name: DAOS client
+    used_for: Experimental RGW SAL backend (off by default)
+    submodules: []
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Experimental, off by default; not carried.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Experimental, off by default; not carried.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Experimental; native library unavailable.
+  - id: grpc-protobuf
+    name: gRPC and Protocol Buffers
+    used_for: NVMe-oF gateway monitor client (C++) and dashboard NVMe-oF API (Python grpcio)
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: google.golang.org/grpc
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official.
+      rust:
+        strategy: native
+        package: tonic + prost
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained.
+      wasm:
+        strategy: native
+        package: tonic + prost
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Codegen fine; HTTP/2 transport over WASI unverified, may need host shim.
+  - id: icu-boost-locale
+    name: ICU + Boost.Locale
+    used_for: Unicode normalisation and case folding for CephFS case-insensitive/charmap directories
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: golang.org/x/text
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Normalisation and case folding; exact ICU folding parity unverified.
+      rust:
+        strategy: native
+        package: icu (icu4x) / unicode-normalization
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained crates.
+      wasm:
+        strategy: native
+        package: icu (icu4x)
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust with compiled data.
+  - id: cpython-embedding
+    name: CPython runtime (embedded via the C API / Boost.Python)
+    used_for: ceph-mgr hosts Python modules in sub-interpreters; all Python tooling (cephadm, ceph-volume,
+      ceph CLI)
+    submodules: []
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: The Python is ported along with everything else (mgr modules, cephadm, ceph-volume), so
+          no interpreter is embedded. The module host itself is rewritten natively and is costed in the
+          taxonomy under mgr/python-host.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: standard
+        note: The Python is ported along with everything else (mgr modules, cephadm, ceph-volume), so
+          no interpreter is embedded. The module host itself is rewritten natively and is costed in the
+          taxonomy under mgr/python-host.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: hard
+        note: CPython builds for WASI exist but embedding many module interpreters inside a WASM mgr is
+          impractical; modules must be ported. The module host is costed under mgr/python-host.
+  - id: cython
+    name: Cython
+    used_for: rados/rbd/cephfs/rgw Python bindings (src/pybind/*.pyx)
+    submodules: []
+    targets:
+      go:
+        strategy: bindings
+        package: null
+        sloc_equivalent: 1500
+        difficulty: standard
+        note: Expose a C ABI from Go (-buildmode=c-shared) and keep thin Cython/cffi wrappers; ~1.5k lines
+          of export glue.
+      rust:
+        strategy: native
+        package: pyo3
+        sloc_equivalent: 0
+        difficulty: glue
+        note: pyo3 generates the Python modules directly from Rust.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: No host Python inside WASI; bindings lost (component-model bindings possible, unverified).
+  - id: py-web
+    name: CherryPy, cheroot, Routes, pecan, werkzeug
+    used_for: HTTP servers for mgr dashboard, restful, prometheus and cephadm agent endpoints
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: net/http
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Standard library server plus a router (e.g. chi).
+      rust:
+        strategy: native
+        package: axum
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained HTTP framework on hyper.
+      wasm:
+        strategy: native
+        package: wstd (wasi:http incoming-handler)
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Server via the host runtime incoming-handler, which wstd exposes (runtime maturity unverified).
+  - id: jinja2
+    name: Jinja2
+    used_for: cephadm/mgr config-file templates (ganesha, haproxy, keepalived, grafana, prometheus, alertmanager)
+      and dashboard
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/nikolalohinski/gonja/v2
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Maintained Jinja-like engine (compatibility unverified); otherwise rewrite the templates
+          in text/template.
+      rust:
+        strategy: native
+        package: minijinja
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Jinja2-compatible, maintained.
+      wasm:
+        strategy: native
+        package: minijinja
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust.
+  - id: kubernetes-client
+    name: kubernetes (Python client)
+    used_for: mgr/rook orchestrator and k8sevents
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: k8s.io/client-go
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Official client.
+      rust:
+        strategy: native
+        package: kube
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained kube-rs.
+      wasm:
+        strategy: native
+        package: kube
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Transport over wasi-http unverified.
+  - id: asyncssh
+    name: asyncssh
+    used_for: mgr/cephadm SSH connections to managed hosts
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: golang.org/x/crypto/ssh
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained.
+      rust:
+        strategy: native
+        package: russh
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained pure-Rust SSH.
+      wasm:
+        strategy: native
+        package: russh
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Needs TCP via wasi-sockets (unverified).
+  - id: py-crypto
+    name: cryptography, pyOpenSSL, bcrypt
+    used_for: Dashboard password hashing, certificate generation and cert-manager, cephadm TLS
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: crypto/x509, golang.org/x/crypto/bcrypt
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Standard library plus x/crypto.
+      rust:
+        strategy: native
+        package: rcgen, x509-parser, bcrypt
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained crates.
+      wasm:
+        strategy: native
+        package: rcgen, x509-parser, bcrypt
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust (ring-backed rcgen on wasm32 unverified).
+  - id: python3-saml
+    name: python3-saml (xmlsec1)
+    used_for: Dashboard SAML2 single sign-on
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: github.com/crewjam/saml
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained pure-Go SAML SP.
+      rust:
+        strategy: bindings
+        package: samael
+        sloc_equivalent: 0
+        difficulty: standard
+        note: Maintained Rust SAML crate; relies on xmlsec for signatures.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: standard
+        note: xmlsec1 not available on WASI; SSO lost or delegated to a proxy.
+  - id: scientific-python
+    name: numpy, scipy, scikit-learn
+    used_for: diskprediction_local failure prediction; numeric helpers in balancer/autoscaler
+    submodules: []
+    targets:
+      go:
+        strategy: port
+        package: gonum.org/v1/gonum
+        sloc_equivalent: 600
+        difficulty: standard
+        note: Pickled sklearn models cannot be loaded natively; port or retrain the small predictors (~600
+          lines) on gonum, or drop the module.
+      rust:
+        strategy: port
+        package: ndarray + linfa
+        sloc_equivalent: 600
+        difficulty: standard
+        note: Same model-port problem; linfa coverage unverified.
+      wasm:
+        strategy: port
+        package: ndarray
+        sloc_equivalent: 600
+        difficulty: standard
+        note: As Rust.
+  - id: py-utils
+    name: PyYAML, jsonpatch, jmespath, xmltodict, prettytable, natsort, python-dateutil, requests, more-itertools,
+      cmd2, colorama, tabulate
+    used_for: General utilities in mgr modules, dashboard, cephadm, cephfs-shell and CLI output
+    submodules: []
+    targets:
+      go:
+        strategy: native
+        package: go.yaml.in/yaml/v3, evanphx/json-patch/v5, jmespath-community/go-jmespath, olekukonko/tablewriter,
+          net/http
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Packages or standard library for each (gopkg.in/yaml.v3 is archived; json-patch and the JMESPath
+          fork are stable but quiet since early 2025).
+      rust:
+        strategy: native
+        package: serde-saphyr, json-patch, jmespath, comfy-table, reqwest, rustyline
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Maintained crates for each; serde-saphyr replaces the archived serde_yaml (serde_yml is archived
+          and flagged unsound by RUSTSEC-2025-0068).
+      wasm:
+        strategy: native
+        package: same crates as Rust
+        sloc_equivalent: 0
+        difficulty: glue
+        note: Pure Rust; network clients need wasi-http.
+  - id: py-test-tooling
+    name: pytest, tox, mypy, pyfakefs, requests-mock, coverage
+    used_for: Python unit tests and type checking
+    submodules: []
+    targets:
+      go:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: go test, go vet.
+      rust:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: cargo test, clippy.
+      wasm:
+        strategy: drop
+        package: null
+        sloc_equivalent: 0
+        difficulty: glue
+        note: cargo test under a WASI runtime.

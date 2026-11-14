@@ -1,0 +1,572 @@
+# g4: common code, tests, qa, non-product paths. Ceph @ ec322a5e95ebcb46dec7d6a9d7813a34543c64ad
+components:
+  - id: common
+    group: common
+    name: Common runtime library
+    description: Shared C++ runtime used by every daemon and client (libceph-common, global init, logging, tracing, public headers)
+    root: [src/common/, src/include/, src/global/, src/log/, src/perfglue/, src/arch/, src/json_spirit/, src/tracing/]
+    features:
+    - id: buffers-encoding
+      name: Buffers and encoding framework
+      description: bufferlist/bufferptr zero-copy buffers and the encode/decode and denc serialization templates
+      globs: [src/common/buffer.cc, src/common/buffer_instrumentation.h, src/common/page.cc, src/include/buffer*.h, src/include/encoding.h, src/include/denc*.h, src/include/inline_memory.h, src/include/page.h, src/include/byteorder.h, src/include/*_encoder.h, src/include/ceph_fs_encoder.h, src/common/versioned_variant.h]
+      scope: headline
+      kind: product
+      difficulty: hard
+      why: Every on-wire and on-disk structure goes through these templates; versioned encode/decode compatibility must be bit-exact.
+    - id: protocol-types
+      name: Core types and protocol definitions
+      description: Shared wire/disk types (hobject, snaps, frags, fs types, utime, uuid, feature bits, rados.h/msgr.h/ceph_fs.h constants)
+      globs: [src/include/rados.h, src/include/msgr.h, src/include/ceph_fs.h, src/include/ceph_features.h, src/include/ceph_frag.h, src/include/frag.h, src/include/fs_types.h, src/include/object.*, src/include/types.*, src/include/types_fmt.h, src/include/utime*, src/include/uuid*, src/include/CompatSet.h, src/include/object.h, src/include/stat.h, src/include/statlite.h, src/include/client_t.*, src/include/shard_id.*, src/include/health.h, src/include/rbd_types.h, src/include/ceph_hash.h, src/include/hash.h, src/include/err.h, src/include/errorcode32.*, src/include/linux_fiemap.h, src/include/event_type.h, src/common/hobject.*, src/common/snap_types.*, src/common/snap_fmt.h, src/common/fs_types.cc, src/common/frag.cc, src/common/ceph_frag.cc, src/common/ceph_fs.cc, src/common/CompatSet.cc, src/common/ceph_strings.*, src/common/ceph_releases.*, src/common/scrub_types.*, src/common/entity_name.*, src/common/types.cc, src/common/version.*, src/common/filepath.*, src/common/json/**]
+      scope: headline
+      kind: product
+      difficulty: hard
+      why: These define the shared vocabulary encoded on the wire and on disk; layout and feature-bit semantics must match existing clusters exactly.
+    - id: config
+      name: Configuration system
+      description: Option schema, config values/proxy/observers, ceph.conf parsing, argument parsing and option code generation
+      globs: [src/common/config*, src/common/options.*, src/common/options/*.cc, src/common/options/*.h, src/common/options/*.py, src/common/ConfUtils.*, src/common/ceph_argparse.*, src/common/code_environment.*, src/common/environment.*, src/common/str_map.cc, src/include/str_map.h]
+      scope: headline
+      kind: product
+      difficulty: standard
+      why: Runtime-mutable typed options with observers and per-daemon defaults; real logic but no persistence or consensus.
+    - id: option-definitions
+      name: Option definitions
+      description: Declarative YAML definitions of every config option, per daemon
+      globs: [src/common/options/*.yaml.in]
+      scope: headline
+      kind: config
+      difficulty: config
+      why: Pure data consumed by the option code generator.
+    - id: threading-sync
+      name: Threads, locks, work queues and async primitives
+      description: Thread wrappers, mutex/lockdep debugging, timers, finisher, thread pools, heartbeat map, and the Boost.Asio completion/coroutine/throttle helpers
+      globs: [src/common/Thread.*, src/common/WorkQueue.*, src/common/Finisher.*, src/common/Timer.*, src/common/ceph_timer.h, src/common/intrusive_timer.h, src/common/ceph_mutex.h, src/common/mutex_debug.*, src/common/shared_mutex_debug.*, src/common/condition_variable_debug.*, src/common/lockdep.*, src/common/Cond.h, src/common/RWLock.h, src/common/Semaphore.h, src/common/fair_mutex.h, src/common/shunique_lock.h, src/common/HeartbeatMap.*, src/common/HBHandle.h, src/common/ContextCompletion.*, src/common/AsyncOpTracker.*, src/common/Continuation.h, src/common/ceph_atomic.h, src/include/Context.h, src/include/spinlock.h, src/common/Clock.h, src/common/ceph_time*, src/common/Cycles.*, src/common/LogClient.*, src/common/admin_finisher.h, src/common/fork_function.h, src/common/Preforker.h, src/common/SubProcess.*, src/common/run_cmd.*, src/common/signal.*, src/common/async/**, src/common/detail/**]
+      scope: headline
+      kind: product
+      difficulty: standard
+      why: Concurrency plumbing that Go/Rust runtimes (goroutines, tokio) largely provide; porting means mapping semantics rather than reimplementing.
+    - id: queues-throttles
+      name: Op queues, throttles and schedulers
+      description: Priority/weighted/mClock op queues, reservers, throttles and the priority cache balancer
+      globs: [src/common/Throttle*, src/common/OpQueue.h, src/common/PrioritizedQueue.h, src/common/WeightedPriorityQueue.h, src/common/mclock_common.*, src/common/not_before_queue.h, src/common/AsyncReserver.h, src/common/QueueRing.h, src/common/PriorityCache.*, src/common/DecayCounter.*, src/common/bounded_key_counter.h, src/common/Readahead.*]
+      scope: headline
+      kind: product
+      difficulty: standard
+      why: Scheduling policy with real logic that OSD QoS depends on, but self-contained and well tested.
+    - id: observability
+      name: Logging, admin socket and observability
+      description: dout/log subsystem and cluster log, admin socket command server, TrackedOp history, perf counters, profilers and LTTng/OpenTelemetry tracing hooks
+      globs: [src/log/**, src/common/dout*, src/common/debug*, src/common/subsys*, src/common/LogEntry.*, src/common/Graylog.*, src/common/Journald.*, src/common/StackStringStream.h, src/common/ostream_temp.*, src/common/fmt_common.h, src/common/ceph_time_fmt.h, src/common/likely.h, src/common/admin_socket*, src/common/OutputDataSocket.*, src/common/TrackedOp.*, src/common/CommandTable.h, src/common/cmdparse.*, src/common/perf_counters*, src/common/perf_histogram.*, src/common/histogram.*, src/common/cputrace.*, src/common/MemoryModel.*, src/common/EventTrace.*, src/common/TracepointProvider.*, src/common/tracer.*, src/common/zipkin_trace.h, src/common/item_history.h, src/perfglue/**]
+      scope: headline
+      kind: product
+      difficulty: standard
+      why: Introspection surface every daemon exposes; command parsing and counters carry real logic, logging sinks and tracing are thin wrappers over ecosystem libraries.
+    - id: tracepoints
+      name: LTTng tracepoint definitions
+      description: Tracepoint provider definitions (.tp) and their provider stubs for LTTng-UST
+      globs: [src/tracing/**]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: LTTng is dropped as a dependency for every target, and a port would use its own tracing library, so these definitions are not carried.
+    - id: checksums-hashing
+      name: Checksums, hashing and chunking
+      description: crc32c dispatch, checksummer, hashes, bloom filter, content-defined chunking and CPU feature probing
+      globs: [src/common/crc32c.cc, src/common/crc32c_aarch64.*, src/common/crc32c_riscv*, src/common/crc32c_intel_baseline.*, src/common/crc32c_intel_fast.*, src/include/crc32c.h, src/common/Checksummer.h, src/common/SloppyCRCMap.*, src/common/ceph_hash.cc, src/common/bloom_filter.*, src/common/CDC.*, src/common/FastCDC.*, src/common/FixedCDC.*, src/common/ceph_crypto.*, src/common/armor.*, src/common/openssl_opts_handler.*, src/common/secret.*, src/common/keyring.*, src/common/random_string.*, src/include/sha_digest.h, src/include/blobhash.h, src/common/hex.*, src/arch/**]
+      scope: headline
+      kind: product
+      difficulty: glue
+      why: Algorithms with exact reference definitions that Go/Rust standard or crate libraries already implement; mostly a matter of selecting them.
+    - id: data-structures
+      name: Containers and caches
+      description: Interval sets/maps, compact maps, LRU and shared caches, mempools, intrusive lists, bit vectors and small utility containers
+      globs: [src/include/interval_set.h, src/common/interval_map.h, src/include/compact_*, src/include/mempool.h, src/common/mempool.cc, src/include/lru.h, src/include/xlist.h, src/include/elist.h, src/include/rangeset.h, src/include/btree_map.h, src/include/container_ios.h, src/include/alloc_ptr.h, src/include/any.h, src/include/random.h, src/common/cohort_lru.h, src/common/intrusive_lru.h, src/common/lru_map.h, src/common/LRUSet.h, src/common/shared_cache.hpp, src/common/simple_cache.hpp, src/common/sharedptr_registry.hpp, src/common/map_cacher.hpp, src/common/mini_flat_map.h, src/common/bitset_set.h, src/common/bit_vector.hpp, src/common/bit_str.*, src/common/static_ptr.h, src/common/RefCountedObj.*, src/common/ref.h, src/common/tracked_int_ptr.hpp, src/common/container_concepts.h, src/common/containers.h, src/common/ptr_wrapper.h, src/common/allocate_unique.h, src/common/inline_variant.h, src/common/weighted_shuffle.h, src/common/mode_collector.h, src/common/web_cache.h, src/common/fault_injector.h]
+      scope: headline
+      kind: product
+      difficulty: glue
+      why: Generic containers; most have direct standard-library or crate equivalents, a few (interval_set, mempool accounting) need modest ports.
+    - id: formatting-strings
+      name: Formatters, JSON and string utilities
+      description: Formatter hierarchy (JSON/XML/HTML/table), ceph_json decoder, escaping, ISO-8601, strtol, UTF-8 and MIME helpers
+      globs: [src/common/*Formatter*, src/common/TextTable.*, src/common/ceph_json.*, src/common/escape.*, src/common/url_escape.*, src/common/strescape.h, src/common/utf8.*, src/common/mime.*, src/common/iso_8601.*, src/common/strtol.*, src/common/str_list.cc, src/include/str_list.h, src/common/split.h, src/common/pretty_binary.*, src/common/convenience.h, src/common/reverse.*, src/common/CanHasPrint.h, src/include/stringify.h, src/include/color.h, src/include/demangle.h, src/include/variant_print.h, src/common/function_signature.h, src/common/util.cc, src/include/util.h, src/include/intarith.h]
+      scope: headline
+      kind: product
+      difficulty: glue
+      why: Output formatting and parsing helpers covered by standard encoding/json and text libraries.
+    - id: process-platform
+      name: Process init, context and platform portability
+      description: CephContext, global_init, signal handling, pidfile, plugin loading, networking/address helpers, block-device probing and OS compat (incl. Windows)
+      globs: [src/common/ceph_context.cc, src/common/ceph_context.h, src/common/common_init.*, src/common/Initialize.h, src/global/**, src/common/assert.cc, src/common/BackTrace.*, src/common/PluginRegistry.*, src/common/module.*, src/common/compat.cc, src/common/*_errno.cc, src/common/errno.*, src/common/error_code.*, src/common/win32/**, src/common/pick_address.*, src/common/ipaddr.cc, src/common/addr_parsing.c, src/common/dns_resolve.*, src/common/hostname.*, src/common/tcp_info.*, src/common/blkdev.*, src/common/numa.*, src/common/linux_version.*, src/common/fd.*, src/common/safe_io.*, src/common/event_socket.h, src/common/valgrind.h, src/common/compiler_extensions.h, src/include/compat.h, src/include/win32/**, src/include/dlfcn_compat.h, src/include/sock_compat.h, src/include/platform_errno.h, src/include/ceph_assert.h, src/include/addr_parsing.h, src/include/ipaddr.h, src/include/coredumpctl.h, src/include/on_exit.h, src/include/scope_guard.h, src/include/error.h, src/include/int_types.h, src/include/timegm.h, src/include/invoke_date.cc, src/include/common_fwd.h, src/include/cpp_lib_backport.h, src/include/ceph_fuse.h]
+      scope: headline
+      kind: product
+      difficulty: standard
+      why: Daemon bootstrap and OS integration; straightforward in Go/Rust but touches many platform-specific code paths.
+    - id: io-exerciser
+      name: RADOS I/O exerciser
+      description: Model-checked I/O sequence generator for EC and replicated pools used by ceph_test_rados_io_sequence
+      globs: [src/common/io_exerciser/**, src/common/obj_bencher.*]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Test-and-benchmark harness logic (I/O sequences, data generation, rados bench) living in common rather than src/test.
+    - id: vendored
+      name: Vendored third-party code
+      description: In-tree copies of Abseil btree, tl::expected, function2, json_spirit, Seastar sstring/deleter and arch-specific crc32c assembly
+      globs: [src/include/cpp-btree/**, src/include/expected.hpp, src/include/function2.hpp, src/include/uses_allocator.h, src/json_spirit/**, src/common/sstring.hh, src/common/deleter.h, src/common/sctp_crc32.*, src/common/crc32c_ppc*, src/common/ppc-*.h, src/common/crc32c_intel_fast_zero_asm.s, src/common/crc32c_s390x*]
+      scope: not-ported
+      kind: product
+      difficulty: glue
+      why: Third-party code carried in-tree; a port uses the ecosystem's own equivalents.
+    - id: build
+      name: Build files
+      description: CMake lists and the config.h template for the common libraries
+      globs: [src/common/CMakeLists.txt, src/common/options/CMakeLists.txt, src/common/io_exerciser/CMakeLists.txt, src/include/CMakeLists.txt, src/include/config-h.in.cmake, src/global/CMakeLists.txt, src/perfglue/CMakeLists.txt, src/arch/CMakeLists.txt, src/tracing/CMakeLists.txt]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Build system, replaced by the target language's toolchain.
+    - id: other
+      name: Other common code
+      description: Build-adjacent stubs and a few tiny helpers not worth a feature
+      globs: [src/common/**, src/include/**]
+      scope: headline
+      kind: product
+      difficulty: glue
+      why: Small remainder.
+  - id: client-api-headers
+    group: common
+    name: Public client API headers
+    description: Installed C/C++ headers defining the librados, neorados, libradosstriper, librbd, libcephfs, librgw and libcephsqlite APIs
+    root: [src/include/rados/, src/include/neorados/, src/include/radosstriper/, src/include/rbd/, src/include/cephfs/, src/include/libcephsqlite.h, src/include/krbd.h]
+    features:
+    - id: api-headers
+      name: Public client API headers
+      description: C/C++ API headers for librados, neorados, libradosstriper, librbd, libcephfs, librgw and libcephsqlite
+      globs: [src/include/rados/**, src/include/neorados/**, src/include/radosstriper/**, src/include/rbd/**, src/include/cephfs/**, src/include/libcephsqlite.h, src/include/krbd.h]
+      scope: headline
+      kind: product
+      difficulty: glue
+      why: Interface declarations only; the port re-expresses them as native APIs, the behaviour lives in the client libraries.
+  - id: tests
+    group: tests
+    name: Unit and integration tests
+    description: In-tree C++/Python/shell unit, integration and benchmark tests under src/test
+    root: src/test/
+    features:
+    - id: osd
+      name: OSD tests
+      description: PG log, peering, EC backend, scrubber, OSDMap, mClock and RADOS model (ceph_test_rados) tests
+      globs: [src/test/osd/**, src/test/test_snap_mapper.cc, src/test/test_scrubber_run.cc, src/test/test_lost.sh, src/test/test_missing_unfound.sh, src/test/test_unfound.sh, src/test/test_split.sh, src/test/test_backfill.sh, src/test/test_pools.sh, src/test/test_rw.sh, src/test/test_common.sh, src/test/lazy-omap-stats/**, src/test/memuse/**, src/test/test_get_blkdev_props.cc]
+      scope: headline
+      kind: test
+      difficulty: hard
+      why: Tests exercise peering/recovery/EC internals through mocks tightly coupled to the C++ class structure; porting them means re-deriving fixtures.
+    - id: mon
+      name: Monitor tests
+      description: Monitor store, PaxosService, MonMap/health and nvmeof gateway-map encoding tests
+      globs: [src/test/mon/**, src/test/test_nvmeof_mon_encoding.cc, src/test/test_nvmeof_gw_utils.cc]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Unit tests of monitor maps and services; moderate fixtures.
+    - id: cephfs
+      name: CephFS client and MDS tests
+      description: libcephfs API, client, MDS unit tests, fscrypt and locking tests
+      globs: [src/test/libcephfs/**, src/test/client/**, src/test/mds/**, src/test/fs/**, src/test/libcephfs_config.cc, src/test/test_cfuse_cache_invalidate.cc, src/test/test_csyn.sh]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: API-level tests that translate mostly mechanically once the client API exists.
+    - id: windows-clients
+      name: Windows client tests
+      description: Tests for the Dokan-based CephFS client on Windows
+      globs: [src/test/dokan/**]
+      scope: shown
+      kind: test
+      difficulty: standard
+      why: Tests for a Windows-only client that is itself shown outside the headline.
+    - id: rgw
+      name: RGW tests
+      description: RGW unit tests (auth, IAM, Lua, D4N cache, posix/FDB drivers, multisite, notifications, dedup), librgw file tests and admin tests
+      globs: [src/test/rgw/**, src/test/librgw_file*, src/test/test_rgw_*, src/test/test_cors.cc]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Large but conventional unit and Python integration tests over RGW interfaces.
+    - id: s3-tests
+      name: Vendored s3-tests suite
+      description: In-tree copy of the s3-tests S3 compatibility suite (MIT, separate upstream project)
+      globs: [src/test/rgw/s3-tests/**]
+      scope: not-ported
+      kind: test
+      difficulty: glue
+      why: Black-box protocol conformance suite from a separate project; a port reuses it unchanged.
+    - id: rbd
+      name: librbd and RBD tests
+      description: librbd unit/mock tests (image, journal, object map, migration, crypto, cache), journal library, immutable object cache and rbd-replay tests
+      globs: [src/test/librbd/**, src/test/journal/**, src/test/immutable_object_cache/**, src/test/test_rbd_replay.cc, src/test/run-rbd-*, src/test/rbd-ggate.sh]
+      scope: headline
+      kind: test
+      difficulty: hard
+      why: Heavy gmock-based tests coupled to librbd's state-machine class structure; much of the mocking would be redesigned.
+    - id: rbd-mirror
+      name: rbd-mirror tests
+      description: rbd-mirror daemon unit and mock tests (image replayer, bootstrap, snapshot/journal replay, pool watcher)
+      globs: [src/test/rbd_mirror/**]
+      scope: headline
+      kind: test
+      difficulty: hard
+      why: Mock-heavy state-machine tests mirroring the daemon's internal structure.
+    - id: librados
+      name: librados, neorados and client-library tests
+      description: librados C/C++ API tests, neorados, libradosstriper, osdc/Objecter, librados test stub, libcephsqlite and system stress tests
+      globs: [src/test/librados/**, src/test/librados_test_stub/**, src/test/neorados/**, src/test/libradosstriper/**, src/test/osdc/**, src/test/system/**, src/test/libcephsqlite/**, src/test/multi_stress_watch.cc, src/test/test_stress_watch.cc, src/test/test_striper.cc]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: API-level tests that translate mostly mechanically; the test stub is a small in-memory RADOS.
+    - id: objectstore
+      name: ObjectStore and BlueStore tests
+      description: store_test, BlueFS/BlueStore types, allocator tests and simulators, KV, deferred writes, ObjectMap and objectstore/fio benchmarks
+      globs: [src/test/objectstore/**, src/test/ObjectMap/**, src/test/objectstore_bench.cc, src/test/xattr_bench.cc, src/test/omap_bench.*, src/test/kv_store_bench.h, src/test/test_objectstore_memstore.sh, src/test/fio/**, src/test/test_rewrite_latency.cc]
+      scope: headline
+      kind: test
+      difficulty: hard
+      why: Exercises on-disk format and allocator invariants; tests must encode the same edge cases as the extreme-difficulty code under test.
+    - id: crimson
+      name: Crimson and SeaStore tests
+      description: Seastar-based tests for crimson messenger, errorator, interruptible futures, SeaStore and crimson OSD backfill/scrub
+      globs: [src/test/crimson/**]
+      scope: headline
+      kind: test
+      difficulty: hard
+      why: Coupled to Seastar futures and SeaStore internals; little survives a change of async model.
+    - id: msgr
+      name: Messenger tests
+      description: Async messenger protocol, frames, thrash and direct-messenger tests
+      globs: [src/test/msgr/**, src/test/direct_messenger/**, src/test/testmsgr.cc, src/test/test_addrs.cc]
+      scope: headline
+      kind: test
+      difficulty: hard
+      why: Wire-protocol and failure-injection tests for the messenger.
+    - id: common
+      name: Common library tests
+      description: Unit tests for buffers, encoding/denc, config, async primitives, containers, formatters, auth/crypto, admin socket, perf counters and the dencoder corpus scripts
+      globs: [src/test/common/**, src/test/encoding/**, src/test/admin_socket/**, src/test/*.cc, src/test/*.h, src/test/test_pidfile.sh]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Small self-contained unit tests; most collapse into standard-library tests in the target language.
+    - id: cls
+      name: Object class tests
+      description: Tests for RADOS object classes (rbd, rgw, lock, log, fifo, queue, journal, lua, cas, ...)
+      globs: [src/test/cls_*/**, src/test/barclass.cc, src/test/fooclass.cc, src/test/testclass.cc]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Each cls test drives a class through librados; mechanical once cls and librados exist.
+    - id: erasure-code-compression
+      name: Erasure code and compressor tests
+      description: Plugin tests for jerasure/ISA/LRC/SHEC/Clay, EC benchmark and non-regression tools, compressor plugin tests
+      globs: [src/test/erasure-code/**, src/test/ceph-erasure-code-tool/**, src/test/compressor/*]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Codec correctness tests with clear reference outputs.
+    - id: crush
+      name: CRUSH tests
+      description: CRUSH map, bucket and mapping unit tests
+      globs: [src/test/crush/**, src/test/test_crush_bucket.sh]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Placement must be bit-identical; tests are compact but exacting.
+    - id: mgr-exporter
+      name: Manager, exporter and Python binding tests
+      description: ceph-mgr C++ unit tests, ceph-exporter tests, Python binding tests (rados/rbd/cephfs/rgw/argparse) and behave cephadm tests
+      globs: [src/test/mgr/**, src/test/exporter/**, src/test/pybind/**, src/test/test_ceph_crash.py, src/test/behave_tests/**]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Thin tests over daemon state structures and language bindings.
+    - id: cli
+      name: CLI transcript (.t) tests
+      description: cram-style transcript tests for ceph-authtool, ceph-conf, crushtool, monmaptool, osdmaptool, rbd and radosgw-admin
+      globs: [src/test/cli/**, src/test/cli-integration/**, src/test/run-cli-tests*]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Command transcripts with expected output; ports by re-running against new binaries.
+    - id: fixtures
+      name: Test fixtures and corpora
+      description: Golden crushtool mapping transcripts, binary crushmaps, compressor osdmap corpus and sysfs/udev samples
+      globs: [src/test/cli/crushtool/test-map-*, src/test/cli/crushtool/set-choose.t, src/test/cli/crushtool/*.crushmap, src/test/cli/crushtool/crush-classes/**, src/test/compressor/osdmaps/**, src/test/common/blkdev-udevadm-info-samples/**, src/test/common/test_blkdev_sys_block/**]
+      scope: not-ported
+      kind: test
+      difficulty: config
+      why: Generated or binary reference data reused as-is, not code.
+    - id: build-harness
+      name: Test build and container harness
+      description: CMake lists and distro container scaffolding for running tests
+      globs: [src/test/CMakeLists.txt, src/test/centos-8/**, src/test/debian-strech/**, src/test/fedora-33/**, src/test/opensuse-13.2/**, src/test/ubuntu-18.04/**, src/test/docker-test*, src/test/detect-build-env-vars.sh, src/test/coverage.sh, src/test/.gitignore]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Build and packaging scaffolding replaced by the target toolchain.
+    - id: other
+      name: Other tests
+      description: Remaining standalone scripts and legacy tests
+      globs: [src/test/**]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Small remainder.
+  - id: qa
+    group: tests
+    name: QA (teuthology) suites, tasks and workunits
+    description: Teuthology integration-test framework content - Python tasks, shell/Python workunits, standalone tests and suite YAML
+    root: qa/
+    features:
+    - id: tasks-core
+      name: Teuthology core tasks
+      description: Cluster bring-up (ceph.py), CephManager, thrasher base, vstart_runner, workunit/cram runners and shared helpers
+      globs: [qa/tasks/ceph.py, qa/tasks/ceph_manager.py, qa/tasks/ceph_test_case.py, qa/tasks/vstart_runner.py, qa/tasks/workunit.py, qa/tasks/cram.py, qa/tasks/util/**, qa/tasks/tests/**, qa/tasks/__init__.py, qa/tasks/thrasher.py, qa/tasks/daemonwatchdog.py, qa/tasks/admin_socket.py, qa/tasks/exec_on_cleanup.py, qa/tasks/die_on_err.py, qa/tasks/python.py, qa/tasks/tox.py, qa/tasks/template.py, qa/tasks/systemd.py, qa/tasks/netem.py, qa/tasks/check_counter.py, qa/tasks/waiter.py, qa/tasks/watched_process.py, qa/tasks/sequential_yield.py, qa/tasks/teuthology_integration.py, qa/tasks/blktrace.py, qa/tasks/autotest.py, qa/tasks/dencoder.py, qa/tasks/aver.py, qa/tasks/cbt*.py, qa/tasks/*.template, qa/tasks/*.conf, qa/tasks/*.yaml]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: The harness every suite depends on (cluster deploy, daemon control, health waits); real logic, largely target-language-agnostic since it drives the CLI.
+    - id: tasks-rados
+      name: RADOS teuthology tasks
+      description: OSD/mon thrashers, EC and recovery scenarios, scrub, lost/unfound, stretch mode, netsplit and RADOS benchmarks
+      globs: [qa/tasks/thrashosds.py, qa/tasks/mon_*.py, qa/tasks/osd_*.py, qa/tasks/ec_*.py, qa/tasks/*lost_unfound*.py, qa/tasks/*scrub*.py, qa/tasks/repair_test.py, qa/tasks/divergent_priors*.py, qa/tasks/dump_stuck.py, qa/tasks/backfill_toofull.py, qa/tasks/resolve_stuck_peering.py, qa/tasks/peer.py, qa/tasks/peering_speed_test.py, qa/tasks/object_source_down.py, qa/tasks/reg11184.py, qa/tasks/rebuild_mondb.py, qa/tasks/stretch_*.py, qa/tasks/*netsplit*.py, qa/tasks/rados.py, qa/tasks/radosbench*.py, qa/tasks/multibench.py, qa/tasks/omapbench.py, qa/tasks/manypools.py, qa/tasks/thrash_pool_snaps.py, qa/tasks/watch_notify_*.py, qa/tasks/ceph_objectstore_tool.py, qa/tasks/create_verify_lfn_objects.py, qa/tasks/dedup*.py, qa/tasks/deduplication.py, qa/tasks/quarantine_thrasher.py]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Scenario scripts against a running cluster; reusable against a port that preserves the CLI and admin interfaces.
+    - id: tasks-cephfs
+      name: CephFS teuthology tasks
+      description: CephFS test cases (volumes, mirroring, quiesce, snapshots, damage/repair, NFS), mount helpers and MDS thrashers
+      globs: [qa/tasks/cephfs/**, qa/tasks/cephfs_*.py, qa/tasks/ceph_fuse.py, qa/tasks/kclient.py, qa/tasks/mds_*.py, qa/tasks/fs.py, qa/tasks/quiescer.py, qa/tasks/fwd_scrub.py, qa/tasks/locktest.py]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Large Python test-case library driving CephFS through mounts and the CLI.
+    - id: tasks-rgw
+      name: RGW teuthology tasks
+      description: RGW deploy, multisite, s3-tests/ragweed/tempest runners, KMS/IdP/notification backends (vault, barbican, keystone, kafka, rabbitmq)
+      globs: [qa/tasks/rgw*, qa/tasks/s3*.py, qa/tasks/radosgw_admin*.py, qa/tasks/barbican.py, qa/tasks/keystone.py, qa/tasks/keycloak.py, qa/tasks/vault.py, qa/tasks/pykmip.py, qa/tasks/kafka*.py, qa/tasks/rabbitmq.py, qa/tasks/redis.py, qa/tasks/notification_tests.py, qa/tasks/bucket_logging_tests.py, qa/tasks/lua_tests.py, qa/tasks/ragweed.py, qa/tasks/tempest.py, qa/tasks/devstack.py, qa/tasks/openssl_keys.py, qa/tasks/dnsmasq.py, qa/tasks/kerberos.py, qa/tasks/boto.cfg.template]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Orchestrates external services and protocol test suites around RGW; logic is in setup, not assertions.
+    - id: tasks-rbd
+      name: RBD and block teuthology tasks
+      description: RBD image/fsx/fio tasks, QEMU, rbd-mirror thrash, immutable object cache, iSCSI/tgt and NVMe-oF gateway tasks
+      globs: [qa/tasks/rbd*.py, qa/tasks/qemu.py, qa/tasks/immutable_object_cache*.py, qa/tasks/populate_rbd_pool.py, qa/tasks/tgt.py, qa/tasks/ceph_iscsi_client.py, qa/tasks/nvmeof.py, qa/tasks/nvme_loop.py]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Workload and failure orchestration for block clients.
+    - id: tasks-mgr-orch
+      name: Manager and orchestration teuthology tasks
+      description: mgr module and dashboard API tests, cephadm and rook deployment tasks, certmgr cases, SMB/Samba and VIP tasks
+      globs: [qa/tasks/mgr/**, qa/tasks/cephadm*, qa/tasks/cephadm_cases/**, qa/tasks/rook*, qa/tasks/kubeadm.py, qa/tasks/smb.py, qa/tasks/samba.py, qa/tasks/cifs_mount.py, qa/tasks/vip.py]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: REST/CLI-level tests and deployment drivers; reusable if interfaces are preserved.
+    - id: workunits-rados
+      name: RADOS workunits
+      description: Shell/C workunits for the ceph CLI, mon, OSD, EC, objectstore, crimson, cls, dencoder and mon bootstrap
+      globs: [qa/workunits/rados/**, qa/workunits/mon/**, qa/workunits/cephtool/**, qa/workunits/erasure-code/*.sh, qa/workunits/objectstore/**, qa/workunits/crimson/**, qa/workunits/cls/**, qa/workunits/dencoder/**, qa/workunits/osdc/**, qa/workunits/restart/**, qa/mon/**]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Shell scripts invoking the CLI and test binaries.
+    - id: workunits-cephfs
+      name: CephFS workunits
+      description: fs, libcephfs, client, direct I/O, rename, caps workunits, xfstests runners and MDS table scripts
+      globs: [qa/workunits/fs/**, qa/workunits/libcephfs/**, qa/workunits/client/**, qa/workunits/direct_io/**, qa/workunits/rename/**, qa/workunits/caps/**, qa/workunits/suites/**, qa/workunits/kernel_untar_build.sh, qa/workunits/hadoop/**, qa/client/**, qa/mds/**, qa/cephfs/unshare_ns_mount.sh, qa/run_xfstests*, qa/runoncfuse.sh, qa/runonkclient.sh]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Filesystem workload scripts; language-agnostic.
+    - id: workunits-rbd
+      name: RBD workunits
+      description: rbd CLI, migration, mirroring, nbd, LUKS and krbd cram tests
+      globs: [qa/workunits/rbd/**, qa/rbd/**, qa/libceph/**]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Shell and cram scripts driving the rbd CLI and kernel client.
+    - id: workunits-rgw
+      name: RGW workunits
+      description: RGW admin, reshard, versioning, quota, D4N, checksum (Go/Java SDK) and Keystone workunits
+      globs: [qa/workunits/rgw/**]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Python/shell/Perl S3 client scripts; protocol-level and reusable.
+    - id: workunits-mgr-orch
+      name: Manager, orchestration and Windows workunits
+      description: cephadm, mgr, nvmeof, SMB, REST, telemetry and Windows workunits
+      globs: [qa/workunits/cephadm/**, qa/workunits/mgr/**, qa/workunits/nvmeof/**, qa/workunits/smb/**, qa/workunits/rest/**, qa/workunits/test_telemetry_*, qa/workunits/windows/**, qa/workunits/ceph-tests/**]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Shell/PowerShell scripts exercising management interfaces.
+    - id: standalone
+      name: Standalone tests
+      description: Single-host shell tests (ceph-helpers.sh) for OSD, scrub, backfill, mon, EC, CRUSH and mgr behaviour
+      globs: [qa/standalone/**, qa/run-standalone.sh]
+      scope: headline
+      kind: test
+      difficulty: standard
+      why: Long shell scenarios asserting precise cluster state transitions (scrub, backfill, recovery); reusable but sensitive to behavioural detail.
+    - id: suites-yaml
+      name: Suite and fragment YAML
+      description: Teuthology suite matrices (qa/suites/**) and shared YAML fragments (clusters, distros, overrides, objectstore, EC profiles, releases)
+      globs: [qa/suites/**, qa/cephfs/**, qa/clusters/**, qa/config/**, qa/distros/**, qa/overrides/**, qa/objectstore*/**, qa/erasure-code/**, qa/erasure-code-profile/**, qa/releases/**, qa/archs/**, qa/balance_reads/**, qa/debug/**, qa/machine_types/**, qa/mon_election/**, qa/msgr/**, qa/nightlies/**, qa/packages/**, qa/pool-migration/**, qa/rgw*/**, qa/timezone/**, qa/crontab/**]
+      scope: headline
+      kind: config
+      difficulty: config
+      why: Declarative test-matrix composition.
+    - id: vendored-fixtures
+      name: Vendored assets and fixtures
+      description: jQuery/flot plotting assets, Maven wrapper and checksum payload files used by workunits
+      globs: [qa/workunits/erasure-code/*.js, qa/workunits/erasure-code/*.css, qa/workunits/erasure-code/*.html, qa/workunits/rgw/jcksum/file-*, qa/workunits/rgw/jcksum/mvnw*, qa/workunits/rgw/jcksum/.mvn/**, qa/workunits/rgw/olh_noname_*]
+      scope: not-ported
+      kind: test
+      difficulty: config
+      why: Third-party JS and data payloads, not test logic.
+    - id: other
+      name: Other QA files
+      description: Top-level QA scripts, sanitizer suppressions and tool config
+      globs: [qa/**]
+      scope: headline
+      kind: test
+      difficulty: glue
+      why: Small remainder.
+  - id: peripheral-clients
+    group: common
+    name: Peripheral clients and examples
+    description: Java CephFS bindings, the Windows ceph-dokan client and example programs
+    root: [src/java/, src/dokan/, examples/]
+    features:
+    - id: java-bindings
+      name: Java CephFS bindings
+      description: libcephfs JNI wrapper, Java API classes and JUnit tests
+      globs: [src/java/**]
+      scope: shown
+      kind: product
+      difficulty: glue
+      why: Thin JNI binding over libcephfs; the bulk is marshalling.
+    - id: dokan
+      name: ceph-dokan Windows client
+      description: Mounts CephFS on Windows through the Dokany user-mode filesystem driver
+      globs: [src/dokan/**]
+      scope: shown
+      kind: product
+      difficulty: glue
+      why: Callback adapter from Dokan to libcephfs calls.
+    - id: examples
+      name: Example programs
+      description: librados/librbd/libradosstriper hello-world programs, RGW boto3/Go/Java/Lua/nginx examples and rbd-replay scripts
+      globs: [examples/**]
+      scope: shown
+      kind: product
+      difficulty: glue
+      why: Illustrative samples, not product code.
+  - id: documentation
+    group: docs
+    name: Documentation
+    description: Sphinx documentation, man page sources, release notes, design notes and doc tooling
+    root: [doc/, man/, src/doc/, admin/]
+    features:
+    - id: user-docs
+      name: User and operator documentation
+      description: Install, RADOS, CephFS, RGW, RBD, mgr, cephadm, security and architecture guides
+      globs: [doc/**]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Prose; not ported.
+    - id: release-notes
+      name: Release notes and changelogs
+      description: Per-release notes and generated changelogs
+      globs: [doc/releases/**, doc/changelog/**]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Historical prose.
+    - id: dev-docs
+      name: Developer documentation
+      description: Developer guide and internal design notes, including src/doc
+      globs: [doc/dev/**, src/doc/**]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Prose; not ported.
+    - id: man-pages
+      name: Man page sources
+      description: reStructuredText man pages and man build glue
+      globs: [doc/man/**, man/**]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Prose; not ported.
+    - id: images
+      name: Documentation images
+      description: SVG/PNG diagrams
+      globs: [doc/images/**]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Binary and SVG assets.
+    - id: doc-tooling
+      name: Documentation build tooling
+      description: Sphinx config, extensions, themes, templates and doc build scripts
+      globs: [doc/_ext/**, doc/_static/**, doc/_templates/**, doc/_themes/**, doc/conf.py, doc/scripts/**, doc/CMakeLists.txt, admin/**]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Doc build plumbing.
+  - id: packaging-build
+    group: docs
+    name: Packaging, build and repository metadata
+    description: Distro packaging, CMake build system, container build, CI config and repository metadata files
+    root: [debian/, cmake/, container/, systemd/, selinux/, udev/, etc/, share/, keys/, mirroring/, bin/, fusetrace/, ceph-menv/, sudoers.d/, .github/, .clang-format, .gitattributes, .githubmap, .gitignore, .gitleaks.toml, .gitmodule_mirrors, .gitmodules, .mailmap, .organizationmap, .peoplemap, .readthedocs.yml, AUTHORS, CMakeLists.txt, CONTRIBUTING.rst, COPYING, COPYING-GPL2, COPYING-LGPL2.1, COPYING-LGPL3, CodingStyle, ContainerBuild.md, Dockerfile.build, MergeRequirements.rst, PendingReleaseNotes, README.FreeBSD, README.aix, README.md, README.solaris, README.windows.rst, SECURITY.md, SubmittingPatches-backports.rst, SubmittingPatches-kernel.rst, SubmittingPatches.rst, ceph.spec.in, do_cmake.sh, do_freebsd.sh, doc_deps.deb.txt, install-deps.sh, make-debs.sh, make-dist, make-srpm.sh, mingw_conf.sh, package-lock.json, pom.xml, run-make-check.sh, win32_build.sh, win32_deps_build.sh, src/CMakeLists.txt, src/.gitignore, src/README, src/TODO, src/ceph_release, src/ceph_release.h.in.cmake, src/ceph_ver.h.in.cmake, src/nasm-wrapper]
+    features:
+    - id: distro-packaging
+      name: Distro packaging
+      description: Debian and RPM packaging, systemd units, SELinux policy, udev/sysctl/sudoers files, release keys and mirror scripts
+      globs: [debian/**, ceph.spec.in, make-debs.sh, make-srpm.sh, make-dist, systemd/**, selinux/**, udev/**, etc/**, sudoers.d/**, keys/**, mirroring/**]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Packaging metadata, rewritten per target.
+    - id: build-system
+      name: Build system
+      description: Top-level and src CMake, cmake modules, dependency install, Windows/FreeBSD build scripts and container image build
+      globs: [cmake/**, CMakeLists.txt, do_cmake.sh, do_freebsd.sh, install-deps.sh, run-make-check.sh, win32_build.sh, win32_deps_build.sh, mingw_conf.sh, Dockerfile.build, ContainerBuild.md, container/**, pom.xml, package-lock.json, doc_deps.deb.txt, src/CMakeLists.txt, src/ceph_release.h.in.cmake, src/ceph_ver.h.in.cmake, src/nasm-wrapper, src/ceph_release]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Replaced by the target language toolchain.
+    - id: dev-tools
+      name: Developer utilities
+      description: git-archive-all, multi-env helpers, uncrustify config and the fusetrace debugging tool
+      globs: [bin/**, ceph-menv/**, share/**, fusetrace/**]
+      scope: not-ported
+      kind: product
+      difficulty: glue
+      why: Developer conveniences outside the product.
+    - id: repo-meta
+      name: Repository metadata and CI
+      description: GitHub workflows and templates, licenses, READMEs, contribution guides, people/mail maps and dotfiles
+      globs: [.github/**, .*, '*', src/.gitignore, src/README, src/TODO]
+      scope: not-ported
+      kind: config
+      difficulty: config
+      why: Project administration, not code.

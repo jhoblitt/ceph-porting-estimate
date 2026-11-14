@@ -68,6 +68,50 @@ specific:
 A file no glob matches lands in `unclassified`, which `check` lists and
 rejects above 1% of code lines.
 
+## Data
+
+Everything the estimate rests on is under `data/`; the formulas that turn
+it into tokens and dollars are [`docs/cost-model.md`](docs/cost-model.md).
+
+| File | What it holds |
+|---|---|
+| `taxonomy/*.yaml` | The groups, and the components and features that claim Ceph's files by glob, each with a scope, kind and difficulty |
+| `dependencies.yaml` | Each library Ceph leans on, and per target what a port does about it and the lines of work that leaves |
+| `models.yaml` | Each model's list prices per million tokens, with the page and date they were read |
+| `assumptions.yaml` | The pinned Ceph commit (`ceph.rev`), bytes per token by language, the cost model's parameters and the scenario presets |
+| `calibration.yaml` | The rgw-go measurements the calibrated parameters are derived from |
+| `generated/sloc.json` | Lines and bytes per file at the pinned commit, written by `cephest count` and never edited by hand |
+
+Every quantity in `assumptions.yaml` carries a `source` and a `reason`, and
+`check` rejects one that lacks either. Derived tokens and dollars are never
+committed: the site computes them in the browser from the rolled-up
+`report.json`, which is build output.
+
+After any edit, validate the data; CI runs the same check, and `go test`
+fails on invalid data too:
+
+```sh
+make data-check     # go run ./cmd/cephest check
+```
+
+To add or move a feature, edit its component's file under `data/taxonomy/`
+and run `make data-check`: it reports a glob that matches nothing, a tie
+between two features and code no feature claims.
+
+To re-pin to a newer Ceph commit, count it, update `ceph.rev` in
+`assumptions.yaml` to the same SHA, run `make data-check`, and fix what it
+reports, usually new files to classify:
+
+```sh
+go run ./cmd/cephest count --repo ~/github/ceph --rev <sha> --out data/generated/sloc.json
+```
+
+`params.sloc_equivalent_bytes_per_line` in `assumptions.yaml` is derived
+from `sloc.json`, as the bytes per code line of C++ in headline features
+of kind `product`, and `check` does not verify it: recompute it on a re-pin.
+Submodule sizes are counted only for submodules whose pinned commit is
+present locally under `.git/modules`; any other is recorded as unavailable.
+
 ## Development
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/);
@@ -80,13 +124,18 @@ the pinned linter, and that pin lives in the `Makefile`.
 
 The report is a Vite, Svelte and TypeScript site under `site/`, built with
 the Node version in `.nvmrc`. It reads one generated file,
-`site/src/generated/report.json`, which `cephest rollup` writes.
+`site/src/generated/report.json`, which `cephest rollup` writes from
+`data/`.
 
 ```sh
-make site-install   # npm ci
+make site-install   # npm ci --ignore-scripts
 make site-build     # cephest rollup, then vite build into site/dist
 make site-test      # typecheck and unit tests
 ```
+
+`site-build` and `site-test` install the dependencies first when
+`node_modules` is missing or older than the lockfile, so `make site-build`
+works from a clean checkout with Go and Node on `PATH`.
 
 To work on the site without the Go side, `make site-dev-data` copies the
 test fixture into place; then run `npm run dev` in `site/` for a live

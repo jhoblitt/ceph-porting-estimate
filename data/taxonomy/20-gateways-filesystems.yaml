@@ -1,0 +1,1650 @@
+# Group 2: gateways and filesystems taxonomy fragment
+# Ceph commit ec322a5e95ebcb46dec7d6a9d7813a34543c64ad
+components:
+  - id: rgw
+    group: rgw
+    name: RADOS Gateway (API plane)
+    description: The radosgw object gateway's request plane - HTTP frontends, S3/Swift APIs, auth, IAM, SSE, notifications, lifecycle and the SAL abstraction.
+    root: src/rgw/
+    features:
+      - id: http-frontends
+        name: HTTP frontends and request processing
+        description: Beast/asio HTTP server, client I/O filters, request dispatch loop, outbound HTTP client, daemon startup.
+        globs:
+          - src/rgw/rgw_asio_*
+          - src/rgw/rgw_client_io*
+          - src/rgw/rgw_http_client*
+          - src/rgw/rgw_process*
+          - src/rgw/rgw_main.*
+          - src/rgw/rgw_appmain.cc
+          - src/rgw/rgw_frontend.*
+          - src/rgw/rgw_loadgen*
+          - src/rgw/rgw_env.cc
+          - src/rgw/rgw_signal.*
+          - src/rgw/rgw_resolve.*
+          - src/rgw/rgw_worker.h
+          - src/rgw/rgw_request.h
+          - src/rgw/rgw_req_context.h
+          - src/rgw/yield_completion.h
+          - src/rgw/async_utils.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Coroutine-based HTTP serving and request lifecycle; a Go/Rust port would sit on a stock HTTP stack, so standard rather than hard.
+      - id: s3-api
+        name: S3 API operations
+        description: S3 REST handlers and op implementations - objects, buckets, multipart, ACLs, CORS, website, tagging, object lock, checksums, compression.
+        globs:
+          - src/rgw/rgw_op.*
+          - src/rgw/rgw_op_type.h
+          - src/rgw/rgw_rest.*
+          - src/rgw/rgw_rest_s3.*
+          - src/rgw/rgw_rest_s3website.h
+          - src/rgw/rgw_rest_s3control.*
+          - src/rgw/rgw_rest_zero.*
+          - src/rgw/rgw_acl.*
+          - src/rgw/rgw_acl_s3.*
+          - src/rgw/rgw_acl_types.h
+          - src/rgw/rgw_cors.*
+          - src/rgw/rgw_cors_s3.*
+          - src/rgw/rgw_website.*
+          - src/rgw/rgw_tag.*
+          - src/rgw/rgw_tag_s3.*
+          - src/rgw/rgw_object_lock.*
+          - src/rgw/rgw_object_ownership.*
+          - src/rgw/rgw_public_access.*
+          - src/rgw/rgw_multi.*
+          - src/rgw/rgw_multi_del.*
+          - src/rgw/rgw_multipart_meta_filter.*
+          - src/rgw/rgw_policy_s3.*
+          - src/rgw/rgw_xml.*
+          - src/rgw/rgw_xml_enc.cc
+          - src/rgw/rgw_formats.*
+          - src/rgw/rgw_torrent.*
+          - src/rgw/rgw_cksum*
+          - src/rgw/rgw_crc_digest.h
+          - src/rgw/rgw_blake3_digest.h
+          - src/rgw/rgw_xxh_digest.h
+          - src/rgw/rgw_compression*
+          - src/rgw/rgw_http_errors.h
+          - src/rgw/rgw_range_projection.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: The brief's difficulty baseline; rgw_op.cc and rgw_rest_s3.cc dominate (~22k lines) and are wide but conventional request handling.
+      - id: s3select
+        name: S3 Select glue
+        description: Glue binding the s3select SQL engine (submodule) to GetObject streaming for CSV/JSON/Parquet queries.
+        globs:
+          - src/rgw/rgw_s3select*
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Only the RGW-side adapter lives here; the query engine itself is the src/s3select submodule.
+      - id: swift-api
+        name: Swift API
+        description: OpenStack Swift REST dialect - containers, SLO/DLO, bulk upload, Swift ACLs/CORS, TempAuth/TempURL/FormPost auth.
+        globs:
+          - src/rgw/rgw_rest_swift.*
+          - src/rgw/rgw_acl_swift.*
+          - src/rgw/rgw_cors_swift.h
+          - src/rgw/rgw_swift_auth.*
+          - src/rgw/rgw_tar.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: A second REST dialect over the same ops; same shape as the S3 baseline.
+      - id: auth
+        name: Authentication (SigV4, Keystone, LDAP)
+        description: Auth strategy framework, AWS SigV2/SigV4 and chunked-upload signing, Keystone tokens/EC2 creds, LDAP, OPA, radosgw-token.
+        globs:
+          - src/rgw/rgw_auth.*
+          - src/rgw/rgw_auth_filters.h
+          - src/rgw/rgw_auth_registry.h
+          - src/rgw/rgw_auth_s3.*
+          - src/rgw/rgw_auth_keystone.*
+          - src/rgw/rgw_keystone*
+          - src/rgw/rgw_ldap.*
+          - src/rgw/rgw_token.*
+          - src/rgw/rgw_opa.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Security-sensitive but well specified by AWS/OpenStack docs; the strategy-applier template machinery is the main porting friction.
+      - id: iam-sts
+        name: IAM, STS and accounts
+        description: IAM policy engine, managed policies, IAM user/group/role/account REST APIs, STS AssumeRole(WithWebIdentity), OIDC providers, ARNs.
+        globs:
+          - src/rgw/rgw_iam_policy*
+          - src/rgw/rgw_iam_managed_policy.*
+          - src/rgw/rgw_rest_iam*
+          - src/rgw/rgw_role.*
+          - src/rgw/rgw_rest_role.*
+          - src/rgw/rgw_sts.*
+          - src/rgw/rgw_rest_sts.*
+          - src/rgw/rgw_web_idp.h
+          - src/rgw/rgw_oidc_provider.*
+          - src/rgw/rgw_rest_oidc_provider.*
+          - src/rgw/rgw_rest_user_policy.*
+          - src/rgw/rgw_account.*
+          - src/rgw/rgw_rest_account.*
+          - src/rgw/rgw_arn.*
+          - src/rgw/rgw_polparser.cc
+          - src/rgw/rgw_poltester.cc
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: AWS-compatible policy evaluation and IAM REST handlers; the policy evaluator needs care but is request-handling class work.
+      - id: encryption
+        name: Server-side encryption and KMS
+        description: SSE-C/SSE-KMS/SSE-S3 block crypto filters, bucket default encryption, Vault/Barbican/KMIP/testing key backends and key cache.
+        globs:
+          - src/rgw/rgw_crypt*
+          - src/rgw/rgw_kms*
+          - src/rgw/rgw_kmip*
+          - src/rgw/rgw_bucket_encryption.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Streaming AES filters plus REST clients to key managers; on-disk crypto metadata must stay compatible.
+      - id: notifications
+        name: Bucket notifications (pubsub)
+        description: S3 bucket notification and SNS-style topic APIs, event filtering, AMQP and Kafka endpoint clients.
+        globs:
+          - src/rgw/rgw_pubsub.*
+          - src/rgw/rgw_rest_pubsub.*
+          - src/rgw/rgw_amqp.*
+          - src/rgw/rgw_kafka.*
+          - src/rgw/rgw_notify_event_type.*
+          - src/rgw/rgw_s3_filter.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Topic/notification config handling plus broker clients that map onto mature Go/Rust libraries.
+      - id: lifecycle
+        name: Lifecycle, restore and expiry
+        description: S3 lifecycle rule parsing and the LC worker (expiration, transition, noncurrent versions), cloud restore, Swift object expirer.
+        globs:
+          - src/rgw/rgw_lc*
+          - src/rgw/rgw_restore*
+          - src/rgw/rgw_rest_restore.*
+          - src/rgw/rgw_object_expirer.cc
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Background sharded worker with lease handling over bucket listings; rgw_lc.cc is ~3.6k lines of policy logic.
+      - id: qos-quota
+        name: Quota, rate limiting and QoS
+        description: User/bucket quota enforcement and stats cache, per-user/bucket rate limits, dmclock request scheduler.
+        globs:
+          - src/rgw/rgw_quota*
+          - src/rgw/rgw_ratelimit.h
+          - src/rgw/rgw_rest_ratelimit.*
+          - src/rgw/rgw_dmclock*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Counters, caches and a scheduler adapter around the dmclock library.
+      - id: ops-logging
+        name: Ops log, bucket logging and usage
+        description: Ops log sinks, S3 bucket access logging, usage accounting, perf counters and tracing hooks.
+        globs:
+          - src/rgw/rgw_log.*
+          - src/rgw/rgw_bucket_logging*
+          - src/rgw/rgw_rest_bucket_logging.*
+          - src/rgw/rgw_usage.*
+          - src/rgw/rgw_perf_counters.*
+          - src/rgw/rgw_tracer.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Log record formatting and batched writers; straightforward service code.
+      - id: lua
+        name: Lua scripting
+        description: Per-request and background Lua hooks exposing request, object and data-filter bindings to user scripts.
+        globs:
+          - src/rgw/rgw_lua*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Large binding surface over the Lua C API; a port would re-bind to an embedded Lua such as gopher-lua or mlua.
+      - id: sal-common
+        name: SAL abstraction and common types
+        description: Storage Abstraction Layer interfaces and filter driver, shared request state, bucket/object/user types, layouts, caches, AIO throttles.
+        globs:
+          - src/rgw/rgw_sal.*
+          - src/rgw/rgw_sal_store.h
+          - src/rgw/rgw_sal_fwd.h
+          - src/rgw/rgw_sal_filter.*
+          - src/rgw/rgw_sal_config.h
+          - src/rgw/rgw_common.*
+          - src/rgw/rgw_basic_types.*
+          - src/rgw/rgw_bucket.*
+          - src/rgw/rgw_bucket_types.h
+          - src/rgw/rgw_bucket_layout.*
+          - src/rgw/rgw_obj_types.h
+          - src/rgw/rgw_obj_manifest.cc
+          - src/rgw/rgw_user.cc
+          - src/rgw/rgw_user_types.h
+          - src/rgw/rgw_placement_types.h
+          - src/rgw/rgw_pool_types.h
+          - src/rgw/rgw_cache.*
+          - src/rgw/rgw_aio*
+          - src/rgw/rgw_putobj.*
+          - src/rgw/rgw_data_access.*
+          - src/rgw/rgw_dencoder.cc
+          - src/rgw/rgw_string.*
+          - src/rgw/rgw_hex.h
+          - src/rgw/rgw_b64.h
+          - src/rgw/rgw_url.*
+          - src/rgw/rgw_tools.cc
+          - src/rgw/rgw_gc_log.h
+          - src/rgw/rgw_jsonparser.cc
+          - src/rgw/rgw_multiparser.cc
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Interfaces and shared types every op and driver uses; encodings of bucket/object types must stay wire-compatible with the cls_rgw side.
+      - id: build-vendored
+        name: Build files, docs and vendored libraries
+        description: CMake/Cargo build files and lockfile, maintainers doc, vendored jwt-cpp, picojson and CRC implementations (madler, SPDK).
+        globs:
+          - src/rgw/CMakeLists.txt
+          - src/rgw/Cargo.*
+          - src/rgw/MAINTAINERS.md
+          - src/rgw/jwt-cpp/**
+          - src/rgw/picojson/**
+          - src/rgw/madler/**
+          - src/rgw/spdk/**
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging and third-party code a port replaces with ecosystem libraries; Cargo.lock alone is 8.7k lines.
+      - id: other
+        name: Other RGW
+        description: Remaining RGW sources not claimed by a specific feature.
+        globs:
+          - src/rgw/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all remainder.
+
+  - id: rgw-access
+    group: rgw
+    name: RGW alternative access paths
+    description: Non-HTTP-S3 ways into RGW - librgw/NFS, Arrow Flight, cuObject RDMA, and the S3 Vectors service with its LanceDB Rust backend.
+    root: [src/rgw/rgw_file, src/rgw/rgw_lib, src/rgw/librgw.cc, src/rgw/rgw_os_lib, src/rgw/rgw_flight, src/rgw/rgw_cuobj, src/rgw/rgw_s3vector, src/rgw/rgw_rest_s3vector, src/rgw/rgw_rest_vector_bucket, src/rgw/rgw_sal_wrapper, src/rgw/lancedb-rgw-store/, src/rgw/rgw-lancedb/]
+    features:
+      - id: librgw-nfs
+        name: librgw file API (NFS-Ganesha FSAL)
+        description: librgw library and the rgw_file POSIX-like namespace over buckets used by NFS-Ganesha.
+        globs:
+          - src/rgw/rgw_file*
+          - src/rgw/rgw_lib*
+          - src/rgw/librgw.cc
+          - src/rgw/rgw_os_lib.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Maps a file handle/directory model onto bucket listings with its own handle cache; moderate state but no on-disk format.
+      - id: arrow-flight
+        name: Arrow Flight frontend
+        description: Apache Arrow Flight server exposing object data as Arrow record batches.
+        globs:
+          - src/rgw/rgw_flight*
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin adapter onto the Arrow Flight SDK, which has Go and Rust implementations.
+      - id: cuobj-rdma
+        name: cuObject RDMA transport
+        description: Runtime-loaded shim to the NVIDIA cuObject server library for RDMA PUT/GET data transfer.
+        globs:
+          - src/rgw/rgw_cuobj*
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small dlopen ABI shim and transport wrapper; the heavy lifting is the vendor SDK.
+      - id: s3vectors
+        name: S3 Vectors
+        description: S3 Vectors API (vector buckets, indexes, put/query vectors), background indexer, metadata filters, and the SAL C wrapper LanceDB calls into.
+        globs:
+          - src/rgw/rgw_s3vector*
+          - src/rgw/rgw_rest_s3vector.*
+          - src/rgw/rgw_rest_vector_bucket.*
+          - src/rgw/rgw_sal_wrapper.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: New AWS-compatible REST service plus a background worker; request-handling class.
+      - id: lancedb-store
+        name: LanceDB object-store backend (Rust)
+        description: Rust crates implementing Arrow object_store over the RGW SAL C API so LanceDB indexes live in RGW.
+        globs:
+          - src/rgw/lancedb-rgw-store/src/**
+          - src/rgw/lancedb-rgw-store/include/**
+          - src/rgw/lancedb-rgw-store/build.rs
+          - src/rgw/rgw-lancedb/src/**
+          - src/rgw/rgw-lancedb/build.rs
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Already Rust; an FFI adapter between two APIs.
+      - id: lancedb-tests
+        name: LanceDB store tests
+        description: Rust integration tests for the RGW object_store adapter.
+        globs:
+          - src/rgw/lancedb-rgw-store/tests/**
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Unit-level tests of the adapter.
+      - id: lancedb-build
+        name: LanceDB crate manifests and docs
+        description: Cargo manifests and README for the LanceDB crates.
+        globs:
+          - src/rgw/lancedb-rgw-store/Cargo.toml
+          - src/rgw/lancedb-rgw-store/README.md
+          - src/rgw/rgw-lancedb/Cargo.toml
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging metadata and docs.
+
+  - id: rgw-rados
+    group: rgw
+    name: RGW RADOS store and multisite
+    description: The production RADOS SAL driver and its services - bucket index, GC, multisite replication, sync modules, dedup, persistent notifications.
+    root: [src/rgw/driver/rados/, src/rgw/services/]
+    features:
+      - id: rados-store
+        name: RADOS object store core
+        description: RGWRados and the RADOS SAL implementation - head/tail object layout, manifests, atomic/multipart/append writers, system-object and cls services.
+        globs:
+          - src/rgw/driver/rados/rgw_rados.*
+          - src/rgw/driver/rados/rgw_sal_rados.*
+          - src/rgw/driver/rados/rgw_putobj_processor.*
+          - src/rgw/driver/rados/rgw_obj_manifest.*
+          - src/rgw/driver/rados/rgw_tools.*
+          - src/rgw/driver/rados/rgw_service.*
+          - src/rgw/driver/rados/shard_io.h
+          - src/rgw/driver/rados/rgw_etag_verifier.*
+          - src/rgw/driver/rados/rgw_d3n_datacache.*
+          - src/rgw/services/svc_sys_obj*
+          - src/rgw/services/svc_config_key*
+          - src/rgw/services/svc_cls.*
+          - src/rgw/services/svc_notify.*
+          - src/rgw/services/svc_quota.*
+          - src/rgw/services/svc_tier_rados.h
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Defines RGW's on-RADOS object layout and manifest encoding, which must remain bit-compatible with existing clusters; rgw_rados.cc alone is 12.9k lines.
+      - id: bucket-index
+        name: Bucket index, bilog and resharding
+        description: Sharded bucket index operations via cls_rgw, bucket index log, bucket instance metadata, and dynamic resharding.
+        globs:
+          - src/rgw/driver/rados/rgw_bucket.*
+          - src/rgw/driver/rados/buckets.*
+          - src/rgw/driver/rados/rgw_bilog.*
+          - src/rgw/driver/rados/rgw_reshard.*
+          - src/rgw/services/svc_bi*
+          - src/rgw/services/svc_bucket.*
+          - src/rgw/services/svc_bucket_sobj.*
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Concurrency-sensitive index consistency and online reshard with layout generations; on-disk index entries are encoded formats.
+      - id: gc-expiry
+        name: Garbage collection and object expiry
+        description: Tail-object GC queue processing and the time-index driven object expirer core.
+        globs:
+          - src/rgw/driver/rados/rgw_gc.*
+          - src/rgw/driver/rados/rgw_gc_log.cc
+          - src/rgw/driver/rados/rgw_object_expirer_core.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Background workers over cls_rgw_gc queues; moderate logic.
+      - id: multisite-config
+        name: Multisite realms, zonegroups and periods
+        description: Realm/zonegroup/zone configuration model, period commit/push/pull/history, realm reload, and the RADOS-backed config store.
+        globs:
+          - src/rgw/rgw_zone*
+          - src/rgw/rgw_period*
+          - src/rgw/rgw_realm*
+          - src/rgw/driver/rados/config/**
+          - src/rgw/driver/rados/rgw_rest_realm.*
+          - src/rgw/rgw_rest_config.*
+          - src/rgw/services/svc_zone*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Configuration objects with epoch/period versioning; must interoperate with existing clusters but is mostly CRUD plus validation.
+      - id: multisite-sync
+        name: Multisite metadata and data sync
+        description: Coroutine framework, metadata and data/bucket sync state machines, datalog/mdlog, sync policy, trimming and the /admin/log REST API.
+        globs:
+          - src/rgw/rgw_coroutine.*
+          - src/rgw/rgw_cr_rest.*
+          - src/rgw/rgw_rest_conn.*
+          - src/rgw/rgw_rest_client.*
+          - src/rgw/rgw_sync_policy.*
+          - src/rgw/rgw_bucket_sync*
+          - src/rgw/rgw_metadata.cc
+          - src/rgw/rgw_mdlog_types.h
+          - src/rgw/rgw_meta_sync_status.h
+          - src/rgw/rgw_rest_metadata.*
+          - src/rgw/driver/rados/rgw_data_sync.*
+          - src/rgw/driver/rados/rgw_sync.*
+          - src/rgw/driver/rados/rgw_datalog*
+          - src/rgw/driver/rados/rgw_log_backing.*
+          - src/rgw/driver/rados/rgw_mdlog.h
+          - src/rgw/driver/rados/rgw_metadata*
+          - src/rgw/driver/rados/rgw_sync_trace.*
+          - src/rgw/driver/rados/rgw_sync_error_repo.*
+          - src/rgw/driver/rados/rgw_sync_counters.*
+          - src/rgw/driver/rados/sync_fairness.*
+          - src/rgw/driver/rados/rgw_trim_*
+          - src/rgw/driver/rados/rgw_rest_log.*
+          - src/rgw/driver/rados/rgw_cr_rados.*
+          - src/rgw/driver/rados/rgw_cr_tools.*
+          - src/rgw/driver/rados/rgw_sync_module.*
+          - src/rgw/services/svc_mdlog.*
+          - src/rgw/services/svc_bucket_sync*
+          - src/rgw/services/svc_sync_modules.*
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Distributed, resumable replication state machines on a bespoke coroutine runtime (rgw_data_sync.cc ~7k lines); correctness under partial failure and log-generation changes is subtle.
+      - id: sync-modules
+        name: Sync modules (cloud sync, Elasticsearch)
+        description: Pluggable sync targets - AWS/S3 cloud sync, Elasticsearch metadata indexing with its query frontend, and log module.
+        globs:
+          - src/rgw/driver/rados/rgw_sync_module_*
+          - src/rgw/rgw_es_*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Sync-target plugins built on the sync framework; mostly REST client logic.
+      - id: lc-cloud-tier
+        name: Lifecycle cloud transition
+        description: Transitions objects to a remote S3 cloud tier with multipart upload and restore support.
+        globs:
+          - src/rgw/driver/rados/rgw_lc_tier.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Outbound S3 client logic driven by lifecycle.
+      - id: notifications-persistent
+        name: Persistent notifications and topics
+        description: Persistent notification queues via cls_2pc_queue, push endpoints (HTTP/AMQP/Kafka), topic metadata storage and migration.
+        globs:
+          - src/rgw/driver/rados/rgw_notify.*
+          - src/rgw/driver/rados/rgw_pubsub_push.*
+          - src/rgw/driver/rados/topic*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Reservation/commit queueing and retry over RADOS queues; service-class logic.
+      - id: users-iam-metadata
+        name: Users, accounts and IAM metadata storage
+        description: RADOS persistence of users, access keys, accounts, groups, roles, OIDC providers and MFA/OTP, plus the user admin ops backend.
+        globs:
+          - src/rgw/driver/rados/rgw_user.*
+          - src/rgw/driver/rados/users.*
+          - src/rgw/driver/rados/account.*
+          - src/rgw/driver/rados/group*
+          - src/rgw/driver/rados/role*
+          - src/rgw/driver/rados/oidc*
+          - src/rgw/driver/rados/rgw_otp.*
+          - src/rgw/services/svc_user*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Metadata CRUD with index objects and uniqueness constraints; encodings must stay compatible.
+      - id: dedup
+        name: Deduplication
+        description: Cluster-wide offline object deduplication - scan epochs, fingerprint tables, cross-RGW coordination, remapping, and its admin REST.
+        globs:
+          - src/rgw/driver/rados/rgw_dedup*
+          - src/rgw/rgw_rest_dedup.*
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Rewrites object manifests in place and coordinates across gateways; correctness errors lose data.
+      - id: bucket-logging-rados
+        name: Bucket logging RADOS backend
+        description: RADOS storage for pending bucket-logging records and their commit to log objects.
+        globs:
+          - src/rgw/driver/rados/rgw_bl_rados.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Backend half of the bucket-logging feature.
+      - id: other
+        name: Other RADOS driver
+        description: Remaining RADOS driver and service sources.
+        globs:
+          - src/rgw/driver/rados/**
+          - src/rgw/services/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all remainder.
+
+  - id: rgw-drivers
+    group: rgw
+    name: RGW alternative storage drivers
+    description: Non-RADOS SAL backends and filters - POSIX, DBStore/SQLite, DAOS, D4N cache, config stores, and the FoundationDB client wrapper.
+    root: [src/rgw/driver/, src/rgw/fdb/]
+    features:
+      - id: posix
+        name: POSIX driver
+        description: SAL driver storing buckets as directories and objects as files, with an LMDB-backed bucket listing cache and inotify.
+        globs:
+          - src/rgw/driver/posix/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Filesystem-backed store with its own listing cache; conventional systems code.
+      - id: posix-vendored
+        name: POSIX driver vendored libraries
+        description: Vendored zpp_bits serializer, unordered_dense hash map and lmdb-safe C++ wrapper.
+        globs:
+          - src/rgw/driver/posix/zpp_bits.h
+          - src/rgw/driver/posix/unordered_dense.h
+          - src/rgw/driver/posix/lmdb-safe*
+        scope: not-ported
+        kind: product
+        difficulty: glue
+        why: Third-party headers; a port uses native equivalents.
+      - id: dbstore
+        name: DBStore (SQLite) driver
+        description: SAL driver keeping buckets, objects and data in SQLite, used by rgw-standalone.
+        globs:
+          - src/rgw/driver/dbstore/**
+          - src/rgw/rgw_sal_dbstore.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: SQL-backed store with prepared-statement plumbing; schema design is its own.
+      - id: dbstore-tests
+        name: DBStore tests
+        description: gtest unit tests for the DBStore driver.
+        globs:
+          - src/rgw/driver/dbstore/tests/**
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Unit tests.
+      - id: config-stores
+        name: Config stores (SQLite, JSON, immutable)
+        description: Non-RADOS realm/zone configuration stores - SQLite-backed, JSON-file and immutable in-memory.
+        globs:
+          - src/rgw/driver/dbstore/config/**
+          - src/rgw/driver/immutable_config/**
+          - src/rgw/driver/json_config/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: CRUD implementations of the config-store interface.
+      - id: daos
+        name: DAOS driver
+        description: SAL driver mapping buckets and objects onto Intel DAOS containers via libds3.
+        globs:
+          - src/rgw/driver/daos/**
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: Mostly a mapping onto an external object library. Experimental and off by default; the DAOS dependency is not carried, so the driver is costed but kept out of the headline.
+      - id: d4n-cache
+        name: D4N / D3N caching
+        description: D4N filter driver with Redis-backed directory, LFUDA cache policy, SSD and Redis cache backends, and D3N request plumbing.
+        globs:
+          - src/rgw/driver/d4n/**
+          - src/rgw/rgw_ssd_driver.*
+          - src/rgw/rgw_redis_driver.*
+          - src/rgw/rgw_cache_driver.h
+          - src/rgw/rgw_d3n_cacherequest.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Write-back cache with distributed directory and eviction policy; cache coherence adds moderate complexity.
+      - id: fdb-client
+        name: FoundationDB client wrapper
+        description: Header-only C++ wrapper over the FoundationDB C client - transactions, range scans, typed conversions.
+        globs:
+          - src/rgw/fdb/**
+          - src/rgw/ceph_fdb.h
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Binding layer over a database client that already has Go and Rust bindings.
+      - id: docs-build
+        name: Driver docs and build files
+        description: Driver READMEs, FDB notes/examples, and CMake files under driver/.
+        globs:
+          - src/rgw/driver/posix/README.md
+          - src/rgw/driver/daos/README.md
+          - src/rgw/driver/dbstore/README.md
+          - src/rgw/driver/dbstore/CMakeLists.txt
+          - src/rgw/driver/dbstore/sqlite/CMakeLists.txt
+          - src/rgw/driver/dbstore/tests/CMakeLists.txt
+          - src/rgw/fdb/EXAMPLES.md
+          - src/rgw/fdb/NOTES.txt
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Documentation and build glue.
+      - id: other
+        name: Other drivers
+        description: Remaining driver sources.
+        globs:
+          - src/rgw/driver/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all remainder.
+
+  - id: radosgw-admin
+    group: rgw
+    name: RGW admin tooling
+    description: radosgw-admin CLI, admin REST API, and operator scripts for orphan detection and index recovery.
+    root: src/rgw/radosgw-admin/
+    features:
+      - id: admin-cli
+        name: radosgw-admin CLI
+        description: The radosgw-admin command - users, buckets, zones, sync status, reshard, lc, gc, quota and more.
+        globs:
+          - src/rgw/radosgw-admin/radosgw-admin.*
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: A 12.8k-line dispatcher over SAL and service calls; wide but shallow.
+      - id: orphan-tools
+        name: Orphan and gap detection
+        description: Orphan RADOS object scan (radosgw-admin orphans) and the rgw-orphan-list / rgw-gap-list scripts.
+        globs:
+          - src/rgw/radosgw-admin/orphan.*
+          - src/rgw/rgw-orphan-list
+          - src/rgw/rgw-gap-list*
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Offline scan tooling and shell/awk scripts.
+      - id: sync-checkpoint
+        name: Sync checkpoint
+        description: Wait-for-sync checkpoint logic used by radosgw-admin bucket sync checkpoint.
+        globs:
+          - src/rgw/radosgw-admin/sync_checkpoint.*
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small polling helper.
+      - id: admin-rest
+        name: Admin REST API
+        description: /admin REST endpoints for users, buckets, usage and info.
+        globs:
+          - src/rgw/rgw_rest_admin.h
+          - src/rgw/rgw_rest_info.*
+          - src/rgw/rgw_rest_usage.*
+          - src/rgw/driver/rados/rgw_rest_bucket.*
+          - src/rgw/driver/rados/rgw_rest_user.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: REST handlers over admin ops; same class as the S3 baseline.
+      - id: admin-scripts
+        name: Operator scripts
+        description: rgw-restore-bucket-index recovery script and the rgwam realm bootstrap helper.
+        globs:
+          - src/rgw/rgw-restore-bucket-index
+          - src/rgw/rgwam.py
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin scripts that drive radosgw-admin.
+      - id: other
+        name: Other admin
+        description: Remaining radosgw-admin sources.
+        globs:
+          - src/rgw/radosgw-admin/**
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all remainder.
+
+  - id: mds
+    group: cephfs
+    name: CephFS metadata server (MDS)
+    description: The ceph-mds daemon - distributed metadata cache, distributed locking and capabilities, metadata journal, subtree partitioning, snapshots, scrub.
+    root: src/mds/
+    features:
+      - id: metadata-cache
+        name: Metadata cache (MDCache)
+        description: In-memory inode/dirfrag/dentry cache, replication across ranks, fragmentation, open file table, recovery and anchoring.
+        globs:
+          - src/mds/MDCache.*
+          - src/mds/CInode.*
+          - src/mds/CDir.*
+          - src/mds/CDentry.*
+          - src/mds/MDSCacheObject.*
+          - src/mds/Anchor.*
+          - src/mds/OpenFileTable.*
+          - src/mds/RecoveryQueue.*
+          - src/mds/inode_backtrace.*
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Brief names MDS cache as hard; MDCache.cc alone is 15.6k lines of cross-rank replication and rejoin state machines.
+      - id: locking-caps
+        name: Distributed locking and capabilities
+        description: Locker state machines (simple/scatter/file/local locks), client capability issue/revoke, file locks (flock/fcntl).
+        globs:
+          - src/mds/Locker.*
+          - src/mds/SimpleLock.*
+          - src/mds/ScatterLock.h
+          - src/mds/LocalLockC.h
+          - src/mds/locks.*
+          - src/mds/Capability.*
+          - src/mds/flock.*
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Brief names MDS locking as hard; the lock-state tables and cap protocol define client-visible coherence semantics.
+      - id: journaling
+        name: Metadata journal (MDLog)
+        description: MDLog segments and trimming, journal pointer, the LogEvent family (EMetaBlob, EUpdate, ...) and their replay.
+        globs:
+          - src/mds/MDLog.*
+          - src/mds/LogEvent.*
+          - src/mds/LogSegment*
+          - src/mds/journal.cc
+          - src/mds/events/**
+          - src/mds/JournalPointer.*
+          - src/mds/SegmentBoundary.h
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Brief names MDS journaling as hard; event encodings are on-disk formats that replay must honour exactly.
+      - id: request-handling
+        name: Client request handling (Server)
+        description: Handles client metadata ops (lookup, create, rename, setattr, ...), peer requests between ranks, mutations and batching.
+        globs:
+          - src/mds/Server.*
+          - src/mds/Mutation.*
+          - src/mds/BatchOp.*
+          - src/mds/MDSMetaRequest.h
+          - src/mds/RetryMessage.h
+          - src/mds/RetryRequest.h
+          - src/mds/metareqid_t.h
+          - src/mds/MDSContinuation.h
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: 13k-line Server.cc whose ops (cross-rank rename above all) are entangled with cache, locking and journal invariants.
+      - id: subtree-migration
+        name: Subtree migration and balancing
+        description: Export/import of subtrees between ranks, the load balancer, and Mantle Lua balancer policies.
+        globs:
+          - src/mds/Migrator.*
+          - src/mds/MDBalancer.*
+          - src/mds/Mantle.*
+          - src/mds/balancers/**
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Two-phase export protocol across ranks with failure handling; tightly bound to cache and journal.
+      - id: snapshots-tables
+        name: Snapshots and MDS tables
+        description: Snap realms and the snap server/client, inode number table, and the generic table client/server protocol.
+        globs:
+          - src/mds/SnapRealm.*
+          - src/mds/SnapServer.*
+          - src/mds/SnapClient.*
+          - src/mds/snap.*
+          - src/mds/MDSTable*
+          - src/mds/InoTable.*
+          - src/mds/mds_table_types.h
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Snapshot realm hierarchy and past-parent semantics are notoriously subtle; table updates are journaled two-phase transactions.
+      - id: sessions-auth
+        name: Client sessions and auth caps
+        description: SessionMap persistence and lifecycle, MDS auth capability parsing/checking, CephFS feature bits.
+        globs:
+          - src/mds/SessionMap.*
+          - src/mds/MDSAuthCaps.*
+          - src/mds/cephfs_features.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Session state with on-disk persistence plus a cap-string grammar; service-class code.
+      - id: scrub-damage
+        name: Scrub and damage tracking
+        description: Forward scrub stack, scrub headers, and the damage table for recorded metadata damage.
+        globs:
+          - src/mds/ScrubStack.*
+          - src/mds/ScrubHeader.h
+          - src/mds/DamageTable.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Traversal and validation driver over the cache; logic-heavy but not protocol-defining.
+      - id: purge-strays
+        name: Purge queue and stray management
+        description: Stray directory handling and the journaled purge queue that deletes file data objects.
+        globs:
+          - src/mds/PurgeQueue.*
+          - src/mds/StrayManager.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Background deletion pipeline with a small journal; contained.
+      - id: quiesce
+        name: Quiesce and quarantine
+        description: Cluster-wide quiesce database/agent used for consistent snapshots, and subtree quarantine tracking.
+        globs:
+          - src/mds/Quiesce*
+          - src/mds/MDSRankQuiesce.cc
+          - src/mds/MDSRankQuarantine.cc
+          - src/mds/QuarantineManager.*
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: A replicated consensus-like quiesce DB across ranks with its own encoding and timing semantics.
+      - id: daemon-rank
+        name: MDS daemon and rank lifecycle
+        description: MDSDaemon, MDSRank state machine (replay/rejoin/active/stopping), beacons to the monitor, contexts, admin socket commands.
+        globs:
+          - src/mds/MDSDaemon.*
+          - src/mds/MDSRank.*
+          - src/mds/Beacon.*
+          - src/mds/MDSPinger.*
+          - src/mds/MDSContext.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Daemon plumbing and state transitions; the hard parts live in the subsystems it drives.
+      - id: maps-types
+        name: FSMap, MDSMap and metadata types
+        description: FSMap/MDSMap cluster maps and the core encoded metadata types (inode_t, fnode_t, old_inode, fscrypt fields).
+        globs:
+          - src/mds/FSMap.*
+          - src/mds/FSMapUser.*
+          - src/mds/MDSMap.*
+          - src/mds/mdstypes.*
+          - src/mds/old_inode.h
+          - src/mds/fscrypt.h
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Versioned on-wire/on-disk encodings shared with the monitor, clients and tools; compatibility is unforgiving.
+      - id: metrics-qos
+        name: Metrics and QoS scheduling
+        description: Client metrics collection and aggregation for the mgr, dmclock-based MDS QoS scheduler, lock phase timing.
+        globs:
+          - src/mds/MetricAggregator.*
+          - src/mds/MetricsHandler.*
+          - src/mds/MDSPerfMetricTypes.h
+          - src/mds/MDSDmclockScheduler.*
+          - src/mds/MDSPhaseTracker.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Counters, aggregation and a scheduler adapter.
+      - id: build
+        name: MDS build files
+        description: CMake build file.
+        globs:
+          - src/mds/CMakeLists.txt
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging.
+      - id: other
+        name: Other MDS
+        description: Remaining MDS sources.
+        globs:
+          - src/mds/**
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Catch-all remainder.
+
+  - id: cephfs-client
+    group: cephfs
+    name: CephFS client (libcephfs, ceph-fuse, proxy, mount helper)
+    description: The userspace CephFS client library behind libcephfs and ceph-fuse, the libcephfs proxy daemon, and the mount.ceph helper.
+    root: [src/client/, src/libcephfs_proxy/, src/mount/]
+    features:
+      - id: client-core
+        name: Userspace client core
+        description: Client class - MDS sessions, metadata requests, capability handling, inode/dentry cache, file I/O through ObjectCacher, delegations, POSIX ACLs.
+        globs:
+          - src/client/Client.*
+          - src/client/Inode.*
+          - src/client/InodeRef.h
+          - src/client/Dentry*
+          - src/client/Dir.h
+          - src/client/Fh.*
+          - src/client/MetaRequest.*
+          - src/client/MetaSession.*
+          - src/client/ClientSnapRealm.*
+          - src/client/UserPerm.h
+          - src/client/RWRef.h
+          - src/client/ObjecterWriteback.h
+          - src/client/Delegation.*
+          - src/client/barrier.*
+          - src/client/posix_acl.*
+          - src/client/ioctl.h
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Client half of the MDS cap/lease coherence protocol; Client.cc is 19.9k lines with intricate cap, snapshot and async I/O state.
+      - id: fscrypt
+        name: fscrypt support
+        description: Client-side fscrypt policy, key management and filename/content encryption.
+        globs:
+          - src/client/FSCrypt.*
+          - src/client/fscrypt_uapi.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Implements a kernel-compatible encryption format; well specified but must match byte-for-byte.
+      - id: fuse
+        name: ceph-fuse low-level FUSE binding
+        description: Maps FUSE low-level ops onto the Client API.
+        globs:
+          - src/client/fuse_ll.*
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin adapter over libfuse; Go/Rust have FUSE crates.
+      - id: synthetic-client
+        name: Synthetic client and trace tooling
+        description: SyntheticClient workload generator, trace replay and ioctl test program.
+        globs:
+          - src/client/SyntheticClient.*
+          - src/client/Trace.*
+          - src/client/test_ioctls.c
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Test-only load generators.
+      - id: libcephfs-proxy
+        name: libcephfs proxy
+        description: libcephfsd daemon and drop-in libcephfs_proxy client library sharing one Ceph client across processes over a UNIX socket protocol.
+        globs:
+          - src/libcephfs_proxy/*.c
+          - src/libcephfs_proxy/*.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: C IPC protocol and request multiplexer; self-contained service code.
+      - id: mount-helper
+        name: mount.ceph helper
+        description: mount.ceph userspace helper - option parsing, monitor address resolution, key lookup, mtab.
+        globs:
+          - src/mount/*.c
+          - src/mount/*.h
+          - src/mount/*.cc
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small CLI helper around the kernel mount syscall.
+      - id: build
+        name: Client build files
+        description: CMake build files.
+        globs:
+          - src/client/CMakeLists.txt
+          - src/libcephfs_proxy/CMakeLists.txt
+          - src/mount/CMakeLists.txt
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging.
+      - id: other
+        name: Other client
+        description: Remaining client sources.
+        globs:
+          - src/client/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all remainder.
+
+  - id: librbd
+    group: rbd
+    name: librbd (RBD block device library)
+    description: The RADOS Block Device client library - image I/O dispatch, exclusive locking, object map, journaling, snapshots, clones, mirroring, migration, encryption and caching.
+    root: src/librbd/
+    features:
+      - id: public-api
+        name: Public C/C++ API and pool-level APIs
+        description: librbd.cc C/C++ entry points, internal helpers and the api/ layer (image, snapshot, pool, namespace, config, diff-iterate, I/O wrappers).
+        globs:
+          - src/librbd/librbd.cc
+          - src/librbd/internal.*
+          - src/librbd/api/**
+          - src/librbd/LibrbdAdminSocketHook.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Large but mechanical API surface delegating to the state machines below; librbd.cc is 7.8k lines of wrappers.
+      - id: io-path
+        name: Image I/O path
+        description: Layered image/object dispatchers, image and object requests, copyup, AIO completions, QoS and write-block dispatch, async throttling.
+        globs:
+          - src/librbd/io/**
+          - src/librbd/AsyncObjectThrottle.*
+          - src/librbd/BlockGuard.h
+          - src/librbd/AsioEngine.*
+          - src/librbd/asio/**
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Brief names librbd I/O paths as hard; ordering, copyup-on-write for clones and dispatch-layer interactions are subtle.
+      - id: image-lifecycle
+        name: Image open, refresh, create, clone and remove
+        description: ImageCtx/ImageState, open/close/refresh state machines, create/clone/remove, parent attach/detach, feature flags.
+        globs:
+          - src/librbd/ImageCtx.*
+          - src/librbd/ImageState.*
+          - src/librbd/image/**
+          - src/librbd/Features.*
+          - src/librbd/ConfigWatcher.*
+          - src/librbd/Utils.*
+          - src/librbd/Types.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Async request state machines over cls_rbd metadata; many steps but each is conventional.
+      - id: operations
+        name: Image maintenance operations
+        description: Resize, snapshot create/remove/rollback/protect, flatten, rename, feature enable/disable, sparsify, metadata, object-map rebuild.
+        globs:
+          - src/librbd/Operations.*
+          - src/librbd/operation/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Request state machines coordinated through the exclusive lock; standard service-class logic.
+      - id: locking-watch
+        name: Exclusive lock and watch/notify
+        description: ManagedLock and ExclusiveLock state machines, image watcher and notify payloads, generic watcher and rewatch handling.
+        globs:
+          - src/librbd/ExclusiveLock.*
+          - src/librbd/exclusive_lock/**
+          - src/librbd/ManagedLock.*
+          - src/librbd/managed_lock/**
+          - src/librbd/ImageWatcher.*
+          - src/librbd/image_watcher/**
+          - src/librbd/Watcher.*
+          - src/librbd/watcher/**
+          - src/librbd/WatchNotifyTypes.*
+          - src/librbd/TaskFinisher.h
+          - src/librbd/AsyncRequest.*
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Distributed lock handover and blocklisting semantics plus encoded notify messages that must interoperate with existing clients.
+      - id: object-map
+        name: Object map
+        description: Per-image object existence bitmap, its update/resize/snapshot requests and invalidation.
+        globs:
+          - src/librbd/ObjectMap.*
+          - src/librbd/object_map/**
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: On-disk bitmap format whose updates must be ordered with data I/O for correctness.
+      - id: journaling
+        name: Image journaling
+        description: RBD journal integration - event encoding, journal open/replay/promote, and write-ahead of image updates.
+        globs:
+          - src/librbd/Journal.*
+          - src/librbd/journal/**
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Journal event encodings and replay semantics underpin journal-based mirroring.
+      - id: mirroring
+        name: Mirroring
+        description: Mirror API, mirror enable/disable/promote/demote, mirror snapshots, and mirroring watcher.
+        globs:
+          - src/librbd/api/Mirror.*
+          - src/librbd/mirror/**
+          - src/librbd/MirroringWatcher.*
+          - src/librbd/mirroring_watcher/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Control-plane state machines; the data movement is in rbd-mirror.
+      - id: migration-deep-copy
+        name: Live migration and deep copy
+        description: Live image migration API, source streams (file, HTTP, S3, NBD) and raw/native/QCOW readers, plus snapshot-aware image deep copy.
+        globs:
+          - src/librbd/api/Migration.*
+          - src/librbd/migration/**
+          - src/librbd/DeepCopyRequest.*
+          - src/librbd/deep_copy/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Migration orchestrates deep copy, which rbd-mirror image sync also reuses; QCOW2 is an external well-documented format.
+      - id: encryption
+        name: Image encryption (LUKS)
+        description: Crypto object dispatch layer, LUKS1/LUKS2 format/load/flatten, OpenSSL data cryptor.
+        globs:
+          - src/librbd/crypto/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Block encryption via a dispatch layer; LUKS header handling relies on libcryptsetup.
+      - id: caching
+        name: Image caches and plugins
+        description: ObjectCacher and write-around dispatch, parent image cache client, plugin registry for cache plugins.
+        globs:
+          - src/librbd/cache/*
+          - src/librbd/plugin/**
+          - src/librbd/PluginRegistry.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Dispatch-layer adapters around existing caches.
+      - id: pwl-cache
+        name: Persistent write-log cache
+        description: SSD-backed persistent write-back log cache (PWL) with crash-consistent ordering.
+        globs:
+          - src/librbd/cache/pwl/**
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: On-disk log format with crash-consistency and sync-point ordering guarantees.
+      - id: groups-trash
+        name: Groups and trash
+        description: Consistency groups and group snapshots, image trash and trash watcher.
+        globs:
+          - src/librbd/api/Group.*
+          - src/librbd/group/**
+          - src/librbd/api/Trash.*
+          - src/librbd/trash/**
+          - src/librbd/TrashWatcher.*
+          - src/librbd/trash_watcher/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Metadata management workflows over cls_rbd.
+      - id: build
+        name: librbd build files
+        description: CMake build file.
+        globs:
+          - src/librbd/CMakeLists.txt
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging.
+      - id: other
+        name: Other librbd
+        description: Remaining librbd sources.
+        globs:
+          - src/librbd/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all remainder.
+
+  - id: rbd-mirror
+    group: rbd
+    name: rbd-mirror daemon
+    description: Asynchronous RBD replication daemon - journal- and snapshot-based image replay, image sync, leader election and image assignment.
+    root: src/tools/rbd_mirror/
+    features:
+      - id: image-replayer
+        name: Image replayer and bootstrap
+        description: Per-image replayer lifecycle, bootstrap (create/open/prepare local and remote images) and state builder.
+        globs:
+          - src/tools/rbd_mirror/ImageReplayer.*
+          - src/tools/rbd_mirror/image_replayer/*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Async state machines selecting and starting a replay mode; the replay itself is split out below.
+      - id: journal-replay
+        name: Journal-based replay
+        description: Replays remote image journal events onto the local image.
+        globs:
+          - src/tools/rbd_mirror/image_replayer/journal/**
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Consumes the librbd journal encoding with ordering and commit-position bookkeeping.
+      - id: snapshot-replay
+        name: Snapshot-based replay
+        description: Mirror-snapshot diff replay, snapshot sync state and remote/local snapshot reconciliation.
+        globs:
+          - src/tools/rbd_mirror/image_replayer/snapshot/**
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Delta replication with crash-resumable state across mirror snapshots; correctness-critical for DR.
+      - id: image-sync
+        name: Image sync
+        description: Full image sync with sync points using deep copy.
+        globs:
+          - src/tools/rbd_mirror/ImageSync.*
+          - src/tools/rbd_mirror/image_sync/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Orchestration over librbd deep-copy.
+      - id: image-deleter
+        name: Image deleter
+        description: Deferred deletion of demoted or removed mirrored images via trash.
+        globs:
+          - src/tools/rbd_mirror/ImageDeleter.*
+          - src/tools/rbd_mirror/image_deleter/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Retry-driven background workflow.
+      - id: leader-instances
+        name: Leader election and image assignment
+        description: Leader watcher via managed lock, instance tracking and notify, and the image map policy assigning images to instances.
+        globs:
+          - src/tools/rbd_mirror/LeaderWatcher.*
+          - src/tools/rbd_mirror/leader_watcher/**
+          - src/tools/rbd_mirror/InstanceWatcher.*
+          - src/tools/rbd_mirror/instance_watcher/**
+          - src/tools/rbd_mirror/Instances.*
+          - src/tools/rbd_mirror/instances/**
+          - src/tools/rbd_mirror/ImageMap.*
+          - src/tools/rbd_mirror/image_map/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: HA coordination built on librbd ManagedLock and watch/notify; the hard lock semantics live in librbd.
+      - id: pool-replay
+        name: Pool and namespace replayers
+        description: Top-level Mirror, cluster/pool watchers, pool and namespace replayers, instance replayer, remote pool polling, status updates.
+        globs:
+          - src/tools/rbd_mirror/Mirror.*
+          - src/tools/rbd_mirror/ClusterWatcher.*
+          - src/tools/rbd_mirror/PoolReplayer.*
+          - src/tools/rbd_mirror/NamespaceReplayer.*
+          - src/tools/rbd_mirror/InstanceReplayer.*
+          - src/tools/rbd_mirror/PoolWatcher.*
+          - src/tools/rbd_mirror/pool_watcher/**
+          - src/tools/rbd_mirror/RemotePoolPoller.*
+          - src/tools/rbd_mirror/PoolMetaCache.*
+          - src/tools/rbd_mirror/MirrorStatus*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Supervisory service code wiring watchers to replayers.
+      - id: daemon
+        name: Daemon plumbing
+        description: main, service-daemon status reporting, threads, throttler and shared request types.
+        globs:
+          - src/tools/rbd_mirror/main.cc
+          - src/tools/rbd_mirror/ServiceDaemon.*
+          - src/tools/rbd_mirror/service_daemon/**
+          - src/tools/rbd_mirror/Threads.*
+          - src/tools/rbd_mirror/Throttler.*
+          - src/tools/rbd_mirror/Types.*
+          - src/tools/rbd_mirror/BaseRequest.h
+          - src/tools/rbd_mirror/CancelableRequest.h
+          - src/tools/rbd_mirror/ProgressContext.h
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small daemon scaffolding.
+      - id: build
+        name: rbd-mirror build files
+        description: CMake build file.
+        globs:
+          - src/tools/rbd_mirror/CMakeLists.txt
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging.
+      - id: other
+        name: Other rbd-mirror
+        description: Remaining rbd-mirror sources.
+        globs:
+          - src/tools/rbd_mirror/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all remainder.
+
+  - id: rbd-tools
+    group: rbd
+    name: RBD command-line tools and block-device frontends
+    description: The rbd CLI and userspace block-device frontends (NBD, WNBD, ggate, FUSE), plus replay and offline recovery tools.
+    root: [src/tools/rbd/, src/tools/rbd_nbd/, src/tools/rbd_wnbd/, src/tools/rbd_ggate/, src/tools/rbd_recover_tool/, src/rbd_fuse/, src/rbd_replay/]
+    features:
+      - id: rbd-cli
+        name: rbd CLI
+        description: The rbd command - shell/argument framework and ~50 actions (create, snap, export/import, mirror, migration, bench, perf, device map).
+        globs:
+          - src/tools/rbd/**
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Argument parsing and formatting over the librbd API.
+      - id: rbd-nbd
+        name: rbd-nbd
+        description: Linux NBD server mapping RBD images as /dev/nbd devices, netlink and quiesce hooks.
+        globs:
+          - src/tools/rbd_nbd/**
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Single-file NBD protocol bridge to librbd.
+      - id: rbd-wnbd
+        name: rbd-wnbd (Windows)
+        description: Windows WNBD driver frontend with mapping service, WMI integration and client cache.
+        globs:
+          - src/tools/rbd_wnbd/**
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: Platform adapter onto the WNBD driver API. A Windows-only client, shown but outside the headline like the Dokan CephFS client.
+      - id: rbd-ggate
+        name: rbd-ggate (FreeBSD)
+        description: FreeBSD GEOM gate frontend for RBD images.
+        globs:
+          - src/tools/rbd_ggate/**
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Platform adapter onto ggate.
+      - id: rbd-fuse
+        name: rbd-fuse
+        description: FUSE filesystem exposing pool images as files.
+        globs:
+          - src/rbd_fuse/rbd-fuse.cc
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small FUSE adapter.
+      - id: rbd-replay
+        name: rbd-replay
+        description: Captures LTTng traces into replayable I/O actions (rbd-replay-prep) and replays them against images.
+        globs:
+          - src/rbd_replay/*.cc
+          - src/rbd_replay/*.h
+          - src/rbd_replay/*.hpp
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Trace parsing and a replay engine; self-contained tooling.
+      - id: rbd-recover-tool
+        name: rbd-recover-tool
+        description: Offline shell tool reconstructing RBD images directly from OSD stores when the cluster is down.
+        globs:
+          - src/tools/rbd_recover_tool/**
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Legacy shell scripts targeting Firefly-era layouts.
+      - id: rbd-recover-tool-test
+        name: rbd-recover-tool test
+        description: Test driver script for rbd-recover-tool.
+        globs:
+          - src/tools/rbd_recover_tool/test_rbd_recover_tool.sh
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Test script.
+      - id: build
+        name: RBD tools build files and docs
+        description: CMake build files and rbd-recover-tool README/FAQ/TODO.
+        globs:
+          - src/tools/rbd/CMakeLists.txt
+          - src/tools/rbd_nbd/CMakeLists.txt
+          - src/tools/rbd_wnbd/CMakeLists.txt
+          - src/tools/rbd_ggate/CMakeLists.txt
+          - src/rbd_fuse/CMakeLists.txt
+          - src/rbd_replay/CMakeLists.txt
+          - src/tools/rbd_recover_tool/README
+          - src/tools/rbd_recover_tool/FAQ
+          - src/tools/rbd_recover_tool/TODO
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging.
+
+  - id: immutable-object-cache
+    group: rbd
+    name: Immutable object cache daemon
+    description: ceph-immutable-object-cache - local read-only cache of parent image objects served to librbd over a UNIX socket.
+    root: src/tools/immutable_object_cache/
+    features:
+      - id: cache-daemon
+        name: Cache daemon
+        description: Cache server, sessions, controller, on-disk object store and LRU promotion policy.
+        globs:
+          - src/tools/immutable_object_cache/Cache{Server,Session,Controller}.*
+          - src/tools/immutable_object_cache/ObjectCacheStore.*
+          - src/tools/immutable_object_cache/Policy.h
+          - src/tools/immutable_object_cache/SimplePolicy.*
+          - src/tools/immutable_object_cache/main.cc
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Small caching service with its own socket protocol.
+      - id: client-protocol
+        name: Client library and protocol
+        description: CacheClient used by librbd's parent cache and the encoded request/reply types.
+        globs:
+          - src/tools/immutable_object_cache/CacheClient.*
+          - src/tools/immutable_object_cache/Types.*
+          - src/tools/immutable_object_cache/SocketCommon.h
+          - src/tools/immutable_object_cache/Utils.h
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Socket client and message encodings.
+      - id: build
+        name: Build files
+        description: CMake build file.
+        globs:
+          - src/tools/immutable_object_cache/CMakeLists.txt
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging.
+      - id: other
+        name: Other
+        description: Remaining sources.
+        globs:
+          - src/tools/immutable_object_cache/**
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all remainder.
+
+  - id: nvmeof-monitor-client
+    group: rbd
+    name: NVMe-oF gateway monitor client
+    description: ceph-nvmeof-monitor-client - links NVMe-oF gateways to the monitor's gateway map via beacons and gRPC to the gateway.
+    root: src/nvmeof/
+    features:
+      - id: monitor-client
+        name: Gateway monitor client
+        description: Beacons gateway state to the monitor, consumes the NVMe-oF gateway map, and drives ANA state on the gateway over gRPC.
+        globs:
+          - src/nvmeof/*.cc
+          - src/nvmeof/*.h
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small bridge between the mon client and a gRPC stub; the gateway itself is an external Python submodule.
+
+  - id: cephfs-tools
+    group: cephfs
+    name: CephFS admin and recovery tools
+    description: Offline CephFS repair and inspection tools plus the cephfs-shell and cephfs-top Python utilities.
+    root: src/tools/cephfs/
+    features:
+      - id: journal-tool
+        name: cephfs-journal-tool
+        description: Inspect, filter, export, reset and recover-dentries from the MDS journal.
+        globs:
+          - src/tools/cephfs/Journal*
+          - src/tools/cephfs/EventOutput.*
+          - src/tools/cephfs/Dumper.*
+          - src/tools/cephfs/Resetter.*
+          - src/tools/cephfs/cephfs-journal-tool.cc
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Decodes and rewrites MDS journal events using the MDS encodings.
+      - id: data-scan
+        name: cephfs-data-scan
+        description: Disaster recovery by scanning data pool objects to rebuild metadata, plus PG file listing and first-damage scan.
+        globs:
+          - src/tools/cephfs/DataScan.*
+          - src/tools/cephfs/PgFiles.*
+          - src/tools/cephfs/cephfs-data-scan.cc
+          - src/tools/cephfs/first-damage.py
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Reconstructs inodes and dentries from backtraces; must emit valid MDS on-disk metadata.
+      - id: table-meta-tools
+        name: cephfs-table-tool and meta injection
+        description: Reset/show MDS session, inode and snap tables; read/inject raw metadata objects.
+        globs:
+          - src/tools/cephfs/TableTool.*
+          - src/tools/cephfs/cephfs-table-tool.cc
+          - src/tools/cephfs/MetaTool.*
+          - src/tools/cephfs/cephfs-meta-injection.cc
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin CLIs over MDS table and object encodings.
+      - id: cephfs-bench
+        name: cephfs-bench tool
+        description: Standalone libcephfs benchmark (sync and async read/write workers).
+        globs:
+          - src/tools/cephfs/cephfs-tool.cc
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Self-contained benchmark CLI.
+      - id: tool-helpers
+        name: Shared tool helpers
+        description: MDS utility base, role selector, progress tracker used across the tools.
+        globs:
+          - src/tools/cephfs/MDSUtility.*
+          - src/tools/cephfs/RoleSelector.*
+          - src/tools/cephfs/ProgressTracker.*
+          - src/tools/cephfs/type_helper.hpp
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small shared scaffolding.
+      - id: cephfs-shell
+        name: cephfs-shell
+        description: Interactive Python shell for CephFS over the cephfs Python binding.
+        globs:
+          - src/tools/cephfs/shell/cephfs-shell
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: cmd2-based CLI over bindings.
+      - id: cephfs-top
+        name: cephfs-top
+        description: curses-based Python monitor of per-client CephFS metrics from the mgr stats module.
+        globs:
+          - src/tools/cephfs/top/cephfs-top
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Display-only client of mgr metrics.
+      - id: build
+        name: Build and packaging files
+        description: CMake, setup.py and tox files for the tools.
+        globs:
+          - src/tools/cephfs/CMakeLists.txt
+          - src/tools/cephfs/shell/CMakeLists.txt
+          - src/tools/cephfs/shell/setup.py
+          - src/tools/cephfs/shell/tox.ini
+          - src/tools/cephfs/top/CMakeLists.txt
+          - src/tools/cephfs/top/setup.py
+          - src/tools/cephfs/top/tox.ini
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging.
+      - id: other
+        name: Other CephFS tools
+        description: Remaining sources.
+        globs:
+          - src/tools/cephfs/**
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all remainder.
+
+  - id: cephfs-mirror
+    group: cephfs
+    name: cephfs-mirror daemon
+    description: Snapshot-based asynchronous CephFS directory replication daemon.
+    root: src/tools/cephfs_mirror/
+    features:
+      - id: peer-replayer
+        name: Peer replayer (snapshot sync)
+        description: Synchronises directory snapshots to peer filesystems using snapdiff, with checkpointing and crawl/transfer workers.
+        globs:
+          - src/tools/cephfs_mirror/PeerReplayer.*
+          - src/tools/cephfs_mirror/Checkpoint.*
+          - src/tools/cephfs_mirror/aio_utils.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Snapshot diff transfer with resumable state; PeerReplayer.cc is 4k lines of concurrency-heavy logic.
+      - id: mirror-control
+        name: Mirror control plane
+        description: Filesystem mirror lifecycle, cluster/mirror/instance watchers, directory assignment and service-daemon status.
+        globs:
+          - src/tools/cephfs_mirror/FSMirror.*
+          - src/tools/cephfs_mirror/Mirror.*
+          - src/tools/cephfs_mirror/ClusterWatcher.*
+          - src/tools/cephfs_mirror/MirrorWatcher.*
+          - src/tools/cephfs_mirror/InstanceWatcher.*
+          - src/tools/cephfs_mirror/Watcher.*
+          - src/tools/cephfs_mirror/watcher/**
+          - src/tools/cephfs_mirror/ServiceDaemon.*
+          - src/tools/cephfs_mirror/main.cc
+          - src/tools/cephfs_mirror/Types.*
+          - src/tools/cephfs_mirror/Utils.*
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Watch/notify driven supervision; service-class code.
+      - id: build
+        name: Build files
+        description: CMake build file.
+        globs:
+          - src/tools/cephfs_mirror/CMakeLists.txt
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging.
+      - id: other
+        name: Other cephfs-mirror
+        description: Remaining sources.
+        globs:
+          - src/tools/cephfs_mirror/**
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all remainder.

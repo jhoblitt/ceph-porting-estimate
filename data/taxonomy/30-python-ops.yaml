@@ -1,0 +1,1460 @@
+# Group 3: Python and operations tooling. ceph @ ec322a5e95ebcb46dec7d6a9d7813a34543c64ad
+# Components are appended as each is finished.
+components:
+  - id: python-bindings
+    group: common
+    name: Python language bindings
+    description: Cython bindings for librados, librbd, libcephfs and librgw, plus the shared CLI argument/daemon-socket helpers.
+    root: src/pybind/
+    features:
+      - id: rados
+        name: rados binding
+        description: Cython wrapper over librados (cluster handle, pools, ioctx, object I/O, omap, watch/notify, mon/osd/mgr commands).
+        globs: [src/pybind/rados/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin 1:1 FFI layer over the librados C API; porting means re-binding the same C calls, not re-deriving logic.
+      - id: rbd
+        name: rbd binding
+        description: Cython wrapper over librbd (images, snapshots, clones, mirroring, groups, namespaces, migration).
+        globs: [src/pybind/rbd/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Largest binding (rbd.pyx ~6.2k lines) but still a direct mapping of librbd C entry points.
+      - id: cephfs
+        name: cephfs binding
+        description: Cython wrapper over libcephfs (mount, path and fd I/O, xattrs, snapshots, quiesce).
+        globs: [src/pybind/cephfs/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Direct mapping of the libcephfs C API.
+      - id: rgw
+        name: rgw (librgw file) binding
+        description: Cython wrapper over the librgw NFS-style file API.
+        globs: [src/pybind/rgw/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small direct mapping of the librgw C API.
+      - id: cli-support
+        name: CLI argument and admin-socket helpers
+        description: ceph_argparse (mon command descriptor parsing and validation), ceph_daemon (admin socket client, perf counter display), mgr REPL.
+        globs: [src/pybind/ceph_argparse.py, src/pybind/ceph_daemon.py, src/pybind/ceph_mgr_repl.py]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Pure-Python support shared by the ceph CLI; typed argument validators and socket framing, modest logic.
+      - id: packaging
+        name: Binding build and packaging
+        description: setup.py, pyproject, MANIFEST and CMake/tox glue that builds the Cython extensions.
+        globs: [src/pybind/CMakeLists.txt, src/pybind/tox.ini,
+                src/pybind/rados/setup.py, src/pybind/rados/pyproject.toml, src/pybind/rados/MANIFEST.in, src/pybind/rados/CMakeLists.txt,
+                src/pybind/rbd/setup.py, src/pybind/rbd/pyproject.toml, src/pybind/rbd/MANIFEST.in, src/pybind/rbd/CMakeLists.txt,
+                src/pybind/cephfs/setup.py, src/pybind/cephfs/pyproject.toml, src/pybind/cephfs/MANIFEST.in, src/pybind/cephfs/CMakeLists.txt,
+                src/pybind/rgw/setup.py, src/pybind/rgw/pyproject.toml, src/pybind/rgw/MANIFEST.in, src/pybind/rgw/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build/packaging glue; replaced wholesale by the target language's build system.
+      - id: other
+        name: Other
+        description: Remainder of src/pybind not claimed by a binding or the mgr components.
+        globs: [src/pybind/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: mgr-modules
+    group: management
+    name: Ceph Manager Python modules
+    description: The Python modules hosted by ceph-mgr (orchestration, CephFS/RBD/NFS/SMB management, autoscaling, metrics, telemetry), excluding the dashboard.
+    root: src/pybind/mgr/
+    features:
+      - id: framework
+        name: Module framework
+        description: MgrModule base class, option/command plumbing, CLI decorators and output formatting, cherrypy hosting, secrets client types.
+        globs: [src/pybind/mgr/mgr_module.py, src/pybind/mgr/mgr_util.py, src/pybind/mgr/object_format.py, src/pybind/mgr/cherrypy_mgr.py, src/pybind/mgr/ceph_module.pyi,
+                src/pybind/mgr/ceph_secrets_client.py, src/pybind/mgr/ceph_secrets_types.py, src/pybind/mgr/cli_api/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: The Python half of the mgr module API every module depends on; must be reproduced against the C++ PyModule bridge.
+      - id: cephadm-core
+        name: cephadm orchestrator core
+        description: The cephadm mgr module - host inventory, placement scheduling, the serve/reconcile loop, SSH transport, agent, upgrades, cert management, migrations.
+        globs: [src/pybind/mgr/cephadm/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Largest orchestration logic in ceph (module/serve/inventory/upgrade ~13k lines); a reconcile loop with placement and staggered upgrade, baseline-level request/state logic.
+      - id: cephadm-services
+        name: cephadm daemon service specs
+        description: Per-daemon-type deployment logic (mon, mgr, osd, rgw, nfs, ingress, smb, nvmeof, monitoring stack, mgmt gateway, ...).
+        globs: [src/pybind/mgr/cephadm/services/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: One class per service type generating daemon configs and keyrings; many small but logic-bearing units.
+      - id: cephadm-templates
+        name: cephadm daemon config templates
+        description: Jinja templates for generated daemon configs (haproxy, keepalived, nginx, grafana, prometheus, alertmanager, ganesha, ...).
+        globs: [src/pybind/mgr/cephadm/templates/**]
+        scope: headline
+        kind: config
+        difficulty: config
+        why: Declarative template data, carried over as-is.
+      - id: cephadm-tests
+        name: cephadm orchestrator tests
+        description: Unit tests for the cephadm mgr module.
+        globs: [src/pybind/mgr/cephadm/tests/**]
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Mock-heavy pytest suite (~29k lines), half of the module by volume.
+      - id: orchestrator-api
+        name: Orchestrator interface and backends
+        description: The orchestrator abstraction and its 'ceph orch' CLI, plus the Rook and test backends.
+        globs: [src/pybind/mgr/orchestrator/**, src/pybind/mgr/rook/**, src/pybind/mgr/test_orchestrator/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Backend-neutral API (_interface.py) and large CLI surface; the Rook backend translates specs to Rook CRs via the Kubernetes API.
+      - id: cephfs-volumes
+        name: CephFS volumes and subvolumes
+        description: The volumes module - volume/subvolume/group lifecycle, versioned subvolume layouts, async clones and purge.
+        globs: [src/pybind/mgr/volumes/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Stateful CephFS management with on-disk subvolume metadata versions and async job queues; the CSI backend.
+      - id: nfs
+        name: NFS exports and clusters
+        description: Manages NFS-Ganesha clusters and exports (CephFS and RGW), ganesha config generation, QoS.
+        globs: [src/pybind/mgr/nfs/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Export CRUD with Ganesha config parse/emit stored in RADOS objects.
+      - id: smb
+        name: SMB shares and clusters
+        description: Declarative SMB cluster/share resources, staging and validation, stores, and Samba config generation.
+        globs: [src/pybind/mgr/smb/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Resource model with staged apply across several stores; real domain logic.
+      - id: cephfs-snapshots-mirroring
+        name: CephFS snapshot scheduling and mirroring
+        description: snap_schedule (scheduled snapshots and retention, sqlite-backed) and mirroring (directory-to-mirror-daemon mapping, peer management).
+        globs: [src/pybind/mgr/snap_schedule/**, src/pybind/mgr/mirroring/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Two CephFS data-protection modules with persistent state and a directory-assignment state machine.
+      - id: rbd-support
+        name: RBD support
+        description: rbd_support - mirror snapshot schedules, trash purge schedules, background task queue, per-image perf stats.
+        globs: [src/pybind/mgr/rbd_support/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Scheduler and task queue built on librbd; moderate logic.
+      - id: placement-automation
+        name: Balancer and autoscalers
+        description: balancer (upmap / crush-compat optimization), pg_autoscaler, mds_autoscaler.
+        globs: [src/pybind/mgr/balancer/**, src/pybind/mgr/pg_autoscaler/**, src/pybind/mgr/mds_autoscaler/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Numeric optimization over the OSDMap/PG distribution; correctness-sensitive but bounded.
+      - id: metrics-exporters
+        name: Metrics and status exporters
+        description: prometheus exporter, influx, telegraf, k8sevents, iostat, stats/osd_perf_query, status.
+        globs: [src/pybind/mgr/prometheus/**, src/pybind/mgr/influx/**, src/pybind/mgr/telegraf/**, src/pybind/mgr/k8sevents/**, src/pybind/mgr/iostat/**, src/pybind/mgr/stats/**,
+                src/pybind/mgr/osd_perf_query/**, src/pybind/mgr/status/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Metric collection and export; prometheus module (~2.9k lines) carries most of it.
+      - id: health-telemetry
+        name: Health, crash and telemetry reporting
+        description: telemetry, crash, devicehealth, diskprediction_local, insights, alerts, feedback, progress.
+        globs: [src/pybind/mgr/telemetry/**, src/pybind/mgr/crash/**, src/pybind/mgr/devicehealth/**, src/pybind/mgr/diskprediction_local/**, src/pybind/mgr/insights/**,
+                src/pybind/mgr/alerts/**, src/pybind/mgr/feedback/**, src/pybind/mgr/progress/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Mostly collection, anonymization and reporting of cluster state; little algorithmic content.
+      - id: diskprediction-models
+        name: Disk failure prediction models
+        description: Pickled SVM models and their config for diskprediction_local.
+        globs: [src/pybind/mgr/diskprediction_local/models/**]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Binary corpora (pickles), not source.
+      - id: small-modules
+        name: Small utility modules
+        description: secrets store, nvmeof, rgw realm bootstrap, localpool, osd_support, selftest, hello.
+        globs: [src/pybind/mgr/ceph_secrets/**, src/pybind/mgr/nvmeof/**, src/pybind/mgr/rgw/**, src/pybind/mgr/localpool/**, src/pybind/mgr/osd_support/**, src/pybind/mgr/selftest/**, src/pybind/mgr/hello/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin modules wrapping mon commands or a single store; little logic each.
+      - id: tests
+        name: Module unit tests
+        description: Unit tests for the framework and non-cephadm modules, plus the Rook e2e CI harness.
+        globs: [src/pybind/mgr/tests/**, src/pybind/mgr/ceph_secrets/tests/**, src/pybind/mgr/cli_api/tests/**, src/pybind/mgr/insights/tests/**, src/pybind/mgr/mds_autoscaler/tests/**,
+                src/pybind/mgr/nfs/tests/**, src/pybind/mgr/nvmeof/tests/**, src/pybind/mgr/orchestrator/tests/**, src/pybind/mgr/pg_autoscaler/tests/**, src/pybind/mgr/rgw/tests/**,
+                src/pybind/mgr/rook/ci/**, src/pybind/mgr/rook/tests/**, src/pybind/mgr/smb/tests/**, src/pybind/mgr/snap_schedule/tests/**, src/pybind/mgr/telemetry/tests/**,
+                src/pybind/mgr/volumes/tests/**, src/pybind/mgr/prometheus/test_module.py, src/pybind/mgr/progress/test_progress.py]
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: pytest suites against mocked mgr state; smb (~10k) and nfs (~3.9k) dominate.
+      - id: build-config
+        name: Lint, tox and packaging config
+        description: tox, pylint, requirements, CMake install rules and dev scaffolding (Vagrant, repo file).
+        globs: [src/pybind/mgr/tox.ini, src/pybind/mgr/.pylintrc, src/pybind/mgr/.gitignore, src/pybind/mgr/CMakeLists.txt, src/pybind/mgr/requirements.txt, src/pybind/mgr/requirements-required.txt,
+                src/pybind/mgr/telemetry/tox.ini, src/pybind/mgr/snap_schedule/tox.ini, src/pybind/mgr/snap_schedule/requirements.txt, src/pybind/mgr/snap_schedule/.gitignore,
+                src/pybind/mgr/rook/CMakeLists.txt, src/pybind/mgr/rook/requirements.txt, src/pybind/mgr/rook/.gitignore, src/pybind/mgr/rook/generate_rook_ceph_client.sh,
+                src/pybind/mgr/diskprediction_local/requirements.txt, src/pybind/mgr/cephadm/Vagrantfile, src/pybind/mgr/cephadm/vagrant.config.example.json,
+                src/pybind/mgr/cephadm/ceph.repo, src/pybind/mgr/cephadm/.gitignore]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Python build/lint tooling, replaced by the target language's toolchain.
+      - id: other
+        name: Other
+        description: Remainder of src/pybind/mgr outside the dashboard.
+        globs: [src/pybind/mgr/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: dashboard
+    group: management
+    name: Ceph Dashboard
+    description: The mgr dashboard module - a cherrypy REST backend in Python and an Angular single-page frontend.
+    root: src/pybind/mgr/dashboard/
+    features:
+      - id: rest-framework
+        name: Backend REST framework and module bootstrap
+        description: Controller/router/endpoint decorators, CRUD scaffolding, OpenAPI doc generation, task tracking, plugin system, module entry point and shared tools.
+        globs:
+          - "src/pybind/mgr/dashboard/controllers/_*.py"
+          - "src/pybind/mgr/dashboard/controllers/__init__.py"
+          - "src/pybind/mgr/dashboard/controllers/docs.py"
+          - "src/pybind/mgr/dashboard/controllers/task.py"
+          - "src/pybind/mgr/dashboard/controllers/settings.py"
+          - "src/pybind/mgr/dashboard/controllers/frontend_logging.py"
+          - "src/pybind/mgr/dashboard/module.py"
+          - "src/pybind/mgr/dashboard/tools.py"
+          - "src/pybind/mgr/dashboard/rest_client.py"
+          - "src/pybind/mgr/dashboard/exceptions.py"
+          - "src/pybind/mgr/dashboard/security.py"
+          - "src/pybind/mgr/dashboard/settings.py"
+          - "src/pybind/mgr/dashboard/cli.py"
+          - "src/pybind/mgr/dashboard/__init__.py"
+          - "src/pybind/mgr/dashboard/plugins/**"
+          - "src/pybind/mgr/dashboard/api/**"
+          - "src/pybind/mgr/dashboard/services/_paginate.py"
+          - "src/pybind/mgr/dashboard/services/exception.py"
+          - "src/pybind/mgr/dashboard/services/settings.py"
+          - "src/pybind/mgr/dashboard/services/progress.py"
+          - "src/pybind/mgr/dashboard/services/__init__.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: A small in-house web framework (routing, RBAC-aware endpoints, OpenAPI emission, async task tracking) every controller rests on.
+      - id: auth-rbac
+        name: Authentication, users and RBAC
+        description: Login/JWT sessions, local user and role store with permission scopes, password policy, SAML2 and OAuth2 SSO.
+        globs:
+          - "src/pybind/mgr/dashboard/controllers/auth.py"
+          - "src/pybind/mgr/dashboard/controllers/user.py"
+          - "src/pybind/mgr/dashboard/controllers/role.py"
+          - "src/pybind/mgr/dashboard/controllers/saml2.py"
+          - "src/pybind/mgr/dashboard/controllers/oauth2.py"
+          - "src/pybind/mgr/dashboard/services/access_control.py"
+          - "src/pybind/mgr/dashboard/services/auth/**"
+          - "src/pybind/mgr/dashboard/services/sso.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Security-sensitive but conventional web auth; ~2.5k lines.
+      - id: block
+        name: Block storage management (RBD, iSCSI, NVMe-oF)
+        description: RBD images, snapshots, trash and mirroring; iSCSI targets; NVMe-oF gateway subsystems via gRPC.
+        globs:
+          - "src/pybind/mgr/dashboard/controllers/rbd.py"
+          - "src/pybind/mgr/dashboard/controllers/rbd_mirroring.py"
+          - "src/pybind/mgr/dashboard/controllers/iscsi.py"
+          - "src/pybind/mgr/dashboard/controllers/nvmeof.py"
+          - "src/pybind/mgr/dashboard/services/rbd.py"
+          - "src/pybind/mgr/dashboard/services/iscsi_client.py"
+          - "src/pybind/mgr/dashboard/services/iscsi_config.py"
+          - "src/pybind/mgr/dashboard/services/iscsi_cli.py"
+          - "src/pybind/mgr/dashboard/services/tcmu_service.py"
+          - "src/pybind/mgr/dashboard/services/nvmeof_cli.py"
+          - "src/pybind/mgr/dashboard/services/nvmeof_client.py"
+          - "src/pybind/mgr/dashboard/services/nvmeof_conf.py"
+          - "src/pybind/mgr/dashboard/services/nvmeof_top_cli.py"
+          - "src/pybind/mgr/dashboard/model/nvmeof.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Largest controller family (nvmeof.py ~3k lines); request handling over librbd and gateway clients.
+      - id: rgw
+        name: Object gateway management
+        description: RGW buckets, users, accounts, IAM roles, multisite and zone config via the RGW admin API with SigV4 signing.
+        globs:
+          - "src/pybind/mgr/dashboard/controllers/rgw.py"
+          - "src/pybind/mgr/dashboard/controllers/rgw_iam.py"
+          - "src/pybind/mgr/dashboard/services/rgw_client.py"
+          - "src/pybind/mgr/dashboard/services/rgw_iam.py"
+          - "src/pybind/mgr/dashboard/model/rgw.py"
+          - "src/pybind/mgr/dashboard/awsauth.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Admin-API client (rgw_client.py ~3.4k lines) plus controllers; request handling at the baseline level.
+      - id: file
+        name: File services management (CephFS, NFS, SMB)
+        description: CephFS volumes, subvolumes, snapshots and quotas; NFS exports; SMB clusters and shares.
+        globs:
+          - "src/pybind/mgr/dashboard/controllers/cephfs.py"
+          - "src/pybind/mgr/dashboard/controllers/nfs.py"
+          - "src/pybind/mgr/dashboard/controllers/smb.py"
+          - "src/pybind/mgr/dashboard/services/cephfs.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Controllers delegating to libcephfs and the nfs/smb mgr modules.
+      - id: cluster
+        name: Cluster, host, OSD and pool management
+        description: Health/summary, hosts, OSDs, pools, CRUSH and EC profiles, config, services/daemons via orchestrator, monitoring proxies (Prometheus, Grafana, Loki), certificates, multi-cluster.
+        globs:
+          - "src/pybind/mgr/dashboard/controllers/**"
+          - "src/pybind/mgr/dashboard/services/**"
+          - "src/pybind/mgr/dashboard/model/**"
+          - "src/pybind/mgr/dashboard/grafana.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: The general cluster-administration controllers and their service helpers; many mid-sized request handlers.
+      - id: backend-tests
+        name: Backend unit tests
+        description: pytest suites for controllers, services and the REST framework.
+        globs:
+          - "src/pybind/mgr/dashboard/tests/**"
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Controller-level tests against a mocked mgr; ~17.5k lines.
+      - id: ci-harness
+        name: Dashboard CI and test runners
+        description: cephadm-based e2e cluster bootstrap scripts, grafana dashboard checks, and run-*-tests.sh wrappers.
+        globs:
+          - "src/pybind/mgr/dashboard/ci/**"
+          - "src/pybind/mgr/dashboard/run-backend-api-tests.sh"
+          - "src/pybind/mgr/dashboard/run-backend-api-request.sh"
+          - "src/pybind/mgr/dashboard/run-backend-rook-api-request.sh"
+          - "src/pybind/mgr/dashboard/run-frontend-e2e-tests.sh"
+          - "src/pybind/mgr/dashboard/run-frontend-unittests.sh"
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Shell glue that stands up clusters and runs test suites.
+      - id: generated
+        name: Generated and vendored backend artifacts
+        description: openapi.yaml (emitted by tox openapi-fix), gRPC Python stubs and the vendored NVMe-oF gateway.proto.
+        globs:
+          - "src/pybind/mgr/dashboard/openapi.yaml"
+          - "src/pybind/mgr/dashboard/services/proto/**"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Regenerated from source, or copied from ceph-nvmeof.
+      - id: backend-build-config
+        name: Backend lint, tox and packaging config
+        description: tox, pylint, requirements, CMake and editor config for the backend.
+        globs:
+          - "src/pybind/mgr/dashboard/tox.ini"
+          - "src/pybind/mgr/dashboard/.pylintrc"
+          - "src/pybind/mgr/dashboard/.coveragerc"
+          - "src/pybind/mgr/dashboard/.editorconfig"
+          - "src/pybind/mgr/dashboard/.gitignore"
+          - "src/pybind/mgr/dashboard/CMakeLists.txt"
+          - "src/pybind/mgr/dashboard/requirements.txt"
+          - "src/pybind/mgr/dashboard/requirements-lint.txt"
+          - "src/pybind/mgr/dashboard/requirements-test.txt"
+          - "src/pybind/mgr/dashboard/constraints.txt"
+          - "src/pybind/mgr/dashboard/HACKING.rst"
+          - "src/pybind/mgr/dashboard/README.rst"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Python toolchain config, replaced by the target toolchain.
+      - id: fe-block
+        name: Frontend block storage pages
+        description: Angular pages for RBD images, mirroring, iSCSI and NVMe-oF.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/block/**/*.{html,scss}"
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/block/**/*[!c].ts"
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: Forms, tables and wizards over the REST API; UI glue rather than storage logic.
+      - id: fe-rgw
+        name: Frontend object gateway pages
+        description: Angular pages for buckets, users, accounts, roles, multisite and RGW config.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/rgw/**/*.{html,scss}"
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/rgw/**/*[!c].ts"
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: Largest page family (multisite wizard, bucket policy editors) but still UI over REST.
+      - id: fe-file
+        name: Frontend file services pages
+        description: Angular pages for CephFS, NFS exports and SMB.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/{cephfs,nfs,smb}/**/*.{html,scss}"
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/{cephfs,nfs,smb}/**/*[!c].ts"
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: UI over the file-services REST endpoints.
+      - id: fe-cluster
+        name: Frontend cluster pages and overview
+        description: Angular pages for hosts, OSDs, pools, services, config, monitoring, the overview/landing dashboards and shared ceph widgets.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/{cluster,pool,overview,dashboard-v3,performance-counter,shared}/**/*.{html,scss}"
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/{cluster,pool,overview,dashboard-v3,performance-counter,shared}/**/*[!c].ts"
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/ceph.module.ts"
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: UI over the cluster-administration REST endpoints.
+      - id: fe-shared
+        name: Frontend shared library
+        description: REST API client services, datatable, form helpers and validators, reusable components, pipes, directives, models.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/src/app/shared/**/*.{html,scss}"
+          - "src/pybind/mgr/dashboard/frontend/src/app/shared/**/*[!c].ts"
+          - "src/pybind/mgr/dashboard/frontend/src/app/shared/models/image-spec.ts"
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: Generic Angular infrastructure (one API client per backend controller, the datatable, CD validators).
+      - id: fe-shell
+        name: Frontend application shell
+        description: App module and routing, navigation, auth guards and login, layouts, error pages, global styles and assets, bootstrap entry points.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/src/app/core/**/*.{html,scss}"
+          - "src/pybind/mgr/dashboard/frontend/src/app/core/**/*[!c].ts"
+          - "src/pybind/mgr/dashboard/frontend/src/app/app*.{html,scss}"
+          - "src/pybind/mgr/dashboard/frontend/src/app/app*[!c].ts"
+          - "src/pybind/mgr/dashboard/frontend/src/styles/**"
+          - "src/pybind/mgr/dashboard/frontend/src/styles.scss"
+          - "src/pybind/mgr/dashboard/frontend/src/assets/**"
+          - "src/pybind/mgr/dashboard/frontend/src/environments/**"
+          - "src/pybind/mgr/dashboard/frontend/src/main.ts"
+          - "src/pybind/mgr/dashboard/frontend/src/polyfills.ts"
+          - "src/pybind/mgr/dashboard/frontend/src/index.html"
+          - "src/pybind/mgr/dashboard/frontend/src/typings.d.ts"
+          - "src/pybind/mgr/dashboard/frontend/src/favicon.ico"
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: Framework wiring and styling; tied to Angular and Carbon, little domain logic.
+      - id: fe-unit-tests
+        name: Frontend unit tests
+        description: Jest specs colocated with components, test helpers and JSON fixtures.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/src/**/*.spec.ts"
+          - "src/pybind/mgr/dashboard/frontend/src/app/ceph/**/fixtures/**"
+          - "src/pybind/mgr/dashboard/frontend/src/testing/**"
+          - "src/pybind/mgr/dashboard/frontend/src/jestGlobalMocks.ts"
+          - "src/pybind/mgr/dashboard/frontend/src/setupJest.ts"
+        scope: shown
+        kind: test
+        difficulty: glue
+        why: Component and service specs (~70k lines), mostly TestBed setup and mocked HTTP.
+      - id: fe-e2e-tests
+        name: Frontend end-to-end tests
+        description: Cypress e2e specs, page objects and Gherkin features.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/cypress/**"
+          - "src/pybind/mgr/dashboard/frontend/cypress.config.ts"
+        scope: shown
+        kind: test
+        difficulty: glue
+        why: Browser-driven UI tests.
+      - id: fe-i18n
+        name: Frontend translations
+        description: Generated XLIFF translation catalogs (one per locale) synced from Transifex.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/src/locale/**"
+          - "src/pybind/mgr/dashboard/frontend/.tx/**"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Generated i18n data (~280k lines), not source.
+      - id: fe-lockfile
+        name: Frontend npm lockfile
+        description: package-lock.json.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/package-lock.json"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Lockfile.
+      - id: fe-build-config
+        name: Frontend build and lint config
+        description: package.json, Angular/TypeScript/Jest/Babel/ESLint/Stylelint config, CMake build rules, build helper cd.js, git hooks.
+        globs:
+          - "src/pybind/mgr/dashboard/frontend/package.json"
+          - "src/pybind/mgr/dashboard/frontend/angular.json"
+          - "src/pybind/mgr/dashboard/frontend/tsconfig*.json"
+          - "src/pybind/mgr/dashboard/frontend/eslint.config.mjs"
+          - "src/pybind/mgr/dashboard/frontend/jest.config.cjs"
+          - "src/pybind/mgr/dashboard/frontend/babel.config.js"
+          - "src/pybind/mgr/dashboard/frontend/ngcc.config.js"
+          - "src/pybind/mgr/dashboard/frontend/module-federation.config.ts"
+          - "src/pybind/mgr/dashboard/frontend/cd.js"
+          - "src/pybind/mgr/dashboard/frontend/CMakeLists.txt"
+          - "src/pybind/mgr/dashboard/frontend/proxy.conf.json.sample"
+          - "src/pybind/mgr/dashboard/frontend/.browserslistrc"
+          - "src/pybind/mgr/dashboard/frontend/.editorconfig"
+          - "src/pybind/mgr/dashboard/frontend/.gitignore"
+          - "src/pybind/mgr/dashboard/frontend/.npmrc"
+          - "src/pybind/mgr/dashboard/frontend/.nvmrc"
+          - "src/pybind/mgr/dashboard/frontend/.prettierrc"
+          - "src/pybind/mgr/dashboard/frontend/.stylelintrc"
+          - "src/pybind/mgr/dashboard/frontend/.husky/**"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Node/Angular toolchain config.
+      - id: other
+        name: Other
+        description: Remainder of the dashboard module.
+        globs:
+          - "src/pybind/mgr/dashboard/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: cephadm
+    group: management
+    name: cephadm (host agent and bootstrap)
+    description: The single-file cephadm binary run on each host - bootstraps clusters and deploys, adopts and removes containerized daemons under systemd.
+    root: src/cephadm/
+    features:
+      - id: cli-bootstrap
+        name: CLI, bootstrap and cluster lifecycle
+        description: Command dispatch, cluster bootstrap, deploy/adopt/rm-daemon/rm-cluster, shell and registry login, plus the privileged invoker wrapper.
+        globs:
+          - "src/cephadm/cephadm.py"
+          - "src/cephadm/cephadmlib/cluster_ops.py"
+          - "src/cephadm/cephadm_invoker.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: The command surface (cephadm.py ~6.7k lines) orchestrating bootstrap and daemon lifecycle; procedural but long.
+      - id: daemon-forms
+        name: Daemon type definitions
+        description: Per-daemon-type container forms (ceph daemons, monitoring stack, ingress, nfs, iscsi, nvmeof, smb, ...) and their deployment identity.
+        globs:
+          - "src/cephadm/cephadmlib/daemons/**"
+          - "src/cephadm/cephadmlib/daemon_form.py"
+          - "src/cephadm/cephadmlib/container_daemon_form.py"
+          - "src/cephadm/cephadmlib/daemon_identity.py"
+          - "src/cephadm/cephadmlib/deployment_utils.py"
+          - "src/cephadm/cephadmlib/deploy.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: One class per daemon type assembling container args, mounts and config files.
+      - id: host-facts
+        name: Host facts, inventory and packaging
+        description: Gathers host hardware/OS facts, lists deployed daemons, manages distro package repos, runs the host agent.
+        globs:
+          - "src/cephadm/cephadmlib/host_facts.py"
+          - "src/cephadm/cephadmlib/listing.py"
+          - "src/cephadm/cephadmlib/listing_updaters.py"
+          - "src/cephadm/cephadmlib/packagers.py"
+          - "src/cephadm/cephadmlib/agent.py"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Reads /proc, /sys and package managers and reports JSON; little algorithmic content.
+      - id: runtime
+        name: Container runtime and host integration
+        description: Podman/Docker engines, container command building, systemd units, firewalld, sysctl, locking, logging, networking and file helpers.
+        globs:
+          - "src/cephadm/cephadmlib/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin wrappers over podman/docker, systemctl and the filesystem.
+      - id: templates
+        name: Host-side config templates
+        description: Jinja templates for systemd units, init containers, logrotate, sidecars.
+        globs:
+          - "src/cephadm/cephadmlib/templates/**"
+        scope: headline
+        kind: config
+        difficulty: config
+        why: Declarative templates.
+      - id: tests
+        name: cephadm unit tests
+        description: pytest suite for the cephadm binary.
+        globs:
+          - "src/cephadm/tests/**"
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Mocked-host unit tests (~10.9k lines).
+      - id: dev-env
+        name: Development and smoke-test environments
+        description: cephadm-box (containerized multi-host dev cluster), dev containers, sample specs, vstart smoke scripts.
+        globs:
+          - "src/cephadm/box/**"
+          - "src/cephadm/containers/**"
+          - "src/cephadm/samples/**"
+          - "src/cephadm/vstart-smoke.sh"
+          - "src/cephadm/vstart-cleanup.sh"
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Developer test harnesses rather than shipped product.
+      - id: build
+        name: zipapp build and packaging
+        description: build.py/build.sh producing the cephadm zipapp, tox, CMake and requirement pins.
+        globs:
+          - "src/cephadm/build.py"
+          - "src/cephadm/build.sh"
+          - "src/cephadm/zipapp-reqs.txt"
+          - "src/cephadm/tox.ini"
+          - "src/cephadm/CMakeLists.txt"
+          - "src/cephadm/.gitignore"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Python packaging; a compiled port ships a binary instead.
+      - id: other
+        name: Other
+        description: Remainder of src/cephadm.
+        globs:
+          - "src/cephadm/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: ceph-volume
+    group: management
+    name: ceph-volume
+    description: The OSD device provisioning tool - prepares, activates, lists and zaps OSD devices via LVM or raw block devices, with optional dm-crypt.
+    root: src/ceph-volume/
+    features:
+      - id: lvm
+        name: LVM device mode
+        description: lvm prepare/activate/create/batch/list/migrate/zap/new-db/new-wal and the LVM command wrapper API.
+        globs:
+          - "src/ceph-volume/ceph_volume/devices/lvm/**"
+          - "src/ceph-volume/ceph_volume/api/**"
+          - "src/ceph-volume/ceph_volume/util/lvm_osd_mappers.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: The main provisioning path; batch sizing and LV tagging carry real logic (~4.5k lines).
+      - id: raw-simple
+        name: Raw and legacy device modes
+        description: raw prepare/activate/list on bare block devices, and 'simple' scan/activate for legacy ceph-disk OSDs.
+        globs:
+          - "src/ceph-volume/ceph_volume/devices/raw/**"
+          - "src/ceph-volume/ceph_volume/devices/simple/**"
+          - "src/ceph-volume/ceph_volume/util/raw_osd_crypt_mappers.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Alternate provisioning paths sharing the objectstore layer.
+      - id: osd-prepare
+        name: OSD objectstore prepare and activate
+        description: Backend-neutral BlueStore prepare/activate pipeline (mkfs, keyring, osd id allocation) for LVM and raw.
+        globs:
+          - "src/ceph-volume/ceph_volume/objectstore/**"
+          - "src/ceph-volume/ceph_volume/util/prepare.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Sequences ceph-osd mkfs, auth and symlink layout; order-sensitive.
+      - id: device-discovery
+        name: Device discovery and inventory
+        description: lsblk/udev/sysfs parsing, device eligibility rules, libstoragemgmt and NVMe probing, the inventory command.
+        globs:
+          - "src/ceph-volume/ceph_volume/util/disk.py"
+          - "src/ceph-volume/ceph_volume/util/device.py"
+          - "src/ceph-volume/ceph_volume/util/lsmdisk.py"
+          - "src/ceph-volume/ceph_volume/util/nvme.py"
+          - "src/ceph-volume/ceph_volume/util/nvme_sysfs.py"
+          - "src/ceph-volume/ceph_volume/inventory/**"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Eligibility logic the orchestrator relies on; disk.py parses many kernel interfaces (~2.7k lines).
+      - id: encryption
+        name: dm-crypt / LUKS encryption
+        description: LUKS formatting and opening, key fetching from the mon config-key store, TPM2 enrollment.
+        globs:
+          - "src/ceph-volume/ceph_volume/util/encryption.py"
+          - "src/ceph-volume/ceph_volume/util/osd_luks_credentials.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Security-relevant cryptsetup orchestration.
+      - id: cli-core
+        name: CLI framework and system plumbing
+        description: Entry point and subcommand dispatch, config parsing, subprocess runner, terminal output, systemd and activate/drive_group dispatch, system helpers.
+        globs:
+          - "src/ceph-volume/ceph_volume/*.py"
+          - "src/ceph-volume/ceph_volume/systemd/**"
+          - "src/ceph-volume/ceph_volume/activate/**"
+          - "src/ceph-volume/ceph_volume/drive_group/**"
+          - "src/ceph-volume/ceph_volume/devices/__init__.py"
+          - "src/ceph-volume/ceph_volume/util/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Argument parsing, logging and subprocess wrappers.
+      - id: zfs-plugin
+        name: ZFS plugin
+        description: Out-of-tree style ceph-volume plugin for ZFS-backed OSDs on FreeBSD.
+        globs:
+          - "src/ceph-volume/plugin/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small plugin mirroring the lvm subcommands.
+      - id: unit-tests
+        name: Unit tests
+        description: pytest suite for devices, util, api and objectstore.
+        globs:
+          - "src/ceph-volume/ceph_volume/tests/**"
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Mock-heavy unit tests (~13k lines).
+      - id: functional-tests
+        name: Functional test scenarios
+        description: Vagrant/Ansible scenario definitions and playbooks for lvm, batch and raw functional runs.
+        globs:
+          - "src/ceph-volume/ceph_volume/tests/functional/**"
+        scope: headline
+        kind: test
+        difficulty: config
+        why: Mostly declarative scenario YAML, Vagrantfile and small scripts.
+      - id: packaging
+        name: Packaging and tox
+        description: setup.py, tox configs, CMake install rules, requirements.
+        globs:
+          - "src/ceph-volume/setup.py"
+          - "src/ceph-volume/CMakeLists.txt"
+          - "src/ceph-volume/tox.ini"
+          - "src/ceph-volume/shell_tox.ini"
+          - "src/ceph-volume/tox_install_command.sh"
+          - "src/ceph-volume/MANIFEST.in"
+          - "src/ceph-volume/requirements.txt"
+          - "src/ceph-volume/.gitignore"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Python packaging.
+      - id: other
+        name: Other
+        description: Remainder of src/ceph-volume.
+        globs:
+          - "src/ceph-volume/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: python-common
+    group: management
+    name: python-common (shared Python library)
+    description: The 'ceph' Python package shared by the mgr, cephadm and ceph-volume - service specs, drive groups, RGW and SMB helpers, crypto wrappers.
+    root: src/python-common/
+    features:
+      - id: service-specs
+        name: Service and placement specs
+        description: ServiceSpec and subclasses for every daemon type, PlacementSpec, HostSpec, validation and YAML round-tripping.
+        globs:
+          - "src/python-common/ceph/deployment/service_spec.py"
+          - "src/python-common/ceph/deployment/hostspec.py"
+          - "src/python-common/ceph/deployment/utils.py"
+          - "src/python-common/ceph/deployment/tls_utils.py"
+          - "src/python-common/ceph/deployment/inventory.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: The declarative orchestration data model (service_spec.py ~4.8k lines) with intricate validation; a public API both orchestrators consume.
+      - id: drive-groups
+        name: OSD drive groups and drive selection
+        description: DriveGroupSpec, device filter matching and translation to ceph-volume batch commands.
+        globs:
+          - "src/python-common/ceph/deployment/drive_group.py"
+          - "src/python-common/ceph/deployment/drive_selection/**"
+          - "src/python-common/ceph/deployment/translate.py"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Filter/limit matching over device inventories; subtle selection semantics.
+      - id: rgw-helpers
+        name: RGW admin helpers
+        description: rgwam realm/zonegroup/zone bootstrap and diff logic, RGW types.
+        globs:
+          - "src/python-common/ceph/rgw/**"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Multisite bootstrap driving radosgw-admin (rgwam_core.py ~1.1k lines).
+      - id: smb-helpers
+        name: SMB control helpers
+        description: smb ctl client and shared SMB constants/network types.
+        globs:
+          - "src/python-common/ceph/smb/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small shared types and a control client for the smb module.
+      - id: misc-helpers
+        name: Crypto, CephFS and cephadm helpers
+        description: cryptotools (out-of-process crypto calls), CephFS earmarking/enctag, cephadm image and d3n types, general utils.
+        globs:
+          - "src/python-common/ceph/cryptotools/**"
+          - "src/python-common/ceph/fs/**"
+          - "src/python-common/ceph/cephadm/**"
+          - "src/python-common/ceph/utils.py"
+          - "src/python-common/ceph/py.typed"
+          - "src/python-common/ceph/__init__.py"
+          - "src/python-common/ceph/deployment/__init__.py"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small utility modules.
+      - id: tests
+        name: Unit tests
+        description: pytest suite for specs, drive selection, rgwam, TLS and utils.
+        globs:
+          - "src/python-common/ceph/tests/**"
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Spec round-trip and selection tests (~5.2k lines).
+      - id: packaging
+        name: Packaging
+        description: setup.py, pyproject, tox, CMake, requirements.
+        globs:
+          - "src/python-common/setup.py"
+          - "src/python-common/pyproject.toml"
+          - "src/python-common/tox.ini"
+          - "src/python-common/CMakeLists.txt"
+          - "src/python-common/requirements.txt"
+          - "src/python-common/README.rst"
+          - "src/python-common/.gitignore"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Python packaging.
+      - id: other
+        name: Other
+        description: Remainder of src/python-common.
+        globs:
+          - "src/python-common/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: tools
+    group: tools
+    name: Admin and debug tools
+    description: Standalone C++ CLIs and scripts under src/tools (rados, ceph-objectstore-tool, monstore/kvstore tools, crushtool/osdmaptool, ceph-dencoder, dedup), excluding the rbd, cephfs and immutable-object-cache tools.
+    root: src/tools/
+    features:
+      - id: rados-cli
+        name: rados CLI
+        description: The rados command (object/pool ops, bench, import/export), pool dump/import, and the neorados CLI.
+        globs:
+          - "src/tools/rados/**"
+          - "src/tools/RadosDump.cc"
+          - "src/tools/RadosDump.h"
+          - "src/tools/neorados.cc"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: A large argument-dispatch CLI (rados.cc ~4.4k lines) over librados; the logic lives in the library.
+      - id: objectstore-tool
+        name: ceph-objectstore-tool
+        description: Offline OSD store surgery - list/export/import PGs and objects, fix up PG metadata, remove/mark-complete.
+        globs:
+          - "src/tools/ceph_objectstore_tool.cc"
+          - "src/tools/ceph_objectstore_tool.h"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Manipulates PG logs, info and on-disk metadata through the ObjectStore API; needs OSD internals knowledge.
+      - id: monstore-tools
+        name: Monitor store recovery tools
+        description: ceph-monstore-tool (inspect/edit/rebuild mon store), rebuild of the mon DB from OSDs, crush update helper.
+        globs:
+          - "src/tools/ceph_monstore_tool.cc"
+          - "src/tools/rebuild_mondb.cc"
+          - "src/tools/rebuild_mondb.h"
+          - "src/tools/ceph-monstore-update-crush.sh"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Disaster-recovery tooling that reads and writes Paxos-versioned mon store keys directly.
+      - id: kvstore-tool
+        name: ceph-kvstore-tool
+        description: Inspect and edit RocksDB/BlueStore key-value stores offline.
+        globs:
+          - "src/tools/ceph_kvstore_tool.cc"
+          - "src/tools/kvstore_tool.cc"
+          - "src/tools/kvstore_tool.h"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin CLI over the KeyValueDB interface.
+      - id: map-tools
+        name: CRUSH, OSDMap and monmap tools
+        description: crushtool (compile/decompile/test), osdmaptool (upmap, pg mapping tests), monmaptool, psim, crushdiff.
+        globs:
+          - "src/tools/crushtool.cc"
+          - "src/tools/osdmaptool.cc"
+          - "src/tools/monmaptool.cc"
+          - "src/tools/psim.cc"
+          - "src/tools/crushdiff"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Front ends over the CRUSH/OSDMap libraries; the algorithms live in src/crush and src/osd.
+      - id: dencoder
+        name: ceph-dencoder
+        description: Type registry and plugins for encoding/decoding/dumping every versioned on-wire/on-disk type.
+        globs:
+          - "src/tools/ceph-dencoder/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Registration tables and macros per subsystem; the encodings themselves live elsewhere.
+      - id: dedup
+        name: Dedup tool and daemon
+        description: ceph-dedup-tool (chunk dedup estimation, chunk/flush ops) and the ceph-dedup-daemon.
+        globs:
+          - "src/tools/ceph_dedup/**"
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Content-defined chunking estimation and a background dedup daemon over librados manifests.
+      - id: misc-cli
+        name: Small utility CLIs
+        description: ceph-authtool, ceph-conf, ceph-erasure-code-tool, ceph-client-debug, ceph-diff-sorted, scratch tools, histogram dump.
+        globs:
+          - "src/tools/ceph_authtool.cc"
+          - "src/tools/ceph_conf.cc"
+          - "src/tools/ceph-client-debug.cc"
+          - "src/tools/ceph-diff-sorted.cc"
+          - "src/tools/scratchtool.c"
+          - "src/tools/scratchtoolpp.cc"
+          - "src/tools/erasure-code/**"
+          - "src/tools/histogram_dump.py"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small single-purpose CLIs.
+      - id: contrib-scripts
+        name: Operator scripts
+        description: contrib scripts (upmap-remapped, bluestore migration, CPU affinity helpers), ceph-lazy, RGW usage/coroutine-dump scripts, virtualenv setup.
+        globs:
+          - "src/tools/contrib/**"
+          - "src/tools/ceph-lazy/**"
+          - "src/tools/rgw/**"
+          - "src/tools/setup-virtualenv.sh"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Standalone Python/shell scripts.
+      - id: build
+        name: Build rules
+        description: CMake rules for the tools.
+        globs:
+          - "src/tools/CMakeLists.txt"
+          - "src/tools/ceph-dencoder/CMakeLists.txt"
+          - "src/tools/ceph_dedup/CMakeLists.txt"
+          - "src/tools/erasure-code/CMakeLists.txt"
+          - "src/tools/rgw/CMakeLists.txt"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: CMake.
+      - id: other
+        name: Other
+        description: Remaining top-level files in src/tools (deliberately not recursive, so the rbd/cephfs/immutable-object-cache trees owned elsewhere are not claimed).
+        globs:
+          - "src/tools/*"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: monitoring
+    group: management
+    name: Monitoring mixin (Grafana and Prometheus)
+    description: The ceph-mixin Jsonnet sources for Grafana dashboards and Prometheus alert rules, their tests, the Crimson dashboard generator and the SNMP MIB.
+    root: monitoring/
+    features:
+      - id: dashboards
+        name: Grafana dashboard sources
+        description: Jsonnet definitions of the Ceph Grafana dashboards (cluster, hosts, hardware, OSDs, pools, RBD, RGW, CephFS, NVMe-oF, SMB, multi-cluster).
+        globs:
+          - "monitoring/ceph-mixin/dashboards/**"
+          - "monitoring/ceph-mixin/dashboards.libsonnet"
+          - "monitoring/ceph-mixin/dashboards.jsonnet"
+          - "monitoring/ceph-mixin/config.libsonnet"
+          - "monitoring/ceph-mixin/mixin.libsonnet"
+        scope: shown
+        kind: config
+        difficulty: config
+        why: Declarative dashboard templates; carried over as data, not ported.
+      - id: alerts
+        name: Prometheus alert rule sources
+        description: Jsonnet definitions of the Prometheus alerting rules.
+        globs:
+          - "monitoring/ceph-mixin/prometheus_alerts.libsonnet"
+          - "monitoring/ceph-mixin/alerts.libsonnet"
+          - "monitoring/ceph-mixin/alerts.jsonnet"
+        scope: shown
+        kind: config
+        difficulty: config
+        why: Declarative PromQL rule definitions.
+      - id: tests
+        name: Alert and dashboard tests
+        description: promtool alert unit tests, rule validators, and behave-based dashboard query tests.
+        globs:
+          - "monitoring/ceph-mixin/tests_alerts/**"
+          - "monitoring/ceph-mixin/tests_dashboards/**"
+        scope: shown
+        kind: test
+        difficulty: glue
+        why: Test fixtures (test_alerts.yml ~3.7k lines) and small Python harnesses.
+      - id: crimson-generator
+        name: Crimson OSD dashboard generator
+        description: Python generator for the Crimson OSD Grafana dashboard and a vstart helper to run the monitoring stack.
+        globs:
+          - "monitoring/crimson/gen_dashboard.py"
+          - "monitoring/crimson/vstart-monitoring.sh"
+          - "monitoring/crimson/README.md"
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: Small script emitting dashboard JSON.
+      - id: snmp-mib
+        name: SNMP MIB
+        description: CEPH-MIB definition for the SNMP gateway alert integration.
+        globs:
+          - "monitoring/snmp/**"
+        scope: shown
+        kind: config
+        difficulty: config
+        why: Declarative MIB.
+      - id: generated
+        name: Generated dashboards and rules
+        description: dashboards_out/*.json and prometheus_alerts.yml (make generate), crimson-osd.json (gen_dashboard.py), jsonnet lockfile.
+        globs:
+          - "monitoring/ceph-mixin/dashboards_out/**"
+          - "monitoring/ceph-mixin/prometheus_alerts.yml"
+          - "monitoring/crimson/crimson-osd.json"
+          - "monitoring/ceph-mixin/jsonnetfile.lock.json"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build outputs committed for convenience (README says regenerate with 'make generate').
+      - id: build-tooling
+        name: Build, lint and packaging tooling
+        description: Makefile, tox, CMake, jsonnet bundler/lint scripts, requirement pins, grafana image build, screenshots.
+        globs:
+          - "monitoring/ceph-mixin/Makefile"
+          - "monitoring/ceph-mixin/tox.ini"
+          - "monitoring/ceph-mixin/CMakeLists.txt"
+          - "monitoring/ceph-mixin/README.md"
+          - "monitoring/ceph-mixin/test-jsonnet.sh"
+          - "monitoring/ceph-mixin/lint-jsonnet.sh"
+          - "monitoring/ceph-mixin/jsonnet-bundler-build.sh"
+          - "monitoring/ceph-mixin/jsonnetfile.json"
+          - "monitoring/ceph-mixin/requirements-lint.txt"
+          - "monitoring/ceph-mixin/requirements-alerts.txt"
+          - "monitoring/ceph-mixin/requirements-grafonnet.txt"
+          - "monitoring/ceph-mixin/.gitignore"
+          - "monitoring/grafana/**"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Toolchain glue and binary screenshots.
+      - id: other
+        name: Other
+        description: Remainder of monitoring/.
+        globs:
+          - "monitoring/**"
+        scope: shown
+        kind: config
+        difficulty: config
+        why: Catch-all.
+  - id: scripts
+    group: tools
+    name: Developer and maintainer scripts
+    description: src/script - release/backport tooling, build and CI wrappers, developer container tooling, and ad-hoc cluster debugging scripts.
+    root: src/script/
+    features:
+      - id: cluster-debug
+        name: Cluster debugging and admin scripts
+        description: Stretch-mode setup, OSD add, CPU maps, PG log dup finder, log dump decoder, CephFS dirfrag splitter, bdev and kernel-console helpers, SMR benchmarks.
+        globs:
+          - "src/script/set_up_stretch_mode.sh"
+          - "src/script/extend_stretch_cluster.sh"
+          - "src/script/add_osd.sh"
+          - "src/script/cpu-map.sh"
+          - "src/script/find_dups_in_pg_log.sh"
+          - "src/script/ceph_dump_log.py"
+          - "src/script/dirfrag_split.py"
+          - "src/script/bdev_grep.pl"
+          - "src/script/crash_bdev.sh"
+          - "src/script/kcon_all.sh"
+          - "src/script/kcon_most.sh"
+          - "src/script/unhexdump-C"
+          - "src/script/smr_benchmark/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small operational scripts that act on a running cluster or its artifacts.
+      - id: cluster-debug-tests
+        name: Stretch CRUSH collision test
+        description: Shell test for stretch-mode CRUSH rule collisions.
+        globs:
+          - "src/script/test_stretch_crush_collisions.sh"
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Single shell test.
+      - id: maintainer-tools
+        name: Release, backport and project-maintenance tools
+        description: ptl-tool (integration branches), redmine upkeep, ceph-backport, release notes, credits, Jenkins/CI analysis, config-diff check, source-hygiene scripts.
+        globs:
+          - "src/script/ptl-tool.py"
+          - "src/script/redmine-upkeep.py"
+          - "src/script/requirements.redmine-upkeep.txt"
+          - "src/script/ceph-backport.sh"
+          - "src/script/ceph-release-notes"
+          - "src/script/build-integration-branch"
+          - "src/script/credits.sh"
+          - "src/script/analyze_unittest_jenkins.py"
+          - "src/script/pin-gh-workflow-deps.sh"
+          - "src/script/clean-ci"
+          - "src/script/verify-qa"
+          - "src/script/qa-summary.sh"
+          - "src/script/fix_modeline.pl"
+          - "src/script/add_header.pl"
+          - "src/script/strip_trailing_whitespace.sh"
+          - "src/script/check_commands.sh"
+          - "src/script/config-diff/**"
+        scope: not-ported
+        kind: product
+        difficulty: glue
+        why: Project infrastructure (GitHub/Redmine/Jenkins automation), not part of the storage system.
+      - id: maintainer-tools-tests
+        name: ptl-tool tests
+        description: Unit tests for ptl-tool.
+        globs:
+          - "src/script/test_ptl_tool.py"
+        scope: not-ported
+        kind: test
+        difficulty: glue
+        why: Tests a not-ported tool.
+      - id: dev-containers
+        name: Developer container tooling
+        description: cpatch (patch container images with dev builds), kubejacker, debug-docker and UML runners.
+        globs:
+          - "src/script/cpatch"
+          - "src/script/cpatch.py"
+          - "src/script/kubejacker/**"
+          - "src/script/ceph-debug-docker.sh"
+          - "src/script/run_uml.sh"
+        scope: not-ported
+        kind: product
+        difficulty: glue
+        why: Developer workflow helpers tied to the C++/Python build, not product.
+      - id: build-ci
+        name: Build and CI wrappers
+        description: build-with-container, run-make, lib-build, tox/mypy/coverity/CLI-test/CBT runners, corpus generation, CMake glue.
+        globs:
+          - "src/script/build-with-container.py"
+          - "src/script/run-make.sh"
+          - "src/script/lib-build.sh"
+          - "src/script/buildcontainer-setup.sh"
+          - "src/script/run_tox.sh"
+          - "src/script/run_mypy.sh"
+          - "src/script/run-coverity"
+          - "src/script/cmake_uninstall.cmake.in"
+          - "src/script/CMakeLists.txt"
+          - "src/script/run-cli-tests.sh"
+          - "src/script/run-cbt.sh"
+          - "src/script/gen-corpus.sh"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build-system and CI plumbing, replaced by the target toolchain.
+      - id: other
+        name: Other
+        description: Remainder of src/script.
+        globs:
+          - "src/script/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: ceph-node-proxy
+    group: management
+    name: ceph-node-proxy
+    description: Per-host hardware monitoring agent that polls BMCs over Redfish (and local sysfs) and reports to the cephadm mgr module.
+    root: src/ceph-node-proxy/
+    features:
+      - id: hardware-backends
+        name: Redfish and local hardware collectors
+        description: Generic and vendor (Dell, Atollon) Redfish system models, the Redfish HTTP client, local sysfs/NVMe collectors and flash-module stats.
+        globs:
+          - "src/ceph-node-proxy/ceph_node_proxy/redfish*.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/baseredfishsystem.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/basesystem.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/baseclient.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/atollon.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/fcm_stats.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/local_collectors.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/node_backend.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/protocols.py"
+          - "src/ceph-node-proxy/ceph_node_proxy/registry.py"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Maps Redfish JSON and sysfs reads into a common inventory model; little algorithmic content.
+      - id: agent
+        name: Agent API and reporting loop
+        description: Daemon entry point, bootstrap, config, HTTPS API for the mgr and the periodic reporter.
+        globs:
+          - "src/ceph-node-proxy/ceph_node_proxy/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small daemon shell around the collectors.
+      - id: tests
+        name: Unit tests
+        description: pytest suite for collectors, client and config.
+        globs:
+          - "src/ceph-node-proxy/tests/**"
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Unit tests.
+      - id: packaging
+        name: Packaging
+        description: setup.py, tox, CMake, MANIFEST.
+        globs:
+          - "src/ceph-node-proxy/setup.py"
+          - "src/ceph-node-proxy/tox.ini"
+          - "src/ceph-node-proxy/CMakeLists.txt"
+          - "src/ceph-node-proxy/MANIFEST.in"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Python packaging.
+      - id: other
+        name: Other
+        description: Remainder of src/ceph-node-proxy.
+        globs:
+          - "src/ceph-node-proxy/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: ceph-exporter
+    group: management
+    name: ceph-exporter
+    description: C++ daemon that scrapes local daemons' admin sockets for perf counters and serves them in Prometheus format.
+    root: src/exporter/
+    features:
+      - id: metric-collector
+        name: Perf counter collection
+        description: Discovers daemon admin sockets, dumps perf counters and schema, converts them to labelled Prometheus metrics.
+        globs:
+          - "src/exporter/DaemonMetricCollector.cc"
+          - "src/exporter/DaemonMetricCollector.h"
+          - "src/exporter/util.cc"
+          - "src/exporter/util.h"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Admin-socket polling plus metric name/label translation.
+      - id: http-server
+        name: HTTP endpoint and entry point
+        description: Beast-based HTTP(S) server exposing /metrics, and the daemon main.
+        globs:
+          - "src/exporter/web_server.cc"
+          - "src/exporter/web_server.h"
+          - "src/exporter/ceph_exporter.cc"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small server; trivial in Go's net/http.
+      - id: build
+        name: Build rules
+        description: CMake.
+        globs:
+          - "src/exporter/CMakeLists.txt"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: CMake.
+      - id: other
+        name: Other
+        description: Remainder of src/exporter.
+        globs:
+          - "src/exporter/**"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: telemetry-archive
+    group: tools
+    name: Telemetry server patch archive
+    description: Archived patch series of the telemetry server code, which now lives in the separate ceph-telemetry repository.
+    root: src/telemetry/
+    features:
+      - id: patches
+        name: Archived telemetry server patches
+        description: telemetry.patches, a git-format-patch dump kept after the code moved out of tree.
+        globs:
+          - "src/telemetry/**"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Not live source; the commit that removed the code from src/telemetry says the code now lives in ceph-telemetry.git.
+  - id: powerdns
+    group: tools
+    name: PowerDNS RGW backend
+    description: PowerDNS remote backend that resolves bucket DNS names to RGW endpoints.
+    root: src/powerdns/
+    features:
+      - id: backend
+        name: pdns-backend-rgw
+        description: Flask service answering PowerDNS remote-backend lookups from RGW bucket metadata.
+        globs:
+          - "src/powerdns/pdns-backend-rgw.py"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Single small script.
+      - id: config
+        name: Config and README
+        description: Sample config template and README.
+        globs:
+          - "src/powerdns/rgw-pdns.conf.in"
+          - "src/powerdns/README.md"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Sample config and documentation.
+  - id: bash-completion
+    group: tools
+    name: Bash completion
+    description: Shell completion scripts for ceph, rados, rbd and radosgw-admin.
+    root: src/bash_completion/
+    features:
+      - id: completions
+        name: Completion scripts
+        description: bash completion functions for the main CLIs.
+        globs:
+          - "src/bash_completion/ceph"
+          - "src/bash_completion/rados"
+          - "src/bash_completion/rbd"
+          - "src/bash_completion/radosgw-admin"
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small shell functions; would be regenerated from the new CLIs' parsers.
+      - id: build
+        name: Build rules
+        description: CMake install rules.
+        globs:
+          - "src/bash_completion/CMakeLists.txt"
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: CMake.
+  - id: src-scripts
+    group: tools
+    name: Top-level CLI, init and dev-cluster scripts
+    description: Script entry points that sit directly in src/ - the ceph CLI, daemon wrappers and init scripts, host map/mount helpers, and the vstart/mstart developer cluster scripts.
+    root: [src/ceph.in, src/vstart.sh, src/stop.sh, src/mstart.sh, src/mstop.sh, src/mrun, src/mrgw.sh, src/cstart.sh, src/ckill.sh,
+           src/vnewosd.sh, src/ceph.conf.twoosds, src/multi-dump.sh, src/loadclass.sh, src/ceph-crash.in, src/ceph-post-file.in,
+           src/ceph-debugpack.in, src/ceph-coverage.in, src/ceph-create-keys, src/ceph-run, src/ceph-osd-prestart.sh, src/ceph_common.sh,
+           src/init-ceph.in, src/init-radosgw, src/block-device-health, src/ceph-clsinfo, src/cmonctl, src/ps-ceph.pl,
+           src/push_to_qemu.pl, src/rbdmap, src/etc-rbdmap, src/ceph-rbdnamer, src/mount.fuse.ceph, src/rbd-replay-many,
+           src/sample.ceph.conf, src/logrotate.conf, src/mypy.ini, src/mypy-constrains.txt, src/cephfs.pc.in]
+    features:
+      - id: ceph-cli
+        name: ceph CLI
+        description: The `ceph` command - mon/mgr/osd/tell command dispatch, argument validation via ceph_argparse, output formatting, interactive mode.
+        globs: [src/ceph.in]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: The admin entry point (~1.4k lines) over librados mon_command and ceph_argparse.
+      - id: daemon-helpers
+        name: Daemon wrappers, init scripts and admin helpers
+        description: ceph-crash (crash report upload), ceph-post-file, ceph-debugpack, ceph-run restart loop, OSD prestart, sysvinit scripts, block-device-health sudo helper, ps-ceph and small legacy stubs.
+        globs: [src/ceph-crash.in, src/ceph-post-file.in, src/ceph-debugpack.in, src/ceph-run, src/ceph-osd-prestart.sh,
+                src/ceph_common.sh, src/init-ceph.in, src/init-radosgw, src/block-device-health, src/ceph-clsinfo,
+                src/ceph-create-keys, src/cmonctl, src/ps-ceph.pl]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Shell/Python wrappers around daemons and system services.
+      - id: host-helpers
+        name: RBD map and CephFS mount helpers
+        description: rbdmap service script and its config, ceph-rbdnamer udev helper, mount.fuse.ceph, rbd-replay-many.
+        globs: [src/rbdmap, src/etc-rbdmap, src/ceph-rbdnamer, src/mount.fuse.ceph, src/rbd-replay-many]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small host-integration scripts.
+      - id: dev-cluster
+        name: vstart/mstart developer clusters
+        description: vstart.sh/stop.sh single-host dev cluster, mstart/mstop/mrun/mrgw multi-cluster variants, cstart/ckill, vnewosd, multi-dump, class loader, coverage wrapper, qemu push helper.
+        globs: [src/vstart.sh, src/stop.sh, src/mstart.sh, src/mstop.sh, src/mrun, src/mrgw.sh, src/cstart.sh, src/ckill.sh,
+                src/vnewosd.sh, src/ceph.conf.twoosds, src/multi-dump.sh, src/loadclass.sh, src/ceph-coverage.in, src/push_to_qemu.pl]
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Developer and test harness scripts; vstart.sh (~2.2k lines) is the main one.
+      - id: config
+        name: Sample config, logrotate, mypy and pkg-config files
+        description: sample.ceph.conf, logrotate.conf, mypy.ini and constraints, cephfs.pc.in.
+        globs: [src/sample.ceph.conf, src/logrotate.conf, src/mypy.ini, src/mypy-constrains.txt, src/cephfs.pc.in]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Packaging and tooling config.

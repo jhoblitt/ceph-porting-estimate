@@ -1,0 +1,1648 @@
+# Group: RADOS core (g1). Source ceph@ec322a5e95ebcb46dec7d6a9d7813a34543c64ad
+components:
+  - id: osd
+    group: rados
+    name: OSD (classic)
+    description: The classic object storage daemon - PG state machines, replication, EC, recovery and scrub.
+    root: src/osd/
+    features:
+      - id: op-execution
+        name: Object op execution (PrimaryLogPG)
+        description: Executes client RADOS ops against objects on the primary - reads, writes, omap, xattrs, class calls, copy-from, snaps.
+        globs: [src/osd/PrimaryLogPG.*, src/osd/PGTransaction.h, src/osd/osd_op_util.*, src/osd/OpRequest.*, src/osd/object_state*, src/osd/osd_internal_types.h, src/osd/ObjectVersioner.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: PrimaryLogPG.cc (18.6k lines) is the op interpreter; it is entangled with recovery, snap and object-context locking semantics that clients depend on bit-for-bit.
+      - id: peering-recovery
+        name: PG peering and recovery
+        description: PG lifecycle state machine - peering, activation, missing-set tracking, recovery and backfill orchestration.
+        globs: [src/osd/PeeringState.*, src/osd/PGPeeringEvent.*, src/osd/PGStateUtils.*, src/osd/MissingLoc.*, src/osd/recovery_types.h, src/osd/PG.*, src/osd/pg_features.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: PeeringState is the boost::statechart peering protocol and PG.cc drives recovery/backfill - named "hard" in the brief.
+      - id: pg-log
+        name: PG log
+        description: Per-PG operation log used for peering, divergent-entry rollback and log-based recovery.
+        globs: [src/osd/PGLog.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: On-disk log format plus merge/divergence logic central to peering correctness.
+      - id: replicated-backend
+        name: Replicated backend
+        description: PGBackend abstraction and the replicated implementation of sub-op fan-out and push/pull recovery.
+        globs: [src/osd/ReplicatedBackend.*, src/osd/PGBackend.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Replication write path and push/pull recovery messages; on-wire sub-op semantics must match peers.
+      - id: erasure-coding
+        name: Erasure-coded pools
+        description: EC backend - stripe layout, read/modify/write pipeline, extent cache, omap journal, legacy (L) and optimized paths.
+        globs: [src/osd/EC*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: All src/osd/EC* files implement EC pools (two parallel generations, ECSwitch selects); EC is named "hard" in the brief.
+      - id: scrub
+        name: Scrub and deep-scrub
+        description: Scrub scheduling, reservations, chunked map comparison, inconsistency store and repair.
+        globs: [src/osd/scrubber/**, src/osd/scrubber_common.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Distributed statechart with replica reservations and object-map comparison; correctness affects data integrity.
+      - id: op-scheduler
+        name: Op scheduler (mClock QoS)
+        description: OSD op queue abstraction and the mClock-based QoS scheduler integration.
+        globs: [src/osd/scheduler/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: A queue abstraction and profile wiring over the dmclock library; algorithmic core lives in src/dmclock.
+      - id: osd-daemon
+        name: OSD daemon core
+        description: OSD service - sharded op dispatch, map handling, PG creation/split/merge, heartbeats, admin commands, perf counters.
+        globs: [src/osd/OSD.*, src/osd/Session.*, src/osd/osd_perf_counters.*, src/osd/DynamicPerfStats.h, src/osd/osd_tracer.*, src/osd/error_code.*, src/osd/Coroutines.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: OSD.cc (11.9k lines) couples sharded queues, osdmap epoch catch-up, heartbeat failure detection and PG split/merge.
+      - id: osdmap
+        name: OSDMap and placement mapping
+        description: OSDMap encoding, incrementals, pg-to-OSD mapping, upmap balancing helpers and precomputed mappings.
+        globs: [src/osd/OSDMap.*, src/osd/OSDMapMapping.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Versioned on-wire map encoding shared by every client and daemon; placement must match CRUSH exactly.
+      - id: osd-types
+        name: OSD wire/disk types
+        description: pg_t, object_info_t, pg_info_t, pg_stat_t, pool_opts and other versioned encodings shared cluster-wide.
+        globs: [src/osd/osd_types.*, src/osd/osd_types_fmt.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: 15.6k lines of versioned encode/decode for on-wire and on-disk structures - "hard" per the brief.
+      - id: snapshots
+        name: Snapshot mapping and trimming
+        description: SnapMapper - on-disk snap-to-object index driving snap trimming.
+        globs: [src/osd/SnapMapper.*, src/osd/SnapMapReaderI.h]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Self-contained key-value index with legacy-format conversion; moderate logic.
+      - id: cache-tiering
+        name: Cache tiering and HitSets
+        description: HitSet tracking (bloom/explicit) and tiering-agent state for cache pools.
+        globs: [src/osd/HitSet.*, src/osd/BloomHitSet.h, src/osd/ExplicitObjectHitSet.h, src/osd/ExplicitHashHitSet.h, src/osd/TierAgentState.h]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Small, isolated data structures for a deprecated feature; agent logic itself is in PrimaryLogPG.
+      - id: caps-and-classes
+        name: OSD caps and object-class host
+        description: OSD capability grammar/enforcement, dynamic cls plugin loading and the objclass host API implementation.
+        globs: [src/osd/OSDCap.*, src/osd/ClassHandler.*, src/osd/objclass.cc]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Cap parser (boost::spirit) plus dlopen-based class loading and the cls_cxx_* host callbacks.
+      - id: watch-notify
+        name: Watch/notify
+        description: Object watch registration, notify fan-out, timeouts and reconnect handling on the OSD.
+        globs: [src/osd/Watch.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Self-contained session/timer bookkeeping behind the watch and notify ops.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/osd/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining OSD files.
+        globs: [src/osd/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: crimson-seastore
+    group: crimson
+    name: SeaStore
+    description: Crimson's native log-structured object store for NVMe/ZNS - transactional extent cache, btrees, journal and cleaner.
+    root: src/crimson/os/seastore/
+    features:
+      - id: store-frontend
+        name: SeaStore ObjectStore front-end
+        description: FuturizedStore implementation - transaction decoding, collection/object ops, mount/mkfs, root block.
+        globs: [src/crimson/os/seastore/seastore.*, src/crimson/os/seastore/root_block.*, src/crimson/os/seastore/root_meta.h, src/crimson/os/seastore/logging.h, src/crimson/os/seastore/ordering_handle.h, src/crimson/os/seastore/seastore_dma_alloc.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Entry point that maps ObjectStore transactions onto the transaction manager; SeaStore is "extreme" per the brief.
+      - id: on-disk-types
+        name: SeaStore on-disk types
+        description: paddr/laddr, extent types, record and delta encodings, segment and journal headers.
+        globs: [src/crimson/os/seastore/seastore_types.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: 5.2k lines defining the on-disk address space and record formats every other SeaStore part encodes against.
+      - id: transaction-cache
+        name: Transaction manager and extent cache
+        description: Optimistic transactions, cached-extent lifecycle, conflict detection, extent pinboard (2Q/LRU) and parent/child extent linkage.
+        globs: [src/crimson/os/seastore/transaction_manager.*, src/crimson/os/seastore/transaction.h, src/crimson/os/seastore/transaction_interruptor.*, src/crimson/os/seastore/cache.*, src/crimson/os/seastore/cached_extent.*, src/crimson/os/seastore/extent_pinboard.*, src/crimson/os/seastore/linked_tree_node.h, src/crimson/os/seastore/logical_child_node.h, src/crimson/os/seastore/retired_extent_placeholder.h]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: The concurrency-control and caching core; interacts with every extent type and the journal replay path.
+      - id: lba-backref
+        name: LBA and backref btrees
+        description: Fixed-KV btree framework plus the logical-block-address and back-reference trees built on it.
+        globs: [src/crimson/os/seastore/btree/**, src/crimson/os/seastore/lba/**, src/crimson/os/seastore/lba_manager.*, src/crimson/os/seastore/lba_mapping.*, src/crimson/os/seastore/backref/**, src/crimson/os/seastore/backref_manager.*, src/crimson/os/seastore/backref_entry.h, src/crimson/os/seastore/backref_mapping.h]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Copy-on-write on-disk btrees with in-memory linkage to cached extents.
+      - id: onode-tree
+        name: Onode tree (staged FLTree)
+        description: Staged fixed-layout tree indexing object onodes by ghobject key.
+        globs: [src/crimson/os/seastore/onode_manager/**, src/crimson/os/seastore/onode_manager.h, src/crimson/os/seastore/onode.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Heavily templated multi-stage node layout with delta-replay - the densest code in SeaStore.
+      - id: omap
+        name: Omap manager
+        description: Per-object key/value storage - btree omap and the log-structured omap manager.
+        globs: [src/crimson/os/seastore/omap_manager/**, src/crimson/os/seastore/omap_manager.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Two on-disk omap formats with string-KV node layouts.
+      - id: object-data
+        name: Object data handler
+        description: Maps object byte ranges to logical extents - read, overwrite, zero, truncate, clone.
+        globs: [src/crimson/os/seastore/object_data_handler.*, src/crimson/os/seastore/laddr_interval_set.h]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Extent split/merge and partial-overwrite logic on top of the LBA.
+      - id: collections
+        name: Collection manager
+        description: Flat collection index for SeaStore.
+        globs: [src/crimson/os/seastore/collection_manager/**, src/crimson/os/seastore/collection_manager.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Small on-disk structure but bound to the same extent/transaction model.
+      - id: journal
+        name: Journal
+        description: Segmented and circular-bounded journals, record submission/batching and replay scanning.
+        globs: [src/crimson/os/seastore/journal.*, src/crimson/os/seastore/journal/**, src/crimson/os/seastore/record_scanner.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Write-ahead record format and crash replay; on-disk compatibility critical.
+      - id: cleaner-placement
+        name: Cleaner and extent placement
+        description: Async segment/RBM cleaner, generational extent placement, hot/cold tiering and space accounting.
+        globs: [src/crimson/os/seastore/async_cleaner.*, src/crimson/os/seastore/extent_placement_manager.*, src/crimson/os/seastore/segment_seq_allocator.h, src/crimson/os/seastore/logical_bucket.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Log-structured GC with reclaim policies; deeply coupled to cache and backrefs.
+      - id: segment-devices
+        name: Segment managers and device layer
+        description: Block, ZNS (zbd) and ephemeral segment managers, device abstraction, block/SPDK I/O drivers.
+        globs: [src/crimson/os/seastore/segment_manager/**, src/crimson/os/seastore/segment_manager.*, src/crimson/os/seastore/segment_manager_group.*, src/crimson/os/seastore/device.*, src/crimson/os/seastore/block_io_driver.*, src/crimson/os/seastore/spdk_*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Direct device I/O including zoned-block and SPDK paths, with on-disk superblocks.
+      - id: random-block-manager
+        name: Random block manager
+        description: RBM for conventional NVMe - AVL extent allocator, NVMe/HDD device drivers and block RB manager.
+        globs: [src/crimson/os/seastore/random_block_manager/**, src/crimson/os/seastore/random_block_manager.*, src/crimson/os/seastore/randomblock_manager_group.h]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Allocator plus raw NVMe command paths - allocators and on-disk formats are "extreme".
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/crimson/os/seastore/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining SeaStore files.
+        globs: [src/crimson/os/seastore/**]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Catch-all.
+  - id: crimson
+    group: crimson
+    name: Crimson OSD
+    description: Seastar-based next-generation OSD - shard-per-core futures runtime, messenger, PG engine and store adapters (SeaStore is its own component).
+    root: src/crimson/
+    features:
+      - id: op-execution
+        name: Client op execution
+        description: Crimson op executor, PG backend object ops, object contexts/locking, class calls, watch/notify and client request pipeline.
+        globs: [src/crimson/osd/ops_executer.*, src/crimson/osd/pg_backend.*, src/crimson/osd/objclass.cc, src/crimson/osd/object_context*, src/crimson/osd/object_metadata_helper.*, src/crimson/osd/exceptions.h, src/crimson/osd/watch*, src/crimson/osd/osd_operations/client_request.*, src/crimson/osd/osd_operations/internal_client_request.*, src/crimson/osd/osd_operations/osdop_params.h]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Re-implementation of PrimaryLogPG semantics on interruptible futures; Crimson is "extreme" per the brief.
+      - id: pg-peering
+        name: PG lifecycle and peering glue
+        description: Crimson PG, PG map, map advancement and the event operations that drive the shared PeeringState.
+        globs: [src/crimson/osd/pg.*, src/crimson/osd/pg_map.*, src/crimson/osd/pg_meta.*, src/crimson/osd/pg_activation_blocker.*, src/crimson/osd/pg_interval_interrupt_condition.*, src/crimson/osd/osdmap_gate.*, src/crimson/osd/osdmap_service.h, src/crimson/osd/osd_operations/peering_event.*, src/crimson/osd/osd_operations/pg_advance_map.*, src/crimson/osd/osd_operations/pgpct_request.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Hosts the classic PeeringState inside a futures-based, interval-interruptible execution model.
+      - id: recovery-backfill
+        name: Recovery and backfill
+        description: Crimson recovery backends (replicated, EC), backfill state machine and background recovery operations.
+        globs: [src/crimson/osd/pg_recovery*, src/crimson/osd/recovery_backend.*, src/crimson/osd/replicated_recovery_backend.*, src/crimson/osd/ec_recovery_backend.*, src/crimson/osd/backfill_*, src/crimson/osd/osd_operations/background_recovery.*, src/crimson/osd/osd_operations/recovery_subrequest.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Recovery/backfill is "hard" in classic and is rewritten here on Seastar futures.
+      - id: replication-ec
+        name: Replicated and EC backends
+        description: Replica write fan-out, EC sub-ops, log-missing and repop request/reply operations.
+        globs: [src/crimson/osd/replicated_backend.*, src/crimson/osd/ec_backend.*, src/crimson/osd/acked_peers.h, src/crimson/osd/osd_operations/replicated_request*, src/crimson/osd/osd_operations/ecrep_request.*, src/crimson/osd/osd_operations/logmissing_request*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Wire-compatible replication and EC sub-op paths in the Crimson runtime.
+      - id: scrub
+        name: Scrub
+        description: Crimson scrubber state machine, chunk validator and scrub event operations.
+        globs: [src/crimson/osd/scrub/**, src/crimson/osd/osd_operations/scrub_events.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Independent re-implementation of scrub for Crimson.
+      - id: snap-trim
+        name: Snap trimming
+        description: Background snap-trim and snap-trim-obj-subop operations.
+        globs: [src/crimson/osd/osd_operations/snaptrim_event.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Snapshot removal pipeline driven by SnapMapper inside Crimson's op model.
+      - id: osd-daemon
+        name: OSD daemon, sharding and scheduling
+        description: Crimson OSD service, per-core shard services, PG-to-shard routing, heartbeat, op tracking, startup and mClock scheduler.
+        globs: [src/crimson/osd/osd.*, src/crimson/osd/main*, src/crimson/osd/shard_services.*, src/crimson/osd/pg_shard_manager.*, src/crimson/osd/heartbeat.*, src/crimson/osd/osd_meta.*, src/crimson/osd/state.h, src/crimson/osd/stop_signal.h, src/crimson/osd/osd_connection_priv.h, src/crimson/osd/osd_operation.*, src/crimson/osd/osd_operation_external_tracking.h, src/crimson/osd/lsan_suppressions.cc, src/crimson/osd/scheduler/**]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Shared-nothing per-core design with cross-shard PG routing has no classic analogue.
+      - id: messenger
+        name: Crimson messenger (msgr2 on Seastar)
+        description: Seastar socket messenger implementing the msgr2 protocol, frame assembly and per-core connection I/O handlers.
+        globs: [src/crimson/net/**]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: msgr2 protocol re-implemented with cross-core connection handoff; the messenger is already "hard" in classic.
+      - id: futures-runtime
+        name: Crimson futures and common runtime
+        description: Errorator and interruptible-future machinery, operation/blocker tracking, tri-mutex, LRU caches, Seastar config/log/perf glue.
+        globs: [src/crimson/common/**]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Template-heavy error-typed futures with no direct Go/Rust analogue; everything in Crimson is built on it.
+      - id: store-adapters
+        name: Futurized store, AlienStore and CyanStore
+        description: FuturizedStore interface, AlienStore (BlueStore on alien threads) and CyanStore (in-memory test store).
+        globs: [src/crimson/os/futurized_*, src/crimson/os/alienstore/**, src/crimson/os/cyanstore/**]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Interface adapters and a simple memory store; AlienStore's thread-pool bridging is the tricky part.
+      - id: cluster-clients
+        name: Mon, mgr and auth clients
+        description: Seastar MonClient, MgrClient, auth client/server interfaces, keyring and CRUSH location.
+        globs: [src/crimson/mon/**, src/crimson/mgr/**, src/crimson/auth/**, src/crimson/crush/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Client protocol re-implementations over the Crimson messenger; protocol logic is moderate.
+      - id: admin
+        name: Admin socket and commands
+        description: Seastar admin socket server and OSD/PG admin commands.
+        globs: [src/crimson/admin/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Command dispatch and JSON formatting.
+      - id: tools
+        name: Crimson tools
+        description: crimson objectstore tool, store-bench, store-nbd and messenger/fltree perf harnesses.
+        globs: [src/crimson/tools/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: CLI tools and benchmarks driving the store and messenger APIs.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/crimson/CMakeLists.txt, src/crimson/admin/CMakeLists.txt, src/crimson/osd/CMakeLists.txt, src/crimson/os/CMakeLists.txt, src/crimson/os/alienstore/CMakeLists.txt, src/crimson/os/cyanstore/CMakeLists.txt, src/crimson/tools/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining Crimson files.
+        globs: [src/crimson/**]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Catch-all.
+  - id: mon
+    group: rados
+    name: Monitor
+    description: ceph-mon - Paxos-replicated cluster maps, elections, and the per-map PaxosServices; also the MonClient library.
+    root: src/mon/
+    features:
+      - id: paxos
+        name: Paxos and PaxosService framework
+        description: Paxos consensus, lease handling, the PaxosService base for replicated maps, and the MonitorDBStore transaction layer.
+        globs: [src/mon/Paxos.*, src/mon/PaxosService.*, src/mon/PaxosMap.h, src/mon/PaxosFSMap.h, src/mon/MonitorDBStore.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Consensus (Paxos) is "hard" per the brief; on-disk store layout must stay compatible for upgrades.
+      - id: elections
+        name: Elections and connectivity tracking
+        description: Elector, classic/disallowed/connectivity election strategies and peer connection scoring.
+        globs: [src/mon/Elector.*, src/mon/ElectionLogic.*, src/mon/ConnectionTracker.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Leader election and quorum formation; subtle liveness/safety behaviour, encoded score exchange.
+      - id: monitor-core
+        name: Monitor daemon core
+        description: Monitor bootstrap, probing, store sync, quorum features, session/subscription handling, command routing and backup.
+        globs: [src/mon/Monitor.*, src/mon/MonOpRequest.h, src/mon/Session.h, src/mon/MonSub.*, src/mon/mon_types.h, src/mon/MonitorBackup.*, src/mon/CommandHandler.*, src/mon/error_code.*, src/mon/MonCommand.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Monitor.cc (7.4k lines) owns probe/sync/quorum state transitions tightly bound to Paxos.
+      - id: osd-monitor
+        name: OSDMonitor
+        description: Authority for the OSDMap - failure reports, pool and CRUSH commands, upmap, PG creation tracking, incremental proposals.
+        globs: [src/mon/OSDMonitor.*, src/mon/CreatingPGs.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: 18k lines that mint OSDMap epochs; correctness of map deltas and failure handling is cluster-critical.
+      - id: pg-stats
+        name: PGMap and stats aggregation
+        description: PGMap digest, pool/OSD usage statistics, PG-state health summaries and the MgrStatMonitor that receives them.
+        globs: [src/mon/PGMap.*, src/mon/MgrStatMonitor.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Aggregation and reporting logic with versioned encodings of the digest.
+      - id: auth-monitor
+        name: AuthMonitor and mon caps
+        description: Cluster key database, entity/caps commands, global_id allocation and MonCap grammar.
+        globs: [src/mon/AuthMonitor.*, src/mon/MonCap.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Keyring CRUD plus a boost::spirit cap parser.
+      - id: fs-monitor
+        name: MDSMonitor and fs commands
+        description: FSMap authority - MDS beacons, failover, standby assignment and `ceph fs` commands.
+        globs: [src/mon/MDSMonitor.*, src/mon/FSCommands.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Service logic over FSMap; failover policy is moderately intricate.
+      - id: mgr-monitor
+        name: MgrMonitor and MgrMap
+        description: Active/standby mgr selection, module enablement and the MgrMap encoding.
+        globs: [src/mon/MgrMonitor.*, src/mon/MgrMap.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Beacon-driven failover and map bookkeeping.
+      - id: config-kv
+        name: Config and config-key store
+        description: Centralized config database (ConfigMonitor/ConfigMap with masks) and the KVMonitor config-key store.
+        globs: [src/mon/ConfigMonitor.*, src/mon/ConfigMap.*, src/mon/KVMonitor.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Option storage with section/mask resolution - conventional service logic.
+      - id: health-log
+        name: Health and cluster log
+        description: HealthMonitor checks/mutes, health_check types, and LogMonitor cluster log persistence.
+        globs: [src/mon/HealthMonitor.*, src/mon/health_check.h, src/mon/LogMonitor.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Aggregation, muting and log channel storage.
+      - id: monmap
+        name: MonMap and MonmapMonitor
+        description: Monitor membership map, addresses, election strategy settings, stretch mode and location commands.
+        globs: [src/mon/MonMap.*, src/mon/MonmapMonitor.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Small map with versioned encoding; stretch-mode commands add moderate logic.
+      - id: nvmeof-gw
+        name: NVMe-oF gateway monitor
+        description: NVMeofGwMon and NVMeofGwMap - gateway group state, ANA group failover and beacons.
+        globs: [src/mon/NVMeofGw*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Self-contained PaxosService with its own map and hand-written serialization.
+      - id: mon-client
+        name: MonClient library
+        description: Client-side monitor session - hunting, auth handshake, subscriptions, command submission.
+        globs: [src/mon/MonClient.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Used by every daemon and client; protocol state machine of moderate size.
+      - id: command-table
+        name: Monitor command table
+        description: Declarative COMMAND() table describing every monitor CLI command and its arguments.
+        globs: [src/mon/MonCommands.h]
+        scope: headline
+        kind: config
+        difficulty: config
+        why: Macro-expanded declarative data; translates mechanically.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/mon/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining monitor files.
+        globs: [src/mon/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: objectstore
+    group: rados
+    name: ObjectStore (classic)
+    description: The OSD's local storage layer - ObjectStore/Transaction API, BlueStore with BlueFS, MemStore and FUSE export (no kstore/filestore at this commit).
+    root: src/os/
+    features:
+      - id: objectstore-api
+        name: ObjectStore API and Transaction encoding
+        description: Abstract ObjectStore interface and the encoded Transaction op list shared by OSD, tools and stores.
+        globs: [src/os/ObjectStore.*, src/os/Transaction.*, src/os/SequencerPosition.h, src/os/kv.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Transaction is a versioned on-wire/on-disk encoding consumed by every store and by replication.
+      - id: bluestore-core
+        name: BlueStore core
+        description: BlueStore collections, onode/buffer caches, blob/extent maps, shared blobs, write path, deferred writes, fsck/repair, admin hooks.
+        globs: [src/os/bluestore/BlueStore.*, src/os/bluestore/BlueStore_*, src/os/bluestore/bluestore_common.h, src/os/bluestore/Writer.*, src/os/bluestore/OnodeScan.cc, src/os/bluestore/BlueAdmin.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: 27k lines of transactional storage engine over RocksDB + raw block; BlueStore is "extreme" per the brief.
+      - id: bluestore-types
+        name: BlueStore on-disk types
+        description: bluestore_blob_t, extent/pextent, onode, shared-blob and superblock encodings.
+        globs: [src/os/bluestore/bluestore_types.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Compact varint-heavy on-disk encodings that must be byte-identical for existing OSDs.
+      - id: bluestore-compression
+        name: BlueStore compression
+        description: Blob compression decisions, recompression scanning and estimator.
+        globs: [src/os/bluestore/Compression.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Self-contained policy logic over BlueStore's extent map; less format-bound than the core.
+      - id: allocators
+        name: Block allocators
+        description: Allocator interface and implementations - AVL, bitmap, fast-bitmap, btree, btree2, hybrid and stupid.
+        globs: [src/os/bluestore/Allocator*, src/os/bluestore/AvlAllocator.*, src/os/bluestore/BitmapAllocator.*, src/os/bluestore/Btree*, src/os/bluestore/fastbmap_allocator_impl.*, src/os/bluestore/HybridAllocator*, src/os/bluestore/StupidAllocator.*, src/os/bluestore/simple_bitmap.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Allocators are named "extreme" in the brief - performance-critical bit/range structures.
+      - id: freelist
+        name: Freelist manager
+        description: Persistent free-space bitmap stored in the KV database.
+        globs: [src/os/bluestore/FreelistManager.*, src/os/bluestore/BitmapFreelistManager.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: On-disk allocation state; format and merge-operator semantics must match.
+      - id: bluefs
+        name: BlueFS
+        description: Minimal journaling filesystem hosting RocksDB on the BlueStore devices, with its log and on-disk types.
+        globs: [src/os/bluestore/BlueFS.*, src/os/bluestore/bluefs_types.*]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: BlueFS on-disk format and log replay are "extreme" per the brief.
+      - id: rocksdb-env
+        name: RocksDB environment over BlueFS
+        description: BlueRocksEnv / BlueEnv adapters exposing BlueFS as a RocksDB Env.
+        globs: [src/os/bluestore/BlueRocksEnv.*, src/os/bluestore/BlueEnv.cc]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Thin in size but bound to RocksDB's C++ Env API, which has no equivalent in a Go/Rust KV choice.
+      - id: bluestore-tool
+        name: ceph-bluestore-tool
+        description: Offline BlueStore/BlueFS maintenance CLI - fsck, repair, bluefs export, device expansion/migration.
+        globs: [src/os/bluestore/bluestore_tool.cc]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: CLI dispatch over BlueStore/BlueFS entry points.
+      - id: memstore
+        name: MemStore
+        description: In-memory ObjectStore used for testing.
+        globs: [src/os/memstore/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Straightforward map-backed ObjectStore implementation.
+      - id: fuse-and-fs
+        name: FuseStore and filesystem helpers
+        description: FUSE export of an ObjectStore plus XFS/ZFS filesystem probing helpers.
+        globs: [src/os/FuseStore.*, src/os/fs/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Debug/inspection tooling and thin OS wrappers.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/os/CMakeLists.txt, src/os/bluestore/CMakeLists.txt, src/os/fs/CMakeLists.txt, src/os/memstore/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining object store files.
+        globs: [src/os/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: mgr
+    group: rados
+    name: Manager daemon (C++)
+    description: ceph-mgr C++ core - daemon state aggregation, command server, and the embedded CPython host for mgr modules (modules themselves are src/pybind/mgr).
+    root: src/mgr/
+    features:
+      - id: python-host
+        name: Embedded Python module host
+        description: CPython embedding - module loading/registry, active and standby module runners, GIL handling, the ceph_module C API exposed to Python.
+        globs: [src/mgr/ActivePyModule*, src/mgr/BaseMgrModule.*, src/mgr/BaseMgrStandbyModule.*, src/mgr/Gil.*, src/mgr/PyFormatter.*, src/mgr/PyModule.*, src/mgr/PyModuleRegistry.*, src/mgr/PyModuleRunner.*, src/mgr/PyOSDMap.*, src/mgr/PyUtil.*, src/mgr/StandbyPyModules.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Large CPython C-API binding surface; mechanical per call but must reproduce the exact Python-visible API.
+      - id: daemon-server
+        name: DaemonServer
+        description: Accepts daemon reports/sessions, handles mgr and `tell` commands, PG/OSD safety checks and progress events.
+        globs: [src/mgr/DaemonServer.*, src/mgr/MgrOpRequest.*, src/mgr/MgrSession.h]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Request handling plus command implementations - the baseline kind of work.
+      - id: cluster-state
+        name: Daemon and cluster state
+        description: DaemonState index, perf-counter ingestion, health metrics, ServiceMap, cached cluster maps.
+        globs: [src/mgr/DaemonState.*, src/mgr/DaemonKey.*, src/mgr/DaemonPerfCounters.*, src/mgr/PerfCounterInstance.*, src/mgr/DaemonHealthMetric*, src/mgr/ClusterState.*, src/mgr/ServiceMap.*, src/mgr/MgrMapCache.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: In-memory state stores with versioned encodings for ServiceMap.
+      - id: perf-queries
+        name: OSD/MDS perf metric queries
+        description: Dynamic perf query types and collectors for per-client/per-op OSD and MDS metrics.
+        globs: [src/mgr/MetricCollector.*, src/mgr/MetricTypes.h, src/mgr/MDSPerfMetric*, src/mgr/OSDPerfMetric*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Query/limit types with wire encodings and simple aggregation.
+      - id: mgr-daemon
+        name: Mgr daemon lifecycle
+        description: Active/standby daemon startup, map subscription, beacons, thread monitoring and perf counters.
+        globs: [src/mgr/Mgr.*, src/mgr/MgrStandby.*, src/mgr/MgrContext.h, src/mgr/Types.h, src/mgr/mgr_perf_counters.*, src/mgr/ThreadMonitor.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Service bootstrap and failover handshakes with the monitor.
+      - id: mgr-caps
+        name: Mgr caps
+        description: MgrCap grammar and authorization checks for mgr commands and modules.
+        globs: [src/mgr/MgrCap.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: boost::spirit capability parser like MonCap/OSDCap.
+      - id: mgr-client
+        name: MgrClient library
+        description: Client side of daemon-to-mgr reporting - perf counters, health metrics, perf-query results and commands.
+        globs: [src/mgr/MgrClient.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Linked into every daemon; a session/report protocol of moderate size.
+      - id: command-table
+        name: Mgr command table
+        description: Declarative table of built-in mgr commands.
+        globs: [src/mgr/MgrCommands.h, src/mgr/mgr_commands.*, src/mgr/JSONCommand.h]
+        scope: headline
+        kind: config
+        difficulty: config
+        why: Macro-expanded declarative data and a tiny JSON command helper.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/mgr/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining mgr files.
+        globs: [src/mgr/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: msg
+    group: rados
+    name: Messenger
+    description: The async messenger - msgr v1/v2 wire protocols, event loops, network stacks (POSIX, RDMA, DPDK) and the Message base.
+    root: src/msg/
+    features:
+      - id: messenger-api
+        name: Messenger API and dispatch
+        description: Messenger/Connection/Dispatcher abstractions, policies, and the fast/slow dispatch queue.
+        globs: [src/msg/Messenger.*, src/msg/Connection.*, src/msg/Dispatcher.h, src/msg/DispatchQueue.*, src/msg/Policy.h, src/msg/SimplePolicyMessenger.h, src/msg/MessageRef.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Public interfaces every daemon codes against; dispatch ordering and throttling semantics are subtle.
+      - id: message-base
+        name: Message base and wire types
+        description: Message header/footer encoding, the type-id decode table, entity_name/entity_addr wire types.
+        globs: [src/msg/Message.*, src/msg/msg_types.*, src/msg/msg_fmt.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: On-wire encodings (entity_addr_t legacy/new formats, message envelopes) - "hard" per the brief.
+      - id: async-core
+        name: Async messenger core
+        description: AsyncMessenger and AsyncConnection - connection lifecycle, worker assignment, reconnect/reset handling.
+        globs: [src/msg/async/AsyncMessenger.*, src/msg/async/AsyncConnection.*, src/msg/async/Protocol.*, src/msg/async/Timeout.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Concurrency-heavy connection state shared across event-loop workers; "the messenger" is hard per the brief.
+      - id: protocol-v2
+        name: msgr2 protocol
+        description: msgr2 handshake, frame format, secure (AES-GCM) and compressed on-wire modes.
+        globs: [src/msg/async/ProtocolV2.*, src/msg/async/frames_v2.*, src/msg/async/crypto_onwire.*, src/msg/async/compression_*, src/msg/compressor_registry.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Byte-exact wire protocol with crypto/compression framing and reconnect semantics.
+      - id: protocol-v1
+        name: Legacy msgr1 protocol
+        description: The legacy v1 wire protocol state machine.
+        globs: [src/msg/async/ProtocolV1.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Byte-exact legacy protocol; could arguably be dropped in a port.
+      - id: event-stack
+        name: Event loop and POSIX stack
+        description: Event center with epoll/kqueue/poll/select backends, network stack abstraction and POSIX sockets.
+        globs: [src/msg/async/Event*, src/msg/async/Stack.*, src/msg/async/PosixStack.*, src/msg/async/net_handler.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Reactor plumbing largely replaced by a target language's runtime (goroutines/tokio).
+      - id: rdma
+        name: RDMA stack
+        description: Infiniband/RoCE and iWARP verbs-based network stack.
+        globs: [src/msg/async/rdma/**]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Low-level ibverbs resource management; needs FFI bindings in Go/Rust.
+      - id: dpdk
+        name: DPDK userspace stack
+        description: Userspace TCP/IP stack (Seastar-derived) over DPDK.
+        globs: [src/msg/async/dpdk/**]
+        scope: shown
+        kind: product
+        difficulty: hard
+        why: A full TCP/IP implementation plus DPDK FFI; rarely deployed. DPDK is off by default in Ceph's build and dropped as a dependency for every target, so this stack is costed but kept out of the headline.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/msg/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining messenger files.
+        globs: [src/msg/**]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Catch-all.
+  - id: messages
+    group: rados
+    name: Message definitions
+    description: Header-only encode/decode definitions for every RADOS, monitor, mgr and CephFS wire message.
+    root: src/messages/
+    features:
+      - id: osd-client-ops
+        name: Client-OSD and pool op messages
+        description: MOSDOp/MOSDOpReply, backoff, watch-notify, pool ops, pool stats and statfs.
+        globs: [src/messages/MOSDOp*, src/messages/MOSDBackoff.h, src/messages/MOSDFastDispatchOp.h, src/messages/MWatchNotify.h, src/messages/MPoolOp*, src/messages/MGetPoolStats*, src/messages/MStatfs*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Versioned on-wire encodings (MOSDOp has several header versions) - "hard" per the brief.
+      - id: osd-peering-recovery
+        name: PG peering and recovery messages
+        description: PG query/notify/info/log, push/pull, backfill/scan, reservations, merge, lease and PG creation messages.
+        globs: [src/messages/MOSDPG*, src/messages/MOSDPeeringOp.h, src/messages/MBackfillReserve.h, src/messages/MRecoveryReserve.h, src/messages/MOSDForceRecovery.h, src/messages/MPoolMigrationReserve.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Peering/recovery wire formats, several with legacy and *2 variants.
+      - id: osd-replication-ec
+        name: Replication and EC sub-op messages
+        description: Replicated repop and EC sub-read/sub-write messages.
+        globs: [src/messages/MOSDRepOp*, src/messages/MOSDECSubOp*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: On-wire formats for the replication data path.
+      - id: osd-scrub
+        name: Scrub messages
+        description: Replica scrub requests, scrub maps, reservations and scrub commands.
+        globs: [src/messages/MOSDRepScrub*, src/messages/MOSDScrub*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: On-wire scrub protocol.
+      - id: osd-cluster
+        name: OSD-to-monitor messages
+        description: Boot, alive, beacon, failure/mark-down, ping, osdmap delivery, full, PG stats and snap removal.
+        globs: [src/messages/MOSDAlive.h, src/messages/MOSDBeacon.h, src/messages/MOSDBoot.h, src/messages/MOSDFailure.h, src/messages/MOSDFull.h, src/messages/MOSDMap.h, src/messages/MOSDMarkMe*, src/messages/MOSDPing.h, src/messages/MPGStats*, src/messages/MRemoveSnaps.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Cluster-membership wire formats.
+      - id: mon-messages
+        name: Monitor, auth, log and config messages
+        description: Paxos, election, probe/sync, subscribe, command, forward/route, auth, log, time-check, config/KV and NVMe-oF gateway messages.
+        globs: [src/messages/MMon*, src/messages/MAuth*, src/messages/MForward.h, src/messages/MRoute.h, src/messages/MLog*, src/messages/MTimeCheck*, src/messages/MConfig.h, src/messages/MGetConfig.h, src/messages/MKVData.h, src/messages/MCommand*, src/messages/MGenericMessage.h, src/messages/MPing.h, src/messages/PaxosServiceMessage.h, src/messages/MServiceMap.h, src/messages/MNVMeofGw*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Versioned wire formats for the monitor quorum and its clients.
+      - id: mgr-messages
+        name: Mgr messages
+        description: Mgr beacon, open/report/configure, digest, commands and MgrMap delivery.
+        globs: [src/messages/MMgr*, src/messages/MMonMgrReport.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Wire formats for daemon reporting to the mgr.
+      - id: cephfs-messages
+        name: CephFS client and MDS messages
+        description: Client requests/caps/leases/snaps, MDS beacon, cache rejoin, export/import, locks, scrub and quiesce messages.
+        globs: [src/messages/MClient*, src/messages/MMDS*, src/messages/MExport*, src/messages/MDentry*, src/messages/MDir*, src/messages/MDiscover*, src/messages/MCacheExpire.h, src/messages/MGatherCaps.h, src/messages/MInodeFileCaps.h, src/messages/MLock.h, src/messages/MHeartbeat.h, src/messages/MFSMap*, src/messages/MQuarantineDisable.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Lives under src/messages but belongs to CephFS; on-wire encodings.
+      - id: other
+        name: Other
+        description: Remaining message headers.
+        globs: [src/messages/**]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Catch-all.
+  - id: auth
+    group: rados
+    name: Authentication
+    description: Pluggable authentication - cephx, Kerberos, none - plus keyrings and the crypto key abstraction.
+    root: src/auth/
+    features:
+      - id: auth-framework
+        name: Auth framework and keyrings
+        description: Auth method registry, client/service/session/authorizer handler interfaces, KeyRing and RotatingKeyRing.
+        globs: [src/auth/Auth.*, src/auth/AuthClient.h, src/auth/AuthClientHandler.*, src/auth/AuthAuthorizeHandler.h, src/auth/AuthMethodList.*, src/auth/AuthRegistry.*, src/auth/AuthServer.h, src/auth/AuthServiceHandler.*, src/auth/AuthSessionHandler.*, src/auth/DummyAuth.h, src/auth/KeyRing.*, src/auth/RotatingKeyRing.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Interfaces, registries and keyring file parsing.
+      - id: cephx
+        name: cephx protocol
+        description: cephx tickets, authorizers, challenge/response, key server and message signing.
+        globs: [src/auth/cephx/**]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Security-critical on-wire protocol with versioned ticket encodings that must interoperate with existing clients.
+      - id: crypto-keys
+        name: CryptoKey and ciphers
+        description: CryptoKey encoding, AES-CBC/AES-256-KRB5 handlers and random sources over OpenSSL.
+        globs: [src/auth/Crypto.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Wraps standard ciphers; key encoding format must match but primitives exist in Go/Rust stdlib.
+      - id: kerberos
+        name: Kerberos (GSSAPI) auth
+        description: Kerberos client/service/authorizer handlers.
+        globs: [src/auth/krb/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: GSSAPI binding glue plus a small handshake protocol.
+      - id: auth-none
+        name: auth none
+        description: No-op authentication method.
+        globs: [src/auth/none/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Trivial stubs.
+      - id: notes
+        name: Design notes
+        description: Plain-text description of the auth scheme.
+        globs: [src/auth/scheme.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Documentation, not code.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/auth/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining auth files.
+        globs: [src/auth/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: crush
+    group: rados
+    name: CRUSH
+    description: The CRUSH placement algorithm, map builder, C++ wrapper, text compiler and tester.
+    root: src/crush/
+    features:
+      - id: mapper
+        name: CRUSH mapping algorithm
+        description: Bucket selection (straw2, list, tree, uniform), rjenkins hash, ln table and rule execution in C.
+        globs: [src/crush/mapper.*, src/crush/crush.*, src/crush/hash.*, src/crush/crush_ln_table.h, src/crush/crush_compat.h, src/crush/types.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Placement must be bit-exact with every existing client and the kernel; fixed-point math and hash quirks.
+      - id: builder
+        name: CRUSH map builder
+        description: C routines for constructing and reweighting buckets and rules.
+        globs: [src/crush/builder.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Data-structure construction; must produce identical bucket internals.
+      - id: wrapper
+        name: CrushWrapper
+        description: C++ map model - encoding, device classes/shadow trees, choose_args, tree edits and rule helpers.
+        globs: [src/crush/CrushWrapper.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Versioned on-wire crush map encoding plus intricate shadow-tree maintenance.
+      - id: compiler
+        name: CRUSH text compiler
+        description: crushtool text format parser (boost::spirit grammar) and decompiler.
+        globs: [src/crush/CrushCompiler.*, src/crush/grammar.h]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Parser/printer for a small DSL.
+      - id: tester-tools
+        name: Tester, tree dumper and location
+        description: CrushTester simulation, tree dumper, CRUSH location resolution for daemons.
+        globs: [src/crush/CrushTester.*, src/crush/CrushTreeDumper.h, src/crush/CrushLocation.*]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Tooling and formatting around the mapper.
+      - id: sample
+        name: Sample map
+        description: Example legacy crush map text.
+        globs: [src/crush/old_sample.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Sample data, not code.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/crush/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining CRUSH files.
+        globs: [src/crush/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: erasure-code
+    group: rados
+    name: Erasure code plugins
+    description: Erasure-code plugin framework and first-party plugins (jerasure/gf-complete libraries are submodules, not claimed here).
+    root: src/erasure-code/
+    features:
+      - id: framework
+        name: EC plugin framework
+        description: ErasureCodeInterface, base ErasureCode (profile parsing, chunk mapping) and the dlopen plugin registry.
+        globs: [src/erasure-code/ErasureCode.*, src/erasure-code/ErasureCodeInterface.h, src/erasure-code/ErasureCodePlugin.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Interface and profile parsing; the math lives in plugins.
+      - id: library-wrappers
+        name: Jerasure and ISA plugins
+        description: Plugin wrappers mapping profiles onto the jerasure and ISA-L libraries, plus ISA decode-table cache.
+        globs: [src/erasure-code/jerasure/ErasureCode*, src/erasure-code/jerasure/jerasure_init.*, src/erasure-code/isa/ErasureCode*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Thin over external GF libraries, but chunk alignment/technique selection must match on-disk layouts.
+      - id: native-codes
+        name: Clay, LRC and SHEC codes
+        description: First-party code constructions - Clay (MSR), locally repairable codes and shingled EC.
+        globs: [src/erasure-code/clay/ErasureCode*, src/erasure-code/lrc/ErasureCode*, src/erasure-code/shec/ErasureCode*, src/erasure-code/shec/determinant.c]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Real coding-theory implementations whose outputs must be byte-identical; EC is "hard" per the brief.
+      - id: consistency-checker
+        name: EC consistency checker
+        description: ceph_ec_consistency_checker tool reading objects via RADOS and re-encoding to verify parity.
+        globs: [src/erasure-code/consistency/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small CLI over librados and the plugin API.
+      - id: notes
+        name: Plugin notes
+        description: ISA plugin README.
+        globs: [src/erasure-code/isa/README]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Documentation, not code.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/erasure-code/CMakeLists.txt, src/erasure-code/clay/CMakeLists.txt, src/erasure-code/isa/CMakeLists.txt, src/erasure-code/jerasure/CMakeLists.txt, src/erasure-code/lrc/CMakeLists.txt, src/erasure-code/shec/CMakeLists.txt, src/erasure-code/consistency/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining erasure-code files (excluding submodules).
+        globs: [src/erasure-code/*, src/erasure-code/clay/*, src/erasure-code/isa/*, src/erasure-code/lrc/*, src/erasure-code/shec/*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all, deliberately non-recursive so it never reaches into the jerasure/gf-complete submodules.
+  - id: compressor
+    group: rados
+    name: Compression plugins
+    description: Compressor plugin framework, codec plugins and hardware offload used by BlueStore and msgr2.
+    root: src/compressor/
+    features:
+      - id: framework
+        name: Compressor framework
+        description: Compressor interface, algorithm/mode enums and plugin registration.
+        globs: [src/compressor/Compressor.*, src/compressor/CompressionPlugin.h]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small interface and enum mapping.
+      - id: codecs
+        name: Codec plugins
+        description: brotli, lz4, snappy, zlib and zstd plugins wrapping their libraries.
+        globs: [src/compressor/brotli/*.cc, src/compressor/brotli/*.h, src/compressor/lz4/*.cc, src/compressor/lz4/*.h, src/compressor/snappy/*.cc, src/compressor/snappy/*.h, src/compressor/zlib/*.cc, src/compressor/zlib/*.h, src/compressor/zstd/*.cc, src/compressor/zstd/*.h]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin bufferlist adapters over codec libraries that Go/Rust provide natively.
+      - id: hw-offload
+        name: QAT and UADK offload
+        description: Intel QAT and UADK hardware compression accelerators.
+        globs: [src/compressor/QatAccel.*, src/compressor/UadkAccel.*]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Vendor C API bindings with session pooling.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/compressor/CMakeLists.txt, src/compressor/brotli/CMakeLists.txt, src/compressor/lz4/CMakeLists.txt, src/compressor/snappy/CMakeLists.txt, src/compressor/zlib/CMakeLists.txt, src/compressor/zstd/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining compressor files.
+        globs: [src/compressor/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: kv
+    group: rados
+    name: Key-value DB layer
+    description: KeyValueDB abstraction over RocksDB used by BlueStore and the monitor store.
+    root: src/kv/
+    features:
+      - id: kv-api
+        name: KeyValueDB interface
+        description: Transaction/iterator/merge-operator abstraction and key-access histogram.
+        globs: [src/kv/KeyValueDB.*, src/kv/KeyValueHistogram.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Interface plus prefix iterator semantics everything above relies on.
+      - id: rocksdb-store
+        name: RocksDBStore
+        description: RocksDB binding - column-family sharding, option parsing, merge operators, compaction and stats.
+        globs: [src/kv/RocksDBStore.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: 4.9k lines of RocksDB API usage; the sharding definition format is on-disk and must be kept.
+      - id: rocksdb-cache
+        name: Binned LRU cache
+        description: Priority-binned sharded LRU implementing RocksDB's Cache interface for BlueStore cache autotuning.
+        globs: [src/kv/rocksdb_cache/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: A concurrent cache implementing a RocksDB C++ interface.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/kv/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining kv files.
+        globs: [src/kv/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: blk
+    group: rados
+    name: Block device layer
+    description: BlockDevice abstraction with kernel (libaio/io_uring) and SPDK NVMe backends used by BlueStore.
+    root: src/blk/
+    features:
+      - id: block-device-api
+        name: BlockDevice interface
+        description: Device abstraction, IOContext and backend selection.
+        globs: [src/blk/BlockDevice.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Interface plus aio completion bookkeeping.
+      - id: kernel-device
+        name: Kernel block device
+        description: O_DIRECT device with libaio and io_uring submission, discard thread and write-hint support.
+        globs: [src/blk/kernel/**, src/blk/aio/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Async direct I/O against Linux interfaces; needs syscall-level bindings in Go/Rust.
+      - id: spdk-device
+        name: SPDK NVMe device
+        description: Userspace NVMe backend through SPDK.
+        globs: [src/blk/spdk/**]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: SPDK FFI with its own polling/thread model.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/blk/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining block-device files.
+        globs: [src/blk/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: crypto
+    group: rados
+    name: Crypto acceleration plugins
+    description: AES acceleration plugin interface with OpenSSL, ISA-L and QAT backends (the isa-l_crypto submodule is not claimed).
+    root: src/crypto/
+    features:
+      - id: accel-plugins
+        name: Crypto accel plugins
+        description: crypto_accel interface and OpenSSL, ISA-L and QAT AES-CBC/GCM plugin implementations.
+        globs: [src/crypto/crypto_accel.h, src/crypto/crypto_plugin.h, src/crypto/openssl/openssl_crypto_*, src/crypto/isa-l/isal_crypto_*, src/crypto/qat/qat_crypto_*, src/crypto/qat/qcccrypto.*]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Bindings over vendor crypto libraries; Go/Rust have native AES.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/crypto/CMakeLists.txt, src/crypto/isa-l/CMakeLists.txt, src/crypto/openssl/CMakeLists.txt, src/crypto/qat/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining crypto files (excluding the isa-l_crypto submodule).
+        globs: [src/crypto/*, src/crypto/openssl/*, src/crypto/qat/*, src/crypto/isa-l/*.*]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all, non-recursive so it never matches into src/crypto/isa-l/isa-l_crypto.
+  - id: extblkdev
+    group: rados
+    name: External block device plugins
+    description: Plugins exposing vendor block-device capabilities (IBM FCM, VDO) for thin-provisioned capacity reporting.
+    root: src/extblkdev/
+    features:
+      - id: plugins
+        name: ExtBlkDev interface and plugins
+        description: Plugin loader/interface plus FCM and VDO implementations reporting physical capacity.
+        globs: [src/extblkdev/ExtBlkDev*, src/extblkdev/fcm/ExtBlkDev*, src/extblkdev/vdo/ExtBlkDev*]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small sysfs/ioctl readers behind a plugin API.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/extblkdev/CMakeLists.txt, src/extblkdev/fcm/CMakeLists.txt, src/extblkdev/vdo/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining extblkdev files.
+        globs: [src/extblkdev/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Catch-all.
+  - id: osdc
+    group: rados
+    name: Objecter and client-side RADOS
+    description: Client-side op targeting, resend and caching layer under librados, librbd and libcephfs.
+    root: src/osdc/
+    features:
+      - id: objecter
+        name: Objecter
+        description: Computes op targets from the OSDMap, sends/resends ops on map change, handles backoff, linger (watch) ops, pool and stat ops.
+        globs: [src/osdc/Objecter.*, src/osdc/error_code.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: 10.7k lines whose resend-on-interval-change and linger semantics are correctness-critical for every client.
+      - id: split-op
+        name: Split ops (EC direct reads)
+        description: Splits client reads across EC shards and reassembles results client-side.
+        globs: [src/osdc/SplitOp.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Must reproduce the OSD's EC stripe layout on the client.
+      - id: object-cacher
+        name: ObjectCacher
+        description: Client-side write-back/read cache for objects used by librbd and ceph-fuse.
+        globs: [src/osdc/ObjectCacher.*, src/osdc/WritebackHandler.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Buffer-head state machine with dirty/flush/lock interactions.
+      - id: striping
+        name: Striper and Filer
+        description: File-to-object striping arithmetic and multi-object file operations (probe, purge, zero).
+        globs: [src/osdc/Striper.*, src/osdc/StriperTypes.h, src/osdc/Filer.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Layout arithmetic that must match existing data placement; modest size.
+      - id: journaler
+        name: osdc Journaler
+        description: Append-only striped journal over RADOS objects used by the MDS.
+        globs: [src/osdc/Journaler.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: On-disk journal header/entry format and recovery/prezero logic - MDS journaling is "hard" per the brief.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/osdc/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining osdc files.
+        globs: [src/osdc/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: librados
+    group: rados
+    name: RADOS client libraries
+    description: librados C/C++ APIs, the neorados asio API with its cls wrappers, and libradosstriper.
+    root: [src/librados/, src/neorados/, src/libradosstriper/]
+    features:
+      - id: client-core
+        name: RadosClient and IoCtx
+        description: Cluster handle, pool I/O context, async completions, listing, xattr iteration and snap diff.
+        globs: [src/librados/RadosClient.*, src/librados/IoCtxImpl.*, src/librados/AioCompletionImpl.h, src/librados/PoolAsyncCompletionImpl.h, src/librados/ListObjectImpl.h, src/librados/ObjectOperationImpl.h, src/librados/RadosXattrIter.*, src/librados/snap_set_diff.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Request plumbing from API calls into the Objecter.
+      - id: c-api
+        name: librados C API
+        description: The exported rados_* C functions.
+        globs: [src/librados/librados_c.*]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: 4.7k lines of one-to-one wrappers; ABI is the main constraint.
+      - id: cxx-api
+        name: librados C++ API
+        description: librados::Rados/IoCtx/ObjectOperation C++ API and helpers.
+        globs: [src/librados/librados_cxx.cc, src/librados/librados_util.*, src/librados/librados_tp.cc]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin wrappers over the impl classes.
+      - id: asio
+        name: librados asio adapters
+        description: Boost.Asio completion-token adapters over librados async calls.
+        globs: [src/librados/librados_asio.h]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Async adapter templates; a target language's async runtime replaces them.
+      - id: neorados
+        name: neorados API
+        description: Asio-native RADOS API used by RGW and newer code.
+        globs: [src/neorados/RADOS.cc, src/neorados/RADOSImpl.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Second client API with its own op builders and error mapping over the Objecter.
+      - id: neorados-cls
+        name: neorados cls client wrappers
+        description: Typed asio client wrappers for FIFO, log, sem_set and version object classes.
+        globs: [src/neorados/cls/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: FIFO wrapper (2k lines) carries real multi-part queue logic, not just encoding.
+      - id: striper
+        name: libradosstriper
+        description: Striping of large objects across RADOS objects with locking and multi-completion.
+        globs: [src/libradosstriper/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Striped layout with shared/exclusive lock protocol on the first object.
+      - id: build
+        name: Build and ABI files
+        description: CMake rules and the librados linker version script.
+        globs: [src/librados/CMakeLists.txt, src/librados/librados.map, src/neorados/CMakeLists.txt, src/libradosstriper/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing and symbol versioning are replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining client-library files.
+        globs: [src/librados/**, src/neorados/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all for src/librados/ and src/neorados/ (src/libradosstriper/** is the striper feature).
+  - id: cls
+    group: rados
+    name: Object classes
+    description: Server-side RADOS object classes (run inside the OSD) with their client helpers, plus the objclass host API headers.
+    root: [src/cls/, src/objclass/]
+    features:
+      - id: cls-rbd
+        name: cls_rbd
+        description: RBD image metadata methods - header, snapshots, parents/children, mirroring, groups, migration, namespaces.
+        globs: [src/cls/rbd/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: 15k lines of method handlers with versioned omap encodings consumed by librbd; logic is per-method and regular.
+      - id: cls-rgw
+        name: cls_rgw and cls_rgw_gc
+        description: RGW bucket index (entries, OLH/versioning, reshard, bilog, usage) and garbage-collection queue methods.
+        globs: [src/cls/rgw/**, src/cls/rgw_gc/**]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Bucket-index transaction protocol (prepare/complete, OLH epochs) with on-disk omap key encodings RGW relies on.
+      - id: queues-logs
+        name: Queues, FIFO and logs
+        description: cls_queue, 2pc_queue, FIFO, log, timeindex and sem_set - append/consume structures used by RGW notifications, datalog and sync.
+        globs: [src/cls/queue/**, src/cls/2pc_queue/**, src/cls/fifo/**, src/cls/log/**, src/cls/timeindex/**, src/cls/sem_set/*.cc, src/cls/sem_set/*.h]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Ring-buffer/omap layouts with reservation protocols; moderate logic per class.
+      - id: cls-journal
+        name: cls_journal
+        description: Journal metadata methods - clients, commit positions, tags and object sets for rbd-mirror journaling.
+        globs: [src/cls/journal/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Metadata CRUD with versioned encodings.
+      - id: cls-lock
+        name: cls_lock
+        description: Advisory shared/exclusive object locks with cookies and expiration.
+        globs: [src/cls/lock/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Small lock protocol used by librbd, RGW and libradosstriper.
+      - id: rgw-account-classes
+        name: cls_user and cls_otp
+        description: RGW per-user bucket stats/header and OTP (TOTP) device methods.
+        globs: [src/cls/user/**, src/cls/otp/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Omap-backed records with TOTP verification.
+      - id: primitives
+        name: Primitive classes
+        description: version, refcount, cas (dedup chunk refs), cmpomap, numops, hello and sdk example classes.
+        globs: [src/cls/version/**, src/cls/refcount/**, src/cls/cas/**, src/cls/cmpomap/*.cc, src/cls/cmpomap/*.h, src/cls/numops/**, src/cls/hello/**, src/cls/sdk/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small single-purpose methods.
+      - id: cls-lua
+        name: cls_lua
+        description: Executes user-supplied Lua scripts inside the OSD with a bufferlist binding.
+        globs: [src/cls/lua/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Embeds a Lua interpreter; Go/Rust need a Lua runtime binding.
+      - id: cls-cephfs
+        name: cls_cephfs
+        description: Accumulates inode scan metadata for cephfs-data-scan.
+        globs: [src/cls/cephfs/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Tiny helper class for a recovery tool.
+      - id: objclass-api
+        name: objclass API
+        description: Header and shim defining the cls_* API object classes compile against.
+        globs: [src/objclass/**]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: API surface only; the host side is src/osd/objclass.cc.
+      - id: notes
+        name: Design notes
+        description: sem_set design document.
+        globs: [src/cls/sem_set/DESIGN.md]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Documentation, not code.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/cls/CMakeLists.txt, src/cls/cmpomap/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining object-class files.
+        globs: [src/cls/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: journal
+    group: rados
+    name: Journal library
+    description: Generic RADOS-object journal (used by rbd-mirror journaling) - recording, replay, metadata and trimming.
+    root: src/journal/
+    features:
+      - id: journaler-metadata
+        name: Journaler and metadata
+        description: Journaler facade and JournalMetadata - registered clients, commit positions, tags, object-set tracking via cls_journal.
+        globs: [src/journal/Journaler.*, src/journal/JournalMetadata*, src/journal/Settings.h, src/journal/Types.h, src/journal/Utils.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Async metadata state machine with watch/notify refresh.
+      - id: recording
+        name: Recording
+        description: Batched append of entries to splayed journal objects with futures for commit ordering.
+        globs: [src/journal/JournalRecorder.*, src/journal/ObjectRecorder.*, src/journal/Future*, src/journal/Entry.*]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Ordered async append across splayed objects plus the on-disk entry format (preamble/crc).
+      - id: replay
+        name: Replay
+        description: Fetching and ordered replay of journal entries across object sets.
+        globs: [src/journal/JournalPlayer.*, src/journal/ObjectPlayer.*, src/journal/ReplayEntry.h, src/journal/ReplayHandler.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Tag/ordering rules during replay and live tailing for mirroring.
+      - id: trimming
+        name: Trimming
+        description: Removes fully committed object sets.
+        globs: [src/journal/JournalTrimmer.*]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Small commit-position driven cleanup.
+      - id: build
+        name: Build files
+        description: CMake build rules.
+        globs: [src/journal/CMakeLists.txt]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing is replaced, not ported.
+      - id: other
+        name: Other
+        description: Remaining journal files.
+        globs: [src/journal/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.
+  - id: dmclock
+    group: rados
+    name: dmClock QoS library
+    description: In-tree dmClock (mClock) distributed QoS scheduler library behind the OSD op scheduler, with simulator and tests.
+    root: src/dmclock/
+    features:
+      - id: scheduler
+        name: dmClock scheduler
+        description: Pull/push priority queues with reservation/weight/limit tags, client-side tracker and records.
+        globs: [src/dmclock/src/*.cc, src/dmclock/src/*.h]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Header-only template scheduler implementing the dmClock tagging algorithm; subtle timing and idle-client semantics.
+      - id: support
+        name: Support data structures
+        description: Indirect intrusive heap, heap, run-every timer and profiling helpers.
+        globs: [src/dmclock/support/src/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Generic containers that Go/Rust standard libraries largely provide.
+      - id: simulator
+        name: QoS simulator
+        description: Discrete-event client/server simulator comparing dmClock with a simple scheduler, with its config parser.
+        globs: [src/dmclock/sim/src/*.cc, src/dmclock/sim/src/*.h, src/dmclock/sim/src/ssched/**]
+        scope: headline
+        kind: test
+        difficulty: glue
+        why: Evaluation harness, not production code.
+      - id: tests
+        name: Unit tests
+        description: gtest suites for the scheduler, client and intrusive heaps.
+        globs: [src/dmclock/test/*.cc, src/dmclock/test/*.h, src/dmclock/support/test/*.cc]
+        scope: headline
+        kind: test
+        difficulty: standard
+        why: Unit tests for the library.
+      - id: benchmark
+        name: Benchmark scripts
+        description: Shell/Python drivers that run the simulator and plot results.
+        globs: [src/dmclock/benchmark/*.sh, src/dmclock/benchmark/*.py]
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Small scripts around the simulator.
+      - id: sim-configs
+        name: Simulator configs
+        description: Declarative simulator scenario files.
+        globs: [src/dmclock/benchmark/configs/**, src/dmclock/sim/*.conf]
+        scope: headline
+        kind: config
+        difficulty: config
+        why: Declarative data.
+      - id: build
+        name: Build and project files
+        description: CMake rules, package config, CI and ignore files, README.
+        globs: [src/dmclock/CMakeLists.txt, src/dmclock/src/CMakeLists.txt, src/dmclock/sim/CMakeLists.txt, src/dmclock/sim/src/CMakeLists.txt, src/dmclock/test/CMakeLists.txt, src/dmclock/support/test/CMakeLists.txt, src/dmclock/cmake/**, src/dmclock/dmclock-*, src/dmclock/.travis.yml, src/dmclock/.gitignore, src/dmclock/README.md, src/dmclock/benchmark/README.md]
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing, packaging and docs are not ported.
+      - id: other
+        name: Other
+        description: Remaining dmclock files.
+        globs: [src/dmclock/**]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Catch-all.

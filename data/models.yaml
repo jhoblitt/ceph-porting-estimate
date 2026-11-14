@@ -1,0 +1,69 @@
+# models.yaml — list prices in USD per million tokens, standard tier only
+# (no batch, flex, fast or data-residency modifiers). Each model's prices were
+# re-read from its vendor's page on read_on.
+#
+# Tiers not modelled, for the methods page:
+#   Anthropic: the Batch API is 0.5x input and output ("a 50 percent discount on
+#     both input and output tokens"), and the cache multipliers stack on top.
+#     Fast mode is 2x input and output for Fable 5.2 ($16 / $80) and Opus 5.5
+#     ($8 / $40), cache multipliers stacking. US-only inference
+#     (inference_geo: "us") is 1.1x on every category.
+#   OpenAI: the Batch and Flex rows for gpt-6-astra are 0.5x the standard row in
+#     every column. Fast (formerly Priority, renamed 2026-07-30) is 2x and
+#     Ultrafast is 6x the standard row in every column.
+models:
+  - id: fable-5-2
+    name: Claude Fable 5.2
+    vendor: Anthropic
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    read_on: "2026-11-14"
+    usd_per_mtok:
+      input: 8
+      cache_write_short: 10   # "5m cache writes", 1.25x base input
+      cache_write_long: 16    # "1h cache writes", 2x base input
+      cache_read: 0.20        # "Cache hits and refreshes", 0.025x base input (footnote 1)
+      output: 40
+    cache_write_ttl: { short: "5m", long: "1h" }
+    # The page says Claude 4.6 and later models other than Haiku 5.5 bill the
+    # full 1M context window at standard rates, so there are no long-context prices.
+    long_context: null
+
+  - id: opus-5-5
+    name: Claude Opus 5.5
+    vendor: Anthropic
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    read_on: "2026-11-14"
+    usd_per_mtok:
+      input: 4
+      cache_write_short: 5    # "5m cache writes", 1.25x base input
+      cache_write_long: 8     # "1h cache writes", 2x base input
+      cache_read: 0.20        # "Cache hits and refreshes", 0.05x base input (footnote 2)
+      output: 20
+    cache_write_ttl: { short: "5m", long: "1h" }
+    long_context: null        # full 1M window at standard rates, as for Fable 5.2
+
+  - id: gpt-6-astra
+    name: GPT-6 Astra
+    vendor: OpenAI
+    source: https://developers.openai.com/api/docs/pricing
+    read_on: "2026-11-14"
+    # Standard-tier columns, in page order: Short context input $10.00 | output
+    # $50.00 | cached input $1.00 | 30m write $12.50 | 12h write $25.00 |
+    # Long context input $20.00 | output $75.00 | cached input $2.00 |
+    # 30m write $25.00 | 12h write $50.00. Footnote: "Short context: ≤272K
+    # input tokens. Long context: >272K input tokens." The page does not define
+    # the write columns any further.
+    usd_per_mtok:
+      input: 10
+      cache_write_short: 12.50   # "Short context 30m write"
+      cache_write_long: 25       # "Short context 12h write"
+      cache_read: 1              # "Short context cached input"
+      output: 50
+    cache_write_ttl: { short: "30m", long: "12h" }
+    long_context:
+      threshold_tokens: 272000   # page says "272K"; 272,000 assumed (not 278,528)
+      input: 20                  # "Long context input"
+      cache_write_short: 25      # "Long context 30m write"
+      cache_write_long: 50       # "Long context 12h write"
+      cache_read: 2              # "Long context cached input"
+      output: 75                 # "Long context output"
