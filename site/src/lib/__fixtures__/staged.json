@@ -1,0 +1,477 @@
+{
+  "assumptions": {
+    "bytes_per_token": {
+      "default": {
+        "value": 3.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Middle of the 3–4 bytes/token range typical for code; used for any language not listed"
+      },
+      "c": {
+        "value": 3.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Same as C++: similar syntax, identifier lengths and indentation in Ceph"
+      },
+      "cpp": {
+        "value": 3.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "C++ sources and headers; equal to Go so that E is a plain byte ratio for C++ features, and its error cancels through the calibration"
+      },
+      "python": {
+        "value": 3.7,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Fewer braces and more words than C-family code, so slightly more bytes per token"
+      },
+      "shell": {
+        "value": 3.3,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Dense in symbols ($, quotes, pipes, flags), so slightly fewer bytes per token than C++"
+      },
+      "go": {
+        "value": 3.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Typical for Go; equal to C++, see the header comment. Used for rgw-go's sizes in calibration.yaml"
+      },
+      "rust": {
+        "value": 3.3,
+        "measured": false,
+        "source": "assumption",
+        "reason": "More sigils and short keywords (&, ::, ', ?) than C++"
+      },
+      "java": {
+        "value": 3.8,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Long identifiers and verbose type names that tokenize into long pieces"
+      },
+      "typescript": {
+        "value": 3.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Similar to C-family code"
+      },
+      "javascript": {
+        "value": 3.4,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Similar to TypeScript with fewer long type annotations"
+      },
+      "html": {
+        "value": 3.2,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Markup is tag- and attribute-heavy, so it splits into many short tokens"
+      },
+      "css": {
+        "value": 3.0,
+        "measured": false,
+        "source": "assumption",
+        "reason": "CSS and SCSS: selectors, numbers and units split into many short tokens"
+      },
+      "yaml": {
+        "value": 3.0,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Short keys, indentation and punctuation; sparser than code"
+      },
+      "json": {
+        "value": 2.8,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Quotes, colons and braces around short values; the most symbol-heavy format listed"
+      },
+      "cmake": {
+        "value": 3.4,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Function-call syntax with variable references; close to shell"
+      },
+      "markdown": {
+        "value": 4.0,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Mostly English prose, which tokenizes more densely than code"
+      },
+      "rst": {
+        "value": 4.0,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Mostly English prose, as Markdown"
+      },
+      "lua": {
+        "value": 3.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Similar to Python and C-family code"
+      },
+      "perl": {
+        "value": 3.2,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Sigil- and regex-heavy"
+      },
+      "jinja": {
+        "value": 3.3,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Templates mix markup with {{ }} and {% %} delimiters"
+      },
+      "jsonnet": {
+        "value": 3.2,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Close to JSON, with fewer quotes"
+      },
+      "cython": {
+        "value": 3.7,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Python syntax with C type declarations; taken as Python"
+      },
+      "xml": {
+        "value": 3.0,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Tags and attributes split into many short tokens, as HTML does, with long repeated element names"
+      },
+      "ini": {
+        "value": 3.2,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Short key = value lines, close to YAML"
+      },
+      "toml": {
+        "value": 3.2,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Short key = value lines, close to YAML"
+      },
+      "protobuf": {
+        "value": 3.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "C-like declarations"
+      },
+      "make": {
+        "value": 3.4,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Close to shell and CMake"
+      },
+      "dockerfile": {
+        "value": 3.4,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Mostly shell commands"
+      },
+      "cram": {
+        "value": 3.3,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Shell commands with their expected output; taken as shell"
+      },
+      "text": {
+        "value": 4.0,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Plain text files, mostly prose or word lists"
+      }
+    },
+    "params": {
+      "expansion": {
+        "value": 1.2133,
+        "measured": false,
+        "source": "calibration.yaml",
+        "reason": "Product Go tokens ÷ (v19.2.7 source tokens × coverage) = 1,337,661 ÷ (2,756,184 × 0.40). Measured sizes, but the coverage of 0.40 (range 0.35–0.47) is an assumption, so E runs from 1.033 to 1.387 across the range."
+      },
+      "test_ratio": {
+        "value": 2.076,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "rgw-go test + tooling Go ÷ product Go, in tokens: (2,520,207 + 256,749) ÷ 1,337,661"
+      },
+      "overhead": {
+        "value": 10.939,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "Port output tokens ÷ tokens of all surviving Go: 45.01M ÷ 4,114,617; covers review passes, rework and discarded drafts"
+      },
+      "uncached_per_output": {
+        "value": 0.007776,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "Port row: 0.35M uncached input ÷ 45.01M output"
+      },
+      "cache_write_per_output": {
+        "value": 25.266,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "Port row: 1,137.2M cache-write tokens ÷ 45.01M output"
+      },
+      "cache_read_per_output": {
+        "value": 1248.91,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "Port row: 56,213.6M cache-read tokens ÷ 45.01M output; an agent re-reads its context on every call"
+      },
+      "source_read_passes": {
+        "value": 0,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Extra uncached reads of the source per unit of work. Zero here because the three measured ratios above already hold all of rgw-go's input; the naive scenario sets it to 1"
+      },
+      "difficulty": {
+        "config": {
+          "value": 0.1,
+          "measured": false,
+          "source": "assumption",
+          "reason": "Configuration such as suite YAML is carried over almost mechanically"
+        },
+        "glue": {
+          "value": 0.5,
+          "measured": false,
+          "source": "assumption",
+          "reason": "Wiring, CLI plumbing and thin wrappers need about half the reasoning of request handling"
+        },
+        "standard": {
+          "value": 1.0,
+          "measured": false,
+          "source": "assumption",
+          "reason": "Defined as RGW S3 request handling, the work rgw-go measured; the anchor of the scale"
+        },
+        "hard": {
+          "value": 1.5,
+          "measured": false,
+          "source": "assumption",
+          "reason": "Consensus, PG peering and recovery, erasure coding, MDS cache and locking, the messenger and wire encodings: concurrency-heavy or protocol-critical code that needs more review and rework per line"
+        },
+        "extreme": {
+          "value": 2.0,
+          "measured": false,
+          "source": "assumption",
+          "reason": "BlueStore and BlueFS allocators and on-disk formats, Crimson and SeaStore: code where a subtle bug loses data, or whose design rests on a runtime the target lacks; taken as twice the standard effort"
+        }
+      },
+      "rust_factor": {
+        "value": 1.15,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Rust needs more tokens than Go for the same logic (lifetimes, explicit error types, async plumbing); rgw-rs is too small a spike to measure it"
+      },
+      "wasm_overhead": {
+        "value": 1.25,
+        "measured": false,
+        "source": "assumption",
+        "reason": "WASI lacks or restricts threads, async sockets and raw block devices, so a quarter more work on top of Rust for shims and redesigns"
+      },
+      "clean_break_discount": {
+        "value": 0.6,
+        "measured": false,
+        "source": "assumption",
+        "reason": "Dropping on-disk and wire compatibility removes the bit-exact encoders and the cross-checks against C++, a large share of rgw-go's review effort"
+      },
+      "long_cache_write_share": {
+        "value": 0.0728,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "rgw-go's cache writes at the 1-hour TTL: 82,800,087 of 1,137,169,701 tokens; applied unchanged to other models' long TTL (e.g. Astra's 12h)"
+      },
+      "long_context_share": {
+        "uncached": {
+          "value": 0.55,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "Share of uncached tokens in rgw-go calls whose prompt exceeds 272K; rgw-go's 1M-context distribution applied unchanged to Astra"
+        },
+        "cache_write": {
+          "value": 0.748,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "Share of cache-write tokens in rgw-go calls whose prompt exceeds 272K; rgw-go's 1M-context distribution applied unchanged to Astra"
+        },
+        "cache_read": {
+          "value": 0.797,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "Share of cache-read tokens in rgw-go calls whose prompt exceeds 272K; rgw-go's 1M-context distribution applied unchanged to Astra"
+        },
+        "output": {
+          "value": 0.699,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "Share of output tokens in rgw-go calls whose prompt exceeds 272K; rgw-go's 1M-context distribution applied unchanged to Astra"
+        }
+      },
+      "model_efficiency": {
+        "fable-5-2": {
+          "value": 1.0,
+          "measured": false,
+          "source": "assumption",
+          "reason": "No measurement of Fable 5.2's token use against Opus 5.5 on this work; same volumes, different price sheet"
+        },
+        "opus-5-5": {
+          "value": 1.0,
+          "measured": false,
+          "source": "assumption",
+          "reason": "The calibration model (98% of rgw-go's calls), so 1 by definition"
+        },
+        "gpt-6-astra": {
+          "value": 1.0,
+          "measured": false,
+          "source": "assumption",
+          "reason": "No measurement of GPT-6 Astra on this work; same volumes, different price sheet"
+        }
+      },
+      "sloc_equivalent_bytes_per_line": {
+        "value": 39.61,
+        "measured": true,
+        "source": "data/generated/sloc.json",
+        "reason": "Bytes per code line of Ceph's own C++ in the headline scope, tests excluded: 45,096,546 B ÷ 1,138,380 code lines. A dependency's sloc_equivalent is in code lines, so each one carries the comments and blank lines real source does."
+      },
+      "adjacent_uplift": {
+        "uncached": {
+          "value": 0.1429,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "Adjacent rows (defect reproduction, security hook, PR servicing, feasibility) ÷ port row: 0.05 ÷ 0.35"
+        },
+        "cache_write": {
+          "value": 0.1597,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "Adjacent rows ÷ port row: 181.6 ÷ 1,137.2"
+        },
+        "cache_read": {
+          "value": 0.0955,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "Adjacent rows ÷ port row: 5,366.2 ÷ 56,213.6"
+        },
+        "output": {
+          "value": 0.3208,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "Adjacent rows ÷ port row: 14.44 ÷ 45.01"
+        }
+      }
+    },
+    "toggles": {
+      "include_adjacent": false,
+      "clean_break": false
+    },
+    "scenarios": {
+      "naive": {
+        "label": "Naive single pass",
+        "description": "What a \"translate every line once\" estimate would say: one pass over the source, no tests, no review, no re-reading. It shows the floor, and how far below the measured cost it sits.",
+        "overrides": {
+          "test_ratio": 0,
+          "overhead": 1,
+          "uncached_per_output": 0,
+          "source_read_passes": 1,
+          "cache_write_per_output": 0,
+          "cache_read_per_output": 0,
+          "difficulty.config": 1,
+          "difficulty.glue": 1,
+          "difficulty.standard": 1,
+          "difficulty.hard": 1,
+          "difficulty.extreme": 1,
+          "rust_factor": 1,
+          "wasm_overhead": 1
+        },
+        "toggles": {}
+      },
+      "calibrated": {
+        "label": "Calibrated on rgw-go",
+        "description": "The token pattern rgw-go actually showed per line of Go, with its tests and review, applied to every Ceph feature. Difficulty and target factors are assumptions; the rest is measured.",
+        "overrides": {},
+        "toggles": {}
+      },
+      "pessimistic": {
+        "label": "Pessimistic",
+        "description": "Calibrated, but hard and extreme code cost more, every line takes a quarter more output, and the work around the port (defect reproduction, security review, upstream PRs) is included.",
+        "overrides": {
+          "difficulty.hard": 2,
+          "difficulty.extreme": 3
+        },
+        "scale": {
+          "overhead": 1.25
+        },
+        "toggles": {
+          "include_adjacent": true
+        }
+      }
+    },
+    "default_scenario": "calibrated"
+  },
+  "models": [
+    {
+      "id": "fable-5-2",
+      "name": "Claude Fable 5.2",
+      "vendor": "Anthropic",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "read_on": "2026-11-14",
+      "usd_per_mtok": {
+        "input": 8,
+        "cache_write_short": 10,
+        "cache_write_long": 16,
+        "cache_read": 0.2,
+        "output": 40
+      },
+      "cache_write_ttl": {
+        "short": "5m",
+        "long": "1h"
+      },
+      "long_context": null
+    },
+    {
+      "id": "opus-5-5",
+      "name": "Claude Opus 5.5",
+      "vendor": "Anthropic",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "read_on": "2026-11-14",
+      "usd_per_mtok": {
+        "input": 4,
+        "cache_write_short": 5,
+        "cache_write_long": 8,
+        "cache_read": 0.2,
+        "output": 20
+      },
+      "cache_write_ttl": {
+        "short": "5m",
+        "long": "1h"
+      },
+      "long_context": null
+    },
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "vendor": "OpenAI",
+      "source": "https://developers.openai.com/api/docs/pricing",
+      "read_on": "2026-11-14",
+      "usd_per_mtok": {
+        "input": 10,
+        "cache_write_short": 12.5,
+        "cache_write_long": 25,
+        "cache_read": 1,
+        "output": 50
+      },
+      "cache_write_ttl": {
+        "short": "30m",
+        "long": "12h"
+      },
+      "long_context": {
+        "threshold_tokens": 272000,
+        "input": 20,
+        "cache_write_short": 25,
+        "cache_write_long": 50,
+        "cache_read": 2,
+        "output": 75
+      }
+    }
+  ]
+}
