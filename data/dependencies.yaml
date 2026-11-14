@@ -41,8 +41,9 @@ dependencies:
         package: fjall
         sloc_equivalent: 0
         difficulty: hard
-        note: RocksDB does not build for WASI (threads, mmap); a pure-Rust LSM (fjall, WASI support unverified)
-          replaces it at the cost of on-disk compatibility, and BlueFS on raw block is lost.
+        note: Assumes RocksDB cannot be built for WASI, since it needs threads and mmap (not verified by a build);
+          a pure-Rust LSM (fjall, WASI support unverified) replaces it at the cost of on-disk
+          compatibility, and BlueFS on raw block is lost.
   - id: seastar
     name: Seastar
     used_for: Shard-per-core async runtime for the Crimson OSD (futures, reactor, networking, DPDK/io_uring)
@@ -68,8 +69,8 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: extreme
-        note: No reactor or io_uring under WASI; Crimson would run on a single-threaded async executor
-          with host-provided I/O.
+        note: Assumes WASI offers no reactor or io_uring (not verified by a build); Crimson would run on a
+          single-threaded async executor with host-provided I/O.
   - id: spdk
     name: SPDK
     used_for: User-space NVMe driver backend for BlueStore (NVMEDevice)
@@ -97,7 +98,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: hard
-        note: Kernel-bypass NVMe is impossible under WASI; capability lost.
+        note: Assumes kernel-bypass NVMe cannot run under WASI (not verified by a build); capability lost.
   - id: isa-l
     name: Intel ISA-L
     used_for: Erasure-code plugin (isa) Reed-Solomon/Cauchy kernels
@@ -191,7 +192,8 @@ dependencies:
         sloc_equivalent: 0
         difficulty: glue
         note: Stable pure-Go XXH64 (feature-complete, no commits since 2024-07); XXH3 via zeebo/xxh3; no
-          maintained XXH32 package exists, so XXH32 (~100 lines) is written in-tree.
+          maintained XXH32 package exists, so XXH32 (~100 lines) is written in-tree. That work is
+          not costed, being below the estimate's resolution, so the strategy stays native.
       rust:
         strategy: native
         package: xxhash-rust
@@ -291,7 +293,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: glue
-        note: Hardware accelerator unavailable under WASI; capability lost.
+        note: Assumes the hardware accelerator is unreachable under WASI (not verified by a build); capability lost.
   - id: fmt
     name: '{fmt}'
     used_for: C++ string formatting used throughout
@@ -436,7 +438,8 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: glue
-        note: No raw DNS sockets assumed under WASI; resolution goes through the host (wasi-sockets ip-name-lookup).
+        note: Assumes WASI offers no raw DNS sockets (not verified by a build); resolution goes through the host
+          (wasi-sockets ip-name-lookup).
   - id: s3select
     name: s3select
     used_for: RGW S3 Select SQL engine over CSV/JSON/Parquet (Ceph-authored, header-only, Boost.Spirit
@@ -541,8 +544,8 @@ dependencies:
         package: rskafka
         sloc_equivalent: 800
         difficulty: standard
-        note: librdkafka does not target WASI; pure-Rust rskafka (SASL/TLS coverage unverified) plus producer
-          glue.
+        note: Assumes librdkafka cannot be built for WASI (not verified by a build); pure-Rust rskafka (SASL/TLS
+          coverage unverified) plus producer glue.
   - id: lancedb
     name: LanceDB C bindings
     used_for: Vector index store backing RGW S3 Vectors (optional)
@@ -615,7 +618,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: glue
-        note: Separate product; SPDK not hostable.
+        note: Separate product; assumes SPDK cannot be hosted under WASI (not verified by a build).
   - id: test-corpora
     name: ceph-object-corpus and ceph-erasure-code-corpus
     used_for: Encoded-object and EC-chunk corpora for encoding non-regression tests
@@ -785,7 +788,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: hard
-        note: RDMA is unavailable under WASI; capability lost.
+        note: Assumes RDMA is unavailable under WASI (not verified by a build); capability lost.
   - id: dpdk
     name: DPDK
     used_for: User-space networking for the messenger and Seastar (off by default)
@@ -808,7 +811,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: hard
-        note: Kernel-bypass networking impossible under WASI; capability lost.
+        note: Assumes kernel-bypass networking cannot run under WASI (not verified by a build); capability lost.
   - id: liburing
     name: liburing
     used_for: io_uring block I/O backend for BlueStore KernelDevice and Seastar
@@ -832,7 +835,8 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: hard
-        note: io_uring is a kernel interface not exposed by WASI; block I/O needs a host shim.
+        note: Assumes WASI does not expose io_uring, a kernel interface (not verified by a build); block I/O needs a host
+          shim.
   - id: libaio
     name: libaio
     used_for: Default Linux AIO backend for BlueStore KernelDevice
@@ -856,7 +860,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: hard
-        note: Kernel AIO unavailable under WASI; block I/O needs a host shim.
+        note: Assumes kernel AIO is unavailable under WASI (not verified by a build); block I/O needs a host shim.
   - id: fuse
     name: FUSE (libfuse3)
     used_for: ceph-fuse, rbd-fuse and FuseStore user-space mounts
@@ -879,7 +883,8 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: hard
-        note: /dev/fuse is a kernel interface; mounts lost or require a host shim.
+        note: Assumes /dev/fuse, a kernel interface, is unreachable under WASI (not verified by a build); mounts lost or
+          require a host shim.
   - id: libcryptsetup
     name: libcryptsetup
     used_for: LUKS1/LUKS2 header format and load for librbd client-side encryption
@@ -956,7 +961,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: standard
-        note: Kernel and device interfaces not available under WASI; needs host shim.
+        note: Assumes kernel and device interfaces are not available under WASI (not verified by a build); needs host shim.
   - id: lttng
     name: LTTng-UST, Babeltrace, systemtap SDT
     used_for: Static tracepoints (OSD, BlueStore, librados, librbd) and rbd-replay trace parsing
@@ -979,7 +984,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: glue
-        note: No user-space tracer under WASI.
+        note: Assumes no user-space tracer can run under WASI (not verified by a build).
   - id: allocators
     name: tcmalloc (gperftools) / jemalloc
     used_for: Memory allocator and heap profiling for OSD/MON (heap admin commands)
@@ -1264,7 +1269,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: glue
-        note: libfdb_c cannot run under WASI; experimental backend lost.
+        note: Assumes libfdb_c cannot run under WASI (not verified by a build); experimental backend lost.
   - id: daos
     name: DAOS client
     used_for: Experimental RGW SAL backend (off by default)
@@ -1287,7 +1292,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: glue
-        note: Experimental; native library unavailable.
+        note: Experimental; assumes its native library is unavailable under WASI (not verified by a build).
   - id: grpc-protobuf
     name: gRPC and Protocol Buffers
     used_for: NVMe-oF gateway monitor client (C++) and dashboard NVMe-oF API (Python grpcio)
@@ -1386,7 +1391,8 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: glue
-        note: No host Python inside WASI; bindings lost (component-model bindings possible, unverified).
+        note: Assumes no host Python is reachable inside WASI (not verified by a build); bindings lost (component-model
+          bindings possible, unverified).
   - id: py-web
     name: CherryPy, cheroot, Routes, pecan, werkzeug
     used_for: HTTP servers for mgr dashboard, restful, prometheus and cephadm agent endpoints
@@ -1526,7 +1532,7 @@ dependencies:
         package: null
         sloc_equivalent: 0
         difficulty: standard
-        note: xmlsec1 not available on WASI; SSO lost or delegated to a proxy.
+        note: Assumes xmlsec1 is not available on WASI (not verified by a build); SSO lost or delegated to a proxy.
   - id: scientific-python
     name: numpy, scipy, scikit-learn
     used_for: diskprediction_local failure prediction; numeric helpers in balancer/autoscaler
