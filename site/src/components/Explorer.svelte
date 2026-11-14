@@ -11,6 +11,7 @@
     type AreaMode,
     type Row,
     type ScopeMode,
+    type Sort,
     explorerLevel,
     perLineRange,
     requiredMode,
@@ -18,10 +19,13 @@
   } from '../lib/explorer';
   import { count, percent, usd } from '../lib/format';
   import { SCOPE_MODE_LABELS } from '../lib/labels';
-  import type { GroupEstimate } from '../lib/model';
+  import type { FeatureEstimate, GroupEstimate } from '../lib/model';
+  import { DEPENDENCIES_COMPONENT_ID } from '../lib/report';
   import type { AppState, WriteOptions } from '../lib/state';
   import Section from './Section.svelte';
   import Segmented from './Segmented.svelte';
+  import Breadcrumb, { type Crumb } from './explorer/Breadcrumb.svelte';
+  import LevelTable from './explorer/LevelTable.svelte';
   import Treemap from './explorer/Treemap.svelte';
   import TreemapLegend from './explorer/TreemapLegend.svelte';
 
@@ -33,9 +37,12 @@
 
   let { d, selection, onselect }: Props = $props();
 
+  const DEPENDENCY_GROUP_NAME = 'Dependencies';
 
   let area = $state<AreaMode>('code');
   let chosenMode = $state<ScopeMode>('headline');
+  let query = $state('');
+  let sort = $state<Sort>({ key: 'usd', dir: 'desc' });
   let hoverId = $state<string | null>(null);
   let treemap: Treemap | undefined = $state();
 
@@ -52,8 +59,17 @@
   const component = $derived(
     d.root.children.find((c): c is GroupEstimate => c.kind !== 'feature' && c.id === componentId),
   );
+  const componentInfo = $derived(d.report.components.find((c) => c.id === componentId));
+  const isDependencies = $derived(componentId === DEPENDENCIES_COMPONENT_ID);
+  const groupId = $derived(componentInfo?.group ?? null);
+  const groupName = $derived(
+    isDependencies ? DEPENDENCY_GROUP_NAME : (d.report.groups.find((g) => g.id === groupId)?.name ?? ''),
+  );
   const componentName = $derived(level.groups[0]?.name ?? component?.name ?? '');
 
+  const feature = $derived(
+    component?.children.find((f): f is FeatureEstimate => f.kind === 'feature' && f.id === featureId),
+  );
 
   type Focus = { cell: string | null } | null;
 
@@ -85,6 +101,17 @@
     else void go([], null);
   }
 
+  const crumbs: Crumb[] = $derived.by(() => {
+    const list: Crumb[] = [{ key: 'root', label: 'Ceph', go: () => void go([], { cell: componentId }) }];
+    if (componentId === null) return list;
+    const firstOfGroup = rootLevel.groups.find((g) => g.rows.some((r) => r.id === componentId))?.rows[0]?.id ?? null;
+    list.push({ key: 'group', label: groupName, kind: 'group', go: () => void go([], { cell: firstOfGroup }) });
+    list.push({ key: 'component', label: componentName, kind: 'component', go: () => void go([componentId], { cell: featureId }) });
+    if (feature) list.push({ key: 'feature', label: feature.name, kind: 'feature', go: () => {} });
+    return list;
+  });
+
+  const levelNoun = $derived(componentId === null ? 'Ceph' : componentName);
   const mapLabel = $derived(
     componentId === null
       ? `Map of Ceph's components by ${area === 'code' ? 'code lines' : 'cost'}, grouped by area`
@@ -124,6 +151,7 @@
   </div>
 
   <div class="where">
+    <Breadcrumb {crumbs} />
     <p class="level-total">
       <strong>{usd(level.total.usd)}</strong> for {count(level.total.code)} lines {scopeWords[mode]}{#if componentId !== null},
         {percent(level.share)} of the headline{:else}, dependency work included{/if}
@@ -138,13 +166,27 @@
     {range}
     selectedId={featureId}
     highlightId={hoverId}
-    query=""
+    {query}
     label={mapLabel}
     onopen={open}
     onhover={(id) => (hoverId = id)}
     onup={up}
   />
   <TreemapLegend {area} {mode} {range} />
+
+  <div class="table">
+    <h3>{componentId === null ? 'Every component' : `The features of ${levelNoun}`}</h3>
+    <LevelTable
+      {level}
+      caption={componentId === null ? 'Components by group' : `Features of ${componentName}`}
+      bind:sort
+      bind:query
+      selectedId={featureId}
+      highlightId={hoverId}
+      onopen={open}
+      onhover={(id) => (hoverId = id)}
+    />
+  </div>
 </Section>
 
 <style>
@@ -173,6 +215,15 @@
 
   .level-total strong {
     color: var(--text);
+    font-size: var(--text-base);
+  }
+
+  .table {
+    margin-top: var(--space-6);
+  }
+
+  .table h3 {
+    margin-bottom: var(--space-3);
     font-size: var(--text-base);
   }
 </style>
