@@ -1,16 +1,18 @@
 <!--
-  Every number the estimate rests on, grouped, each adjustable. A change
-  writes an override to the URL and every view recomputes; a value equal to
-  the scenario's is not stored, so "reset" and "set it back" are the same.
-  Each group is a native <details>, open at first, whose summary says how
-  many of its values are changed; lib/reveal.ts opens a group before it
-  sends the reader into it.
+  The adjustable numbers the estimate rests on, grouped; the lede says what
+  else it rests on that is not adjustable here. A change writes an override
+  to the URL and every view recomputes; a value equal to the scenario's is
+  not stored, so "reset" and "set it back" are the same. Each group is a
+  native <details>, open at first, whose summary says how many of its
+  values are changed; lib/reveal.ts opens a group before it sends the
+  reader into it.
 -->
 <script lang="ts">
-  import { groupParams, toggleText } from '../lib/assumptions';
-  import type { Derived, ToggleInfo } from '../lib/derived.svelte';
+  import { groupParams, provenance, toggleText } from '../lib/assumptions';
+  import type { Derived, ParamNote, ToggleInfo } from '../lib/derived.svelte';
+  import { paramValue } from '../lib/format';
   import { withOverride, withoutOverride } from '../lib/overrides';
-  import type { AppState, WriteOptions } from '../lib/state';
+  import { type AppState, type WriteOptions, hashFromState } from '../lib/state';
   import ParamControl from './ParamControl.svelte';
   import Section from './Section.svelte';
 
@@ -33,13 +35,36 @@
   function setToggle(t: ToggleInfo, on: boolean) {
     setOverrides(withOverride(d.overrides, t.key, on ? 1 : 0, t.scenario ? 1 : 0));
   }
+
+  const project = $derived(d.calibration.projectName);
+  const methodsHref = $derived(hashFromState({ ...selection, route: 'methods' }));
+
+  function noteText(note: ParamNote | undefined): string | undefined {
+    if (!note) return undefined;
+    switch (note.kind) {
+      case 'zeroes':
+        return 'At 0 this alone makes the estimate $0.';
+      case 'below':
+        return `At or below ${paramValue(note.threshold)}, the tests Ceph already has per unit of product code, this has no effect: existing tests are taken to replace new ones.`;
+      case 'switch':
+        return `No effect while “${toggleText(note.toggle).label}” is off.`;
+    }
+  }
 </script>
 
 <Section id="assumptions" title="Assumptions">
   {#snippet lede()}
-    Every number the estimate rests on. Change one and every figure on the page follows; the address bar keeps your changes,
-    so a link shares them.
+    The numbers you can change. Change one and every figure on the page follows; the address bar keeps your changes, so a
+    link shares them. The estimate also rests on inputs that are not adjustable here: bytes per token for each language,
+    the share of its component the calibration port is taken to cover, the difficulty class of each feature, and each
+    model's prices. <a href={methodsHref}>Methods</a> explains them.
   {/snippet}
+
+  <p class="measured-means">
+    “Measured on {project ?? 'the calibration port'}” means measured by that project's own script over its own transcripts,
+    on one port; “Measured on Ceph” means counted from Ceph's source at the commit this report prices. Everything else is
+    assumed.
+  </p>
 
   <div class="scenario">
     <div>
@@ -81,6 +106,8 @@
           <ParamControl
             {info}
             value={d.values.get(info.path) ?? info.scenario}
+            badge={provenance(info, project)}
+            note={noteText(d.paramNotes.get(info.path))}
             onchange={(v, live) => setOverrides(withOverride(d.overrides, info.path, v, info.scenario), live)}
             onreset={() => setOverrides(withoutOverride(d.overrides, info.path))}
           />
@@ -91,6 +118,12 @@
 </Section>
 
 <style>
+  .measured-means {
+    margin: 0 0 var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+
   .scenario {
     display: flex;
     justify-content: space-between;

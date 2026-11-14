@@ -1,31 +1,46 @@
 <!--
-  One adjustable assumption: its value as a slider and a number box, whether
-  it was measured or assumed, where it comes from and why (behind the "i"),
-  and a reset once it differs from the scenario.
+  One adjustable assumption: its value as a slider and a number box, where
+  the value comes from, what it rests on (behind the "i"), a line when the
+  value zeroes the estimate or does nothing where it is, and a reset once it
+  differs from the scenario. A multiplier's slider is a log track from a
+  quarter of its baseline to four times it, with the baseline marked.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { sliderRange } from '../lib/assumptions';
-  import { decimal } from '../lib/format';
+  import { SLIDER_STEPS, type SliderRange, fromSlider, sliderRange, toSlider } from '../lib/assumptions';
+  import { decimal, paramValue } from '../lib/format';
   import type { ParamInfo } from '../lib/model';
   import InfoPopover from './InfoPopover.svelte';
 
   interface Props {
     info: ParamInfo;
     value: number;
+    /** Where the value comes from: "Measured on rgw-go", "Assumed", … */
+    badge: string;
+    /** Said beside the control, e.g. that the value has no effect where it is. */
+    note?: string | undefined;
     /** `live` while a slider is being dragged, so the caller can coalesce history entries. */
     onchange: (value: number, live: boolean) => void;
     onreset: () => void;
   }
 
-  let { info, value, onchange, onreset }: Props = $props();
+  let { info, value, badge, note, onchange, onreset }: Props = $props();
 
   const id = $props.id();
-  const range = $derived(sliderRange(info, value));
+  /**
+   * The track as it was when a gesture began, held until it ends: the track
+   * widens to reach the value, so recomputing it mid-drag would move the
+   * track under the thumb.
+   */
+  let held = $state<SliderRange | undefined>();
+  const range = $derived(held ?? sliderRange(info, value));
+  const position = $derived(toSlider(range, value));
+  const mark = $derived(range.baselineAt);
   const changed = $derived(value !== info.scenario);
   const isUrl = $derived(/^https?:\/\//.test(info.source));
-  /** Six significant figures in the number box, so a slider step does not show float noise. */
-  const shown = $derived(Number(value.toPrecision(6)));
+  /** The number box shows three significant figures, as the rest of the panel does. */
+  const shown = $derived(Number(value.toPrecision(3)));
+  const exactBaseline = $derived(decimal(info.baseline));
 
   /**
    * True after the first input of a gesture, so the rest of a drag replaces
@@ -34,10 +49,17 @@
    * the next change replacing an entry it should add.
    */
   let dragging = false;
-  const startGesture = () => (dragging = false);
+  function startGesture() {
+    dragging = false;
+    held = range;
+  }
+  function endGesture() {
+    dragging = false;
+    held = undefined;
+  }
 
   function slide(event: Event & { currentTarget: HTMLInputElement }) {
-    onchange(event.currentTarget.valueAsNumber, dragging);
+    onchange(fromSlider(range, event.currentTarget.valueAsNumber, [info.baseline, info.scenario]), dragging);
     dragging = true;
   }
 
@@ -54,7 +76,7 @@
 <div class="param" class:changed data-param-path={info.path}>
   <div class="head">
     <label id="{id}-label" for="{id}-number">{info.label}</label>
-    <span class="mark" class:measured={info.measured}>{info.measured ? 'Measured' : 'Assumed'}</span>
+    <span class="badge" class:measured={info.measured}>{badge}</span>
     <InfoPopover label="About: {info.label}">
       <p>{info.reason}</p>
       <p>
@@ -68,29 +90,49 @@
         {/if}
       </p>
       <p>
-        Baseline {decimal(info.baseline)}{#if info.scenario !== info.baseline}; this scenario sets {decimal(info.scenario)}{/if}.
+        Baseline {paramValue(info.baseline)}{#if exactBaseline !== paramValue(info.baseline)}{' '}({exactBaseline} in the data){/if}{#if info.scenario !== info.baseline}; this scenario sets {paramValue(info.scenario)}{/if}.
+        {#if range.scale === 'log'}The slider runs from {paramValue(range.lo)} to {paramValue(range.hi)} on a log scale.{/if}
       </p>
     </InfoPopover>
   </div>
   <div class="inputs">
+    <div class="track">
+      <input
+        type="range"
+        aria-labelledby="{id}-label"
+        aria-valuetext={paramValue(value)}
+        aria-describedby={note ? `${id}-note` : undefined}
+        min="0"
+        max={SLIDER_STEPS}
+        step="1"
+        value={position}
+        oninput={slide}
+        onpointerdown={startGesture}
+        onkeydown={startGesture}
+        onpointerup={endGesture}
+        onpointercancel={endGesture}
+        onchange={endGesture}
+        onblur={endGesture}
+      />
+      <span class="baseline" style:--at={mark} title="Baseline {paramValue(info.baseline)}" aria-hidden="true"></span>
+    </div>
     <input
-      type="range"
-      aria-labelledby="{id}-label"
-      min={range.min}
-      max={range.max}
-      step={range.step}
-      {value}
-      oninput={slide}
-      onpointerdown={startGesture}
-      onkeydown={startGesture}
-      onchange={startGesture}
-      onblur={startGesture}
+      id="{id}-number"
+      type="number"
+      class="number"
+      step="any"
+      min="0"
+      value={shown}
+      aria-describedby={note ? `${id}-note` : undefined}
+      onchange={type}
     />
-    <input id="{id}-number" type="number" class="number" step="any" min="0" value={shown} onchange={type} />
   </div>
+  {#if note}
+    <p class="param-note" id="{id}-note">{note}</p>
+  {/if}
   {#if changed}
     <div class="reset">
-      <span>Scenario value {decimal(info.scenario)}</span>
+      <span>Scenario value {paramValue(info.scenario)}</span>
       <button type="button" onclick={onreset}>Reset<span class="visually-hidden"> {info.label}</span></button>
     </div>
   {/if}
@@ -126,7 +168,7 @@
     padding-top: 0.2rem;
   }
 
-  .mark {
+  .badge {
     flex: none;
     margin-top: 0.15rem;
     padding: 0 var(--space-2);
@@ -135,9 +177,10 @@
     font-size: 0.75rem;
     line-height: 1.5rem;
     color: var(--text-muted);
+    white-space: nowrap;
   }
 
-  .mark.measured {
+  .badge.measured {
     border-color: var(--accent);
     color: var(--accent);
   }
@@ -149,10 +192,30 @@
     gap: var(--space-3);
   }
 
+  .track {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    padding-bottom: 6px;
+  }
+
   input[type='range'] {
     flex: 1;
     min-width: 0;
+    margin: 0;
     accent-color: var(--accent);
+  }
+
+  /* The baseline, under the track where the thumb's centre would sit (the thumb is about 16px wide). */
+  .baseline {
+    position: absolute;
+    bottom: 0;
+    left: calc(8px + var(--at) * (100% - 16px));
+    width: 2px;
+    height: 6px;
+    background: var(--text-muted);
+    transform: translateX(-50%);
   }
 
   .number {
@@ -165,6 +228,13 @@
     font: inherit;
     font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
+  }
+
+  .param-note {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    line-height: 1.45;
   }
 
   .reset {
