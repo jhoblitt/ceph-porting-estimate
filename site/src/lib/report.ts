@@ -86,6 +86,8 @@ export interface Dependency {
   /** Paths in the ceph tree; empty for a system dependency. */
   submodules: string[];
   submodule_size: SubmoduleSize | null;
+  /** The listed submodules' own files, without their nested submodules. */
+  submodule_own: SubmoduleSize | null;
   targets: Record<Target, DependencyTarget>;
 }
 
@@ -137,9 +139,18 @@ export interface Params {
 
 export type Toggles = Record<ToggleId, boolean>;
 
+/**
+ * What a scenario stands for in the range: its low, central and high
+ * outcomes, or a reference point that is not an outcome.
+ */
+export const SCENARIO_ROLES = ['low', 'central', 'high', 'reference'] as const;
+export type ScenarioRole = (typeof SCENARIO_ROLES)[number];
+
 export interface Scenario {
   label: string;
   description: string;
+  /** Absent in data older than the roles; the views then show the scenario without placing it in the range. */
+  role?: ScenarioRole;
   /** Dotted param path → replacement value. */
   overrides?: Record<string, number>;
   /** Dotted param path → factor applied to the baseline value. */

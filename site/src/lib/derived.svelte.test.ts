@@ -174,12 +174,12 @@ describe('Derived', () => {
   });
 
   it('lists the long-context billing of models that have long-context prices', () => {
-    const { d } = setup();
+    const { d } = setup({ scenario: 'pessimistic' });
     expect(d.longContext).toEqual([
       {
         model: report.models[2],
         threshold: 272_000,
-        shares: { uncached: 0.3, cacheWrite: 0.3, cacheRead: 0.4, output: 0.3 },
+        shares: { uncached: 0.55, cacheWrite: 0.748, cacheRead: 0.797, output: 0.699 },
       },
     ]);
   });
@@ -242,7 +242,7 @@ describe('Derived', () => {
   it('lists every model at the current target', () => {
     const { d, set } = setup();
     set({ target: 'rust' });
-    expect(d.byModel.map((m) => m.model.id)).toEqual(['fable-5-2', 'opus-5-5', 'gpt-6-astra']);
+    expect(d.byModel.map((m) => m.model.id)).toEqual(['fable-5-2', 'opus-5-5', 'gpt-6-astra', 'kimi-k3']);
     for (const m of d.byModel) expect(m.cost).toBe(d.matrix.rust[m.model.id]);
   });
 });

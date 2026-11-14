@@ -176,6 +176,7 @@
       "used_for": "BlueStore metadata and the monitor store.",
       "submodules": ["src/rocksdb"],
       "submodule_size": { "available": true, "files": 1210, "code": 412300, "comment": 61200, "blank": 70110, "bytes": 18630221, "unavailable_nested": 0 },
+      "submodule_own": { "available": true, "files": 1210, "code": 412300, "comment": 61200, "blank": 70110, "bytes": 18630221, "unavailable_nested": 0 },
       "targets": {
         "go": { "strategy": "bindings", "package": "github.com/linxGnu/grocksdb", "sloc_equivalent": 6000, "difficulty": "hard", "note": "cgo bindings exist; Ceph's merge operators and env need wrapping." },
         "rust": { "strategy": "bindings", "package": "rust-rocksdb", "sloc_equivalent": 4000, "difficulty": "standard", "note": "Mature crate; custom comparators and env shims remain." },
@@ -188,6 +189,7 @@
       "used_for": "Asio, intrusive containers, program options and more.",
       "submodules": [],
       "submodule_size": null,
+      "submodule_own": null,
       "targets": {
         "go": { "strategy": "native", "package": null, "sloc_equivalent": 0, "difficulty": "glue", "note": "The standard library covers what Ceph uses." },
         "rust": { "strategy": "native", "package": "tokio", "sloc_equivalent": 0, "difficulty": "glue", "note": "Covered by std and common crates." },
@@ -225,6 +227,16 @@
       "usd_per_mtok": { "input": 10, "cache_write_short": 12.5, "cache_write_long": 25, "cache_read": 1, "output": 50 },
       "cache_write_ttl": { "short": "30m", "long": "12h" },
       "long_context": { "threshold_tokens": 272000, "input": 20, "cache_write_short": 25, "cache_write_long": 50, "cache_read": 2, "output": 75 }
+    },
+    {
+      "id": "kimi-k3",
+      "name": "Kimi K3",
+      "vendor": "Moonshot AI",
+      "source": "https://platform.moonshot.ai/docs/pricing",
+      "read_on": "2026-11-13",
+      "usd_per_mtok": { "input": 3, "cache_write_short": 3, "cache_write_long": 6, "cache_read": 0.3, "output": 15 },
+      "cache_write_ttl": { "short": "5m", "long": "1h" },
+      "long_context": null
     }
   ],
   "assumptions": {
@@ -255,15 +267,16 @@
       "clean_break_discount": { "value": 0.8, "measured": false, "source": "assumption", "reason": "No on-disk or wire compatibility to keep." },
       "long_cache_write_share": { "value": 0.5, "measured": false, "source": "assumption", "reason": "Half of writes outlive the short TTL." },
       "long_context_share": {
-        "uncached": { "value": 0.3, "measured": false, "source": "assumption", "reason": "Long agent sessions cross the threshold." },
-        "cache_write": { "value": 0.3, "measured": false, "source": "assumption", "reason": "Follows the uncached share." },
-        "cache_read": { "value": 0.4, "measured": false, "source": "assumption", "reason": "Reads concentrate in long contexts." },
-        "output": { "value": 0.3, "measured": false, "source": "assumption", "reason": "Follows the uncached share." }
+        "uncached": { "value": 0, "measured": false, "source": "data/calibration.yaml", "reason": "A harness kept under the threshold; the pessimistic scenario uses rgw-go's shares." },
+        "cache_write": { "value": 0, "measured": false, "source": "data/calibration.yaml", "reason": "A harness kept under the threshold; the pessimistic scenario uses rgw-go's shares." },
+        "cache_read": { "value": 0, "measured": false, "source": "data/calibration.yaml", "reason": "A harness kept under the threshold; the pessimistic scenario uses rgw-go's shares." },
+        "output": { "value": 0, "measured": false, "source": "data/calibration.yaml", "reason": "A harness kept under the threshold; the pessimistic scenario uses rgw-go's shares." }
       },
       "model_efficiency": {
         "fable-5-2": { "value": 1, "measured": false, "source": "assumption", "reason": "No benchmark claim is made." },
         "opus-5-5": { "value": 1, "measured": false, "source": "assumption", "reason": "The calibration model." },
-        "gpt-6-astra": { "value": 1, "measured": false, "source": "assumption", "reason": "No benchmark claim is made." }
+        "gpt-6-astra": { "value": 1, "measured": false, "source": "assumption", "reason": "No benchmark claim is made." },
+        "kimi-k3": { "value": 1, "measured": false, "source": "assumption", "reason": "No benchmark claim is made." }
       },
       "sloc_equivalent_bytes_per_line": { "value": 43.6, "measured": true, "source": "data/generated/sloc.json", "reason": "Bytes per code line of Ceph's C++." },
       "adjacent_uplift": {
@@ -275,9 +288,36 @@
     },
     "toggles": { "include_adjacent": false, "clean_break": false },
     "scenarios": {
+      "optimistic": {
+        "label": "Optimistic",
+        "description": "A second port that has learned, on a leaner harness; none of this has been measured.",
+        "role": "low",
+        "scale": { "overhead": 0.8, "cache_read_per_output": 0.75, "difficulty.hard": 0.8333, "difficulty.extreme": 0.75 }
+      },
+      "calibrated": {
+        "label": "Scaled from rgw-go",
+        "description": "rgw-go as measured: tests, review rounds, plans and docs.",
+        "role": "central"
+      },
+      "pessimistic": {
+        "label": "Pessimistic",
+        "description": "Calibrated, with harder core daemons, adjacent work and rgw-go's long prompts.",
+        "role": "high",
+        "overrides": {
+          "difficulty.hard": 2,
+          "difficulty.extreme": 3,
+          "long_context_share.uncached": 0.55,
+          "long_context_share.cache_write": 0.748,
+          "long_context_share.cache_read": 0.797,
+          "long_context_share.output": 0.699
+        },
+        "scale": { "overhead": 1.25 },
+        "toggles": { "include_adjacent": true }
+      },
       "naive": {
         "label": "Naive",
-        "description": "Read every file once and write the target once. A lower bound.",
+        "description": "Read every file once and write the target once. A reference point, not an outcome.",
+        "role": "reference",
         "overrides": {
           "test_ratio": 0,
           "overhead": 1,
@@ -291,25 +331,23 @@
           "difficulty.hard": 1,
           "difficulty.extreme": 1,
           "rust_factor": 1,
-          "wasm_overhead": 1
+          "wasm_overhead": 1,
+          "long_context_share.uncached": 0,
+          "long_context_share.cache_write": 0,
+          "long_context_share.cache_read": 0,
+          "long_context_share.output": 0
         }
-      },
-      "calibrated": {
-        "label": "Calibrated",
-        "description": "rgw-go as measured: tests, review rounds, plans and docs."
-      },
-      "pessimistic": {
-        "label": "Pessimistic",
-        "description": "Calibrated, with harder core daemons and adjacent work included.",
-        "overrides": { "difficulty.hard": 2, "difficulty.extreme": 3 },
-        "scale": { "overhead": 1.25 },
-        "toggles": { "include_adjacent": true }
       }
     },
     "default_scenario": "calibrated"
   },
   "calibration": {
-    "rgw_go": { "repo": "jhoblitt/rgw-go", "rev": "239f789", "measured_on": "2026-11-13" },
-    "port_tokens_m": { "calls": 163109, "uncached": 0.35, "cache_write": 1137.2, "cache_read": 56213.6, "output": 45.01 }
+    "project": { "name": "rgw-go", "repo": "jhoblitt/rgw-go", "commit": "239f789" },
+    "measurement": {
+      "model_id": "opus-5-5",
+      "unit": "millions of tokens",
+      "port": { "calls": 163109, "uncached": 0.35, "cache_write": 1137.2, "cache_read": 56213.6, "output": 45.01 }
+    },
+    "coverage": { "value": 0.37, "low": 0.3, "high": 0.4, "measured": false }
   }
 }

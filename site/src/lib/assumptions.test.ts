@@ -45,7 +45,12 @@ describe('groupParams', () => {
       'long_context_share.cache_read',
       'long_context_share.output',
     ]);
-    expect(byId.get('models')).toEqual(['model_efficiency.fable-5-2', 'model_efficiency.opus-5-5', 'model_efficiency.gpt-6-astra']);
+    expect(byId.get('models')).toEqual([
+      'model_efficiency.fable-5-2',
+      'model_efficiency.opus-5-5',
+      'model_efficiency.gpt-6-astra',
+      'model_efficiency.kimi-k3',
+    ]);
     expect(byId.get('other')).toEqual([
       'clean_break_discount',
       'sloc_equivalent_bytes_per_line',

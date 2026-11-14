@@ -68,7 +68,7 @@ function depTarget(strategy: Strategy, sloc_equivalent: number, difficulty: Diff
 }
 
 function dep(id: string, go: DependencyTarget, rust: DependencyTarget, wasm: DependencyTarget): Dependency {
-  return { id, name: id, used_for: '', submodules: [], submodule_size: null, targets: { go, rust, wasm } };
+  return { id, name: id, used_for: '', submodules: [], submodule_size: null, submodule_own: null, targets: { go, rust, wasm } };
 }
 
 function report(components: Component[], dependencies: Dependency[] = [], models: Model[] = STAGED_MODELS): Report {

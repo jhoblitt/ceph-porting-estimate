@@ -5,8 +5,8 @@ import { cephCommitUrl, commitDay, parseReport, shortSha } from './report';
 describe('parseReport', () => {
   it('accepts the fixture', () => {
     const report = parseReport(fixture);
-    expect(report.models.map((m) => m.id)).toEqual(['fable-5-2', 'opus-5-5', 'gpt-6-astra']);
-    expect(Object.keys(report.assumptions.scenarios).sort()).toEqual(['calibrated', 'naive', 'pessimistic']);
+    expect(report.models.map((m) => m.id)).toEqual(['fable-5-2', 'opus-5-5', 'gpt-6-astra', 'kimi-k3']);
+    expect(Object.keys(report.assumptions.scenarios)).toEqual(['optimistic', 'calibrated', 'pessimistic', 'naive']);
   });
 
   it('carries the groups and each component group', () => {
