@@ -8,7 +8,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,8 +18,6 @@ import (
 
 	"github.com/jhoblitt/ceph-porting-estimate/internal/version"
 )
-
-var errNotImplemented = errors.New("not implemented")
 
 // Run executes the command tree against args and returns the first error.
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -50,7 +47,7 @@ func newRootCmd(stdin io.Reader, stdout, stderr io.Writer) *cobra.Command {
 	pf.String("log-level", "info", "log level: debug, info, warn, or error (CEPHEST_LOG_LEVEL)")
 	pf.String("log-format", "json", "log format: json or text (CEPHEST_LOG_FORMAT)")
 
-	cmd.AddCommand(newCountCmd(v), newCheckCmd(), newRollupCmd())
+	cmd.AddCommand(newCountCmd(v), newCheckCmd(v), newRollupCmd(v))
 
 	return cmd
 }

@@ -22,14 +22,6 @@ var _ = Describe("Run", func() {
 		return cli.Run(context.Background(), args, &bytes.Buffer{}, stdout, stderr)
 	}
 
-	DescribeTable("a subcommand whose behavior has not landed",
-		func(name string) {
-			Expect(run(name)).To(MatchError("not implemented"), "subcommand %q", name)
-		},
-		Entry("check", "check"),
-		Entry("rollup", "rollup"),
-	)
-
 	It("lists every subcommand in its help", func() {
 		Expect(run("--help")).To(Succeed())
 		for _, name := range []string{"count", "check", "rollup"} {

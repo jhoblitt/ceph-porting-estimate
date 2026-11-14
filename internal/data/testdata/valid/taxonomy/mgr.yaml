@@ -1,0 +1,14 @@
+components:
+  - id: mgr
+    group: core
+    name: Manager
+    description: The manager daemon and its modules.
+    features:
+      - id: dashboard
+        name: Dashboard
+        description: The web dashboard module.
+        globs: ["src/pybind/mgr/dashboard/**"]
+        scope: shown
+        kind: product
+        difficulty: glue
+        why: Mostly UI glue.

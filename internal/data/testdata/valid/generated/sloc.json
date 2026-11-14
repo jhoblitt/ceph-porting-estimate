@@ -1,0 +1,33 @@
+{
+  "repo": "ceph/ceph",
+  "rev": "0123456789abcdef0123456789abcdef01234567",
+  "commit_date": "2026-11-01T12:00:00Z",
+  "files": [
+    {"path": "src/mon/Monitor.cc", "lang": "cpp", "code": 300, "comment": 40, "blank": 30, "bytes": 12000, "binary": false},
+    {"path": "src/mon/Paxos.cc", "lang": "cpp", "code": 150, "comment": 20, "blank": 15, "bytes": 6000, "binary": false},
+    {"path": "src/mon/Paxos.h", "lang": "cpp", "code": 50, "comment": 10, "blank": 5, "bytes": 2000, "binary": false},
+    {"path": "src/test/mon/test_paxos.cc", "lang": "cpp", "code": 80, "comment": 5, "blank": 10, "bytes": 3000, "binary": false},
+    {"path": "src/rgw/rgw_main.cc", "lang": "cpp", "code": 250, "comment": 30, "blank": 20, "bytes": 10000, "binary": false},
+    {"path": "src/rgw/rgw_admin.py", "lang": "python", "code": 60, "comment": 5, "blank": 5, "bytes": 2000, "binary": false},
+    {"path": "src/pybind/mgr/dashboard/module.py", "lang": "python", "code": 100, "comment": 10, "blank": 10, "bytes": 4000, "binary": false},
+    {"path": "src/pybind/mgr/dashboard/logo.png", "lang": "", "code": 0, "comment": 0, "blank": 0, "bytes": 5000, "binary": true},
+    {"path": "README.md", "lang": "markdown", "code": 9, "comment": 0, "blank": 3, "bytes": 400, "binary": false}
+  ],
+  "submodules": [
+    {"path": "src/rocksdb", "rev": "fedcba9876543210fedcba9876543210fedcba98", "available": true, "langs": {
+      "cpp": {"files": 10, "code": 5000, "comment": 500, "blank": 400, "bytes": 200000},
+      "c": {"files": 2, "code": 300, "comment": 20, "blank": 10, "bytes": 9000}
+    }},
+    {"path": "src/rocksdb/third-party/folly", "rev": "1111111111111111111111111111111111111111", "available": true, "langs": {
+      "cpp": {"files": 3, "code": 900, "comment": 50, "blank": 40, "bytes": 30000}
+    }},
+    {"path": "src/rocksdb/third-party/gtest", "rev": "2222222222222222222222222222222222222222", "available": false, "langs": {}},
+    {"path": "src/rocksdb_tools", "rev": "3333333333333333333333333333333333333333", "available": true, "langs": {
+      "python": {"files": 1, "code": 70, "comment": 5, "blank": 5, "bytes": 2500}
+    }},
+    {"path": "src/seastar", "rev": "00112233445566778899aabbccddeeff00112233", "available": false, "langs": {}},
+    {"path": "src/dpdk", "rev": "4444444444444444444444444444444444444444", "available": true, "langs": {
+      "c": {"files": 4, "code": 800, "comment": 60, "blank": 50, "bytes": 25000}
+    }}
+  ]
+}

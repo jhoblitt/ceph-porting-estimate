@@ -23,8 +23,8 @@ go build -o bin/cephest ./cmd/cephest
 
 `cephest` has three subcommands: `count` counts source lines per file in a
 Ceph checkout, `check` validates the hand-edited data files, and `rollup`
-combines both into the report's `report.json`. Only `count` is implemented
-so far. Run `cephest --help` for flags.
+combines both into the report's `report.json`. Run `cephest --help` for
+flags.
 
 `count` reads the commit through git objects only, so the checkout's working
 tree may be dirty, and counts each submodule whose pinned commit is present
@@ -37,6 +37,36 @@ cephest count --repo ~/github/ceph --rev <sha> --out data/generated/sloc.json
 Lines are classified as code, comment or blank by the language rules of
 [scc](https://github.com/boyter/scc) v3.7.0; which language a file is, and
 so its bucket in `sloc.json`, is `cephest`'s own table.
+
+`check` validates the data directory against `<data>/generated/sloc.json` and
+reports every problem it finds; `rollup` runs the same checks and writes the
+report only when they pass. `--data` defaults to `data`:
+
+```sh
+cephest check
+cephest rollup --out site/src/generated/report.json
+```
+
+The taxonomy is `data/taxonomy.yaml` and every `data/taxonomy/*.yaml`, read
+in that order. Any of them may hold a `groups:` list (`id`, `name`,
+`description`) and a `components:` list; every component names its `group:`,
+the report presents components under their groups, and `check` rejects a
+group that is undefined, defined twice or used by no component. Each
+file in `sloc.json` belongs to the feature whose matching
+[doublestar](https://github.com/bmatcuk/doublestar) glob is the most
+specific:
+
+1. The longest literal prefix, the text before the glob's first
+   metacharacter, wins.
+2. Among equal prefixes, the most literal characters win: everything that
+   is not glob syntax, where `*`, `?`, a `[...]` class and a `**/` segment
+   count nothing and a `{a,b}` alternation counts its shortest alternative.
+   `src/common/*Formatter*` (20) beats `src/common/**` (11).
+3. Globs of two features still equal on both are an error naming the file,
+   the features, the prefix and the score. One feature's globs may overlap.
+
+A file no glob matches lands in `unclassified`, which `check` lists and
+rejects above 1% of code lines.
 
 ## Development
 

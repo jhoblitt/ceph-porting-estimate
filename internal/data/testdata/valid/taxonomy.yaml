@@ -1,0 +1,35 @@
+groups:
+  - id: core
+    name: Core daemons
+    description: The daemons every cluster runs.
+components:
+  - id: mon
+    group: core
+    name: Monitor
+    description: The cluster map authority.
+    root: src/mon
+    features:
+      - id: paxos
+        name: Paxos
+        description: The consensus engine.
+        globs: ["src/mon/Paxos*"]
+        scope: headline
+        kind: product
+        difficulty: hard
+        why: Consensus code is subtle.
+      - id: core
+        name: Monitor core
+        description: Everything else in the monitor.
+        globs: ["src/mon/**"]
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Ordinary service code.
+      - id: tests
+        name: Monitor tests
+        description: Unit tests for the monitor.
+        globs: ["src/test/mon/**"]
+        scope: shown
+        kind: test
+        difficulty: standard
+        why: Tests port with the code.
