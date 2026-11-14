@@ -36,9 +36,11 @@
   </p>
 </div>
 
-<SelectionControls {report} {selection} onchange={onselect} changed={d.changedCount} />
-
-<Summary {d} />
+<Summary {d} {selection}>
+  {#snippet controls()}
+    <SelectionControls {report} {selection} onchange={onselect} changed={d.changedCount} />
+  {/snippet}
+</Summary>
 <ScenarioRange {d} {selection} {onselect} />
 <Matrix {d} {selection} {onselect} />
 <CostByCategory {d} />

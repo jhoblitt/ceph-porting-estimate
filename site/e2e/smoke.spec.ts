@@ -52,6 +52,21 @@ test('choosing a matrix cell changes the headline', async ({ page }) => {
   await expect(page).toHaveURL(/target=rust&model=fable-5-2/);
 });
 
+for (const width of [1280, 390]) {
+  test(`at ${width}px the answer comes before the controls, on screen and in the document`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await open(page);
+    const answer = page.locator('.answer');
+    const controls = page.getByRole('region', { name: 'Selection' });
+    // A union locator lists its matches in document order.
+    await expect(page.locator('.answer, section[aria-label="Selection"]').first()).toHaveClass(/\banswer\b/);
+    const a = await answer.boundingBox();
+    const c = await controls.boundingBox();
+    // Seen after the answer: below it, or beside it to the right.
+    expect(c!.y >= a!.y + a!.height || c!.x >= a!.x + a!.width).toBe(true);
+  });
+}
+
 test('choosing a treemap cell zooms in, and a feature opens its detail', async ({ page }) => {
   await open(page);
   const explorer = page.locator('#explorer');
