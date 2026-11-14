@@ -100,9 +100,24 @@ function findGroup(g: GroupEstimate, id: string): GroupEstimate {
 // 1 and 2: the calibration identity and the dollar cross-check
 // ---------------------------------------------------------------------------
 
-// RGW v19.2.7 source tokens × coverage 0.40, all of it C++ at 3.5 bytes/token.
-const RGW_S = 2_756_184 * 0.4; // 1,102,473.6
-const rgwReport = report([comp('rgw', [feat('rgw', 'product', 'standard', 'headline', { cpp: RGW_S * 3.5 })])]);
+// RGW v19.2.7 source tokens × coverage 0.37, all of it C++ at 3.5 bytes/token,
+// split by difficulty class as rgw-go ported it (calibration.yaml
+// ported_mix.share_by_difficulty). The difficulty scale is normalised so that
+// its average over that mix is 1, which is what the identity rests on.
+const RGW_S = 2_756_184 * 0.37; // 1,019,788.08
+/** rgw-go's measured long-prompt shares (calibration.yaml), the pessimistic scenario's. */
+const RGW_GO_LONG: Tokens = { uncached: 0.55, cacheWrite: 0.748, cacheRead: 0.797, output: 0.699 };
+const PORTED_MIX = [
+  ['standard', 0.64432],
+  ['hard', 0.34722],
+  ['glue', 0.00846],
+] as const;
+const rgwReport = report([
+  comp(
+    'rgw',
+    PORTED_MIX.map(([difficulty, share]) => feat(`rgw-${difficulty}`, 'product', difficulty, 'headline', { cpp: RGW_S * share * 3.5 })),
+  ),
+]);
 
 describe('calibration identity', () => {
   let p: Params;
@@ -113,19 +128,23 @@ describe('calibration identity', () => {
   });
 
   it('reads the calibrated baseline from the staged assumptions', () => {
-    expect([p.expansion, p.testRatio, p.overhead]).toEqual([1.2133, 2.076, 10.939]);
+    expect([p.expansion, p.testRatio, p.overhead]).toEqual([1.3117, 2.076, 10.939]);
     expect([p.uncachedPerOutput, p.cacheWritePerOutput, p.cacheReadPerOutput]).toEqual([0.007776, 25.266, 1248.91]);
-    expect(p.difficulty.standard).toBe(1);
     expect(p.toggles).toEqual({ includeAdjacent: false, cleanBreak: false });
   });
 
-  it('sizes the feature at RGW source tokens × coverage', () => {
-    expectClose(findFeature(root, 'rgw').sourceTokens, RGW_S);
+  it('averages the difficulty to 1 over what rgw-go ported', () => {
+    expectClose(PORTED_MIX.reduce((s, [, share]) => s + share, 0), 1, 1e-12);
+    expectClose(PORTED_MIX.reduce((s, [d, share]) => s + share * p.difficulty[d], 0), 1, 1e-3);
+  });
+
+  it('sizes the features at RGW source tokens × coverage', () => {
+    expectClose(root.headline.sourceTokens, RGW_S);
     expect(existingTestRatio(rgwReport, p)).toBe(0);
   });
 
   it("reproduces rgw-go's measured port row within 1%", () => {
-    // out = S × E × (1 + T) × H = 1,102,473.6 × 1.2133 × 3.076 × 10.939 ≈ 45.009M
+    // out = S × mean D × E × (1 + T) × H = 1,019,788.08 × 1.0000 × 1.3117 × 3.076 × 10.939 ≈ 45.01M
     const t = root.headline.tokens;
     expectClose(t.output, 45.01e6, 0.01);
     expectClose(t.cacheRead, 56_213.6e6, 0.01);
@@ -141,36 +160,40 @@ describe('dollars', () => {
   });
   const usd = (model: string, params: Params = p) => estimate(rgwReport, 'go', model, params).headline;
 
-  it('uses the measured cache-write and long-context shares', () => {
+  it('uses the measured cache-write share, and bills no long prompts in the baseline', () => {
     expect(p.longCacheWriteShare).toBe(0.0728);
-    expect(p.longContextShare).toEqual({ uncached: 0.55, cacheWrite: 0.748, cacheRead: 0.797, output: 0.699 });
+    expect(p.longContextShare).toEqual({ uncached: 0, cacheWrite: 0, cacheRead: 0, output: 0 });
+    // rgw-go's measured shares are the pessimistic scenario's.
+    expect(resolveParams(rgwReport, 'pessimistic').longContextShare).toEqual(RGW_GO_LONG);
   });
 
   it.each([
     // Independent figures: the port row (45.01M out, 56,213.6M read,
-    // 1,137.2M write, 0.35M uncached) at models.yaml list prices.
+    // 1,137.2M write, 0.35M uncached) at models.yaml list prices, Astra's
+    // short-context ones: 0.35 × 10 + 1,137.2 × (0.9272 × 12.5 + 0.0728 × 25)
+    // + 56,213.6 × 1 + 45.01 × 50 = 73,717.
     ['opus-5-5', 18_078],
     ['fable-5-2', 24_914],
-    ['gpt-6-astra', 130_713],
+    ['gpt-6-astra', 73_717],
   ])('prices the rgw-go-sized port on %s at about $%d', (model, expected) => {
     expectClose(usd(model).usd, expected, 0.005);
   });
 
   it('blends long-context prices only for the model that has them', () => {
-    const noLong = resolveParams(rgwReport, 'calibrated', {
-      'long_context_share.uncached': 0,
-      'long_context_share.cache_write': 0,
-      'long_context_share.cache_read': 0,
-      'long_context_share.output': 0,
+    const long = resolveParams(rgwReport, 'calibrated', {
+      'long_context_share.uncached': RGW_GO_LONG.uncached,
+      'long_context_share.cache_write': RGW_GO_LONG.cacheWrite,
+      'long_context_share.cache_read': RGW_GO_LONG.cacheRead,
+      'long_context_share.output': RGW_GO_LONG.output,
     });
-    expect(usd('opus-5-5', noLong).usd).toBe(usd('opus-5-5').usd);
-    expect(usd('fable-5-2', noLong).usd).toBe(usd('fable-5-2').usd);
+    expect(usd('opus-5-5', long).usd).toBe(usd('opus-5-5').usd);
+    expect(usd('fable-5-2', long).usd).toBe(usd('fable-5-2').usd);
 
     // Astra at short-context prices only: input 10, writes 12.5 / 25, read 1, output 50.
-    const t = usd('gpt-6-astra', noLong).tokens;
+    const t = usd('gpt-6-astra').tokens;
     const shortOnly = (t.uncached * 10 + t.cacheWrite * (0.9272 * 12.5 + 0.0728 * 25) + t.cacheRead * 1 + t.output * 50) / 1e6;
-    expectClose(usd('gpt-6-astra', noLong).usd, shortOnly, 1e-9);
-    expect(usd('gpt-6-astra').usd).toBeGreaterThan(shortOnly * 1.7);
+    expectClose(usd('gpt-6-astra').usd, shortOnly, 1e-9);
+    expect(usd('gpt-6-astra', long).usd).toBeGreaterThan(shortOnly * 1.7);
   });
 });
 
@@ -517,21 +540,21 @@ describe('scenarios', () => {
   it('calibrated equals the baseline', () => {
     const expected: Params = {
       bytesPerToken: Object.fromEntries(Object.entries(STAGED_ASSUMPTIONS.bytes_per_token).map(([k, q]) => [k, q.value])),
-      expansion: 1.2133,
+      expansion: 1.3117,
       testRatio: 2.076,
       overhead: 10.939,
       uncachedPerOutput: 0.007776,
       cacheWritePerOutput: 25.266,
       cacheReadPerOutput: 1248.91,
       sourceReadPasses: 0,
-      difficulty: { config: 0.1, glue: 0.5, standard: 1, hard: 1.5, extreme: 2 },
+      difficulty: { config: 0.0855, glue: 0.4276, standard: 0.8551, hard: 1.2827, extreme: 1.7103 },
       rustFactor: 1.15,
       wasmOverhead: 1.25,
       cleanBreakDiscount: 0.6,
       longCacheWriteShare: 0.0728,
-      longContextShare: { uncached: 0.55, cacheWrite: 0.748, cacheRead: 0.797, output: 0.699 },
-      modelEfficiency: { 'fable-5-2': 1, 'opus-5-5': 1, 'gpt-6-astra': 1 },
-      slocEquivalentBytesPerLine: 39.61,
+      longContextShare: { uncached: 0, cacheWrite: 0, cacheRead: 0, output: 0 },
+      modelEfficiency: { 'fable-5-2': 1, 'opus-5-5': 1, 'gpt-6-astra': 1, 'kimi-k3': 1 },
+      slocEquivalentBytesPerLine: 39.58,
       adjacentUplift: { uncached: 0.1429, cacheWrite: 0.1597, cacheRead: 0.0955, output: 0.3208 },
       toggles: { includeAdjacent: false, cleanBreak: false },
     };
@@ -544,7 +567,7 @@ describe('scenarios', () => {
     const root = estimate(stagedMany, target, 'opus-5-5', p);
     for (const id of ['x-prod', 'x-test', 'y-conf', 'y-glue']) {
       const f = findFeature(root, id);
-      expect(f.tokens.output).toBe(f.sourceTokens * 1.2133);
+      expect(f.tokens.output).toBe(f.sourceTokens * 1.3117);
       expect(f.tokens.uncached).toBe(f.sourceTokens);
       expect(f.tokens.cacheWrite).toBe(0);
       expect(f.tokens.cacheRead).toBe(0);
@@ -552,22 +575,42 @@ describe('scenarios', () => {
     const S = root.headline.sourceTokens;
     // 700,000/3.5 + 37,000/3.7 + 350,000/3.5 + 30,000/3.0 + 33,000/3.3
     expectClose(S, 200_000 + 10_000 + 100_000 + 10_000 + 10_000);
-    expectClose(root.headline.tokens.output, S * 1.2133);
+    expectClose(root.headline.tokens.output, S * 1.3117);
     expectClose(root.headline.tokens.uncached, S);
   });
 
-  it('pessimistic scales overhead, raises hard and extreme, and includes adjacent work', () => {
+  it('pessimistic takes the latest phase, harder code, low coverage, long prompts, more WASM and adjacent work', () => {
     const p = resolveParams(stagedMany, 'pessimistic');
     const base = resolveParams(stagedMany, 'calibrated');
-    expect(p.overhead).toBe(10.939 * 1.25);
-    expect(p.difficulty).toEqual({ ...base.difficulty, hard: 2, extreme: 3 });
-    expect(p.toggles).toEqual({ includeAdjacent: true, cleanBreak: false });
-    expect({ ...p, overhead: 0, difficulty: base.difficulty, toggles: base.toggles }).toEqual({ ...base, overhead: 0 });
+    const changed: Partial<Params> = {
+      expansion: 1.6178,
+      overhead: 10.939 * 1.1971,
+      cacheReadPerOutput: 1248.91 * 1.1555,
+      cacheWritePerOutput: 25.266 * 1.2691,
+      difficulty: { ...base.difficulty, hard: 1.2827 * 1.3333, extreme: 1.7103 * 1.5 },
+      wasmOverhead: 1.25 * 1.2,
+      longContextShare: RGW_GO_LONG,
+      toggles: { includeAdjacent: true, cleanBreak: false },
+    };
+    expect(p).toEqual({ ...base, ...changed });
+  });
+
+  it('optimistic takes the first phase, easier hard code and high coverage', () => {
+    const p = resolveParams(stagedMany, 'optimistic');
+    const base = resolveParams(stagedMany, 'calibrated');
+    expect(p).toEqual({
+      ...base,
+      expansion: 1.2133,
+      overhead: 10.939 * 0.871,
+      cacheReadPerOutput: 1248.91 * 0.8652,
+      cacheWritePerOutput: 25.266 * 0.7291,
+      difficulty: { ...base.difficulty, hard: 1.2827 * 0.8333, extreme: 1.7103 * 0.75 },
+    });
   });
 
   it('scales the baseline even when the user overrides another path', () => {
     const p = resolveParams(stagedMany, 'pessimistic', { 'difficulty.glue': 0.7, expansion: 2 });
-    expect(p.overhead).toBe(10.939 * 1.25);
+    expect(p.overhead).toBe(10.939 * 1.1971);
     expect(p.difficulty.glue).toBe(0.7);
     expect(p.expansion).toBe(2);
   });
@@ -623,7 +666,7 @@ describe('scenarios', () => {
   });
 
   it('throws on an unknown scenario or model', () => {
-    expect(() => resolveParams(stagedMany, 'optimistic')).toThrow(/scenario "optimistic"/);
+    expect(() => resolveParams(stagedMany, 'hopeful')).toThrow(/scenario "hopeful"/);
     expect(() => describeParams(stagedMany, 'toString')).toThrow(/scenario "toString"/);
     const p = resolveParams(stagedMany, 'calibrated');
     expect(() => estimate(stagedMany, 'go', 'gpt-2', p)).toThrow(/model "gpt-2"/);
@@ -821,8 +864,8 @@ describe('invariants', () => {
       const p = resolveParams(r, 'pessimistic', { source_read_passes: 0.3 });
       const go = estimate(r, 'go', 'fable-5-2', p);
       for (const [target, factor] of [
-        ['rust', 1.15],
-        ['wasm', 1.15 * 1.25],
+        ['rust', p.rustFactor],
+        ['wasm', p.rustFactor * p.wasmOverhead],
       ] as const) {
         const other = estimate(r, target, 'fable-5-2', p);
         for (const c of r.components) {
@@ -939,6 +982,7 @@ describe('describeParams', () => {
     'model_efficiency.fable-5-2',
     'model_efficiency.opus-5-5',
     'model_efficiency.gpt-6-astra',
+    'model_efficiency.kimi-k3',
     'sloc_equivalent_bytes_per_line',
     'adjacent_uplift.uncached',
     'adjacent_uplift.cache_write',
@@ -954,13 +998,13 @@ describe('describeParams', () => {
     const byPath = new Map(describeParams(stagedMany, 'pessimistic').map((d) => [d.path, d]));
     expect(byPath.get('overhead')).toMatchObject({
       baseline: 10.939,
-      scenario: 10.939 * 1.25,
+      scenario: 10.939 * 1.1971,
       measured: true,
       source: 'calibration.yaml',
     });
-    expect(byPath.get('difficulty.hard')).toMatchObject({ baseline: 1.5, scenario: 2, measured: false, source: 'assumption' });
-    expect(byPath.get('expansion')).toMatchObject({ baseline: 1.2133, scenario: 1.2133 });
-    expect(byPath.get('test_ratio')?.reason).toMatch(/^rgw-go test \+ tooling Go/);
+    expect(byPath.get('difficulty.hard')).toMatchObject({ baseline: 1.2827, scenario: 1.2827 * 1.3333, measured: false, source: 'assumption' });
+    expect(byPath.get('expansion')).toMatchObject({ baseline: 1.3117, scenario: 1.6178 });
+    expect(byPath.get('test_ratio')?.reason).toMatch(/^Test and tooling Go rgw-go wrote/);
     expect(byPath.get('model_efficiency.gpt-6-astra')?.label).toMatch(/GPT-6 Astra/);
     const labels = [...byPath.values()].map((d) => d.label);
     expect(new Set(labels).size).toBe(labels.length);
