@@ -306,7 +306,7 @@
   }
 }
 
-@media (max-width: 719px) {
+@media (width < 720px) {
   .prose h2 {
     margin-top: var(--space-6);
   }
