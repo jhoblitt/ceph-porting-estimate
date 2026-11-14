@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import Footer from './components/Footer.svelte';
   import Header from './components/Header.svelte';
+  import { SECTION_IDS } from './lib/prose/content';
   import type { Report as ReportData } from './lib/report';
   import { type Route, createStateStore, windowHashLocation } from './lib/state';
   import Calibration from './routes/Calibration.svelte';
@@ -16,7 +17,7 @@
 
   // main.ts loads the report once and mounts with it; it is never replaced.
   // svelte-ignore state_referenced_locally
-  const selection = createStateStore(report, windowHashLocation(window));
+  const selection = createStateStore(report, windowHashLocation(window), SECTION_IDS);
   onDestroy(selection.destroy);
 
   const titles: Record<Route, string> = {
@@ -53,9 +54,9 @@
 
 <main bind:this={main} tabindex="-1">
   {#if $selection.route === 'methods'}
-    <Methods />
+    <Methods {report} selection={$selection} />
   {:else if $selection.route === 'calibration'}
-    <Calibration />
+    <Calibration {report} selection={$selection} />
   {:else}
     <Report {report} selection={$selection} onselect={(next, opts) => selection.set(next, opts)} />
   {/if}

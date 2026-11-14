@@ -11,11 +11,12 @@ describe('parseReport', () => {
 
   it('carries the groups and each component group', () => {
     const report = parseReport(fixture);
-    expect(report.groups.map((g) => g.id)).toEqual(['rados', 'rgw', 'tests']);
+    expect(report.groups.map((g) => g.id)).toEqual(['rados', 'rgw', 'tests', 'crimson']);
     expect(report.components.map((c) => [c.id, c.group])).toEqual([
       ['rgw', 'rgw'],
       ['osd', 'rados'],
       ['qa', 'tests'],
+      ['crimson', 'crimson'],
     ]);
   });
 

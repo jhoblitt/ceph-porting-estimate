@@ -80,6 +80,33 @@ export function percent(x: number): string {
   return signed(x * 100, (abs) => twoSignificant.format(abs), '', '%');
 }
 
+/**
+ * A change as a fraction, with its sign, through `percent`: +3.6%, −31%, 0%.
+ * A change too small for `percent` to print reads "<+0.01%" or ">−0.01%".
+ */
+export function signedPercent(x: number): string {
+  if (!Number.isFinite(x)) return DASH;
+  if (x === 0) return '0%';
+  if (Math.abs(x) * 100 < TINY) return x > 0 ? '<+0.01%' : `>${MINUS}0.01%`;
+  return `${x > 0 ? '+' : MINUS}${percent(Math.abs(x))}`;
+}
+
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+
+/** A whole count for running prose: zero to ten in words, larger counts in figures. */
+export function cardinal(n: number): string {
+  if (!Number.isFinite(n)) return DASH;
+  const r = Math.round(n);
+  return r >= 0 && r < WORDS.length ? (WORDS[r] as string) : countExact(r);
+}
+
+const twoDecimals = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** A rate to two decimal places, so rates printed side by side line up: 2.70, 3.10, 3.71. */
+export function rate(x: number): string {
+  return plain(x, twoDecimals);
+}
+
 /** A factor: 1.25×, 435×, 7.21k×. */
 export function multiplier(x: number): string {
   return signed(x, short3, '', '×');

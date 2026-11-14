@@ -45,6 +45,7 @@ describe('explorerLevel at the root', () => {
       ['rados', ['osd']],
       ['rgw', ['rgw']],
       ['tests', ['qa']],
+      ['crimson', ['crimson']],
       [DEPENDENCY_GROUP_ID, ['dependencies']],
     ]);
     expect(level.groups[0]!.name).toBe('RADOS core');
@@ -145,7 +146,7 @@ describe('explorerLevel at the root', () => {
     expect(rowIds(explorerLevel(shownOnly, r, null, 'costed').groups[2]!.rows)).toEqual(['qa', 'ui']);
     const nativeOnly = { ...report, dependencies: report.dependencies.filter((d) => d.id === 'boost') };
     const noWork = estimate(nativeOnly, 'go', 'opus-5-5', params);
-    expect(explorerLevel(nativeOnly, noWork, null, 'all').groups.map((g) => g.id)).toEqual(['rados', 'rgw', 'tests']);
+    expect(explorerLevel(nativeOnly, noWork, null, 'all').groups.map((g) => g.id)).toEqual(['rados', 'rgw', 'tests', 'crimson']);
   });
 
   it('counts only features that match files', () => {

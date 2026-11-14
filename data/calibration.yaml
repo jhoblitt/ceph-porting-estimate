@@ -347,9 +347,9 @@ phases:
     #          cache write 32.070 / 25.270 = 1.2691
   # The note's provenance is phases.source above.
   note: >-
-    The rgw-go session reports that its ratios rise from phase to phase, that
-    phase 2 was more review-heavy and carried larger contexts than phase 1, and
-    that phase 2 was about 81% done at the cut.
+    The rgw-go session reports that the port's ratios rise from phase to phase,
+    that phase 2 was more review-heavy and carried larger contexts than phase 1,
+    and that phase 2 was about 81% done at the cut.
   # Scenarios whose overhead, cache_read_per_output and cache_write_per_output
   # scales are a phase's ratio over all phases'; cephest check verifies them.
   # Optimistic takes phase 1, the cheaper of the two implementation phases

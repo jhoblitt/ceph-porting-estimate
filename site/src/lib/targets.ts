@@ -40,8 +40,9 @@ export function targetText(target: Target, params: Params): TargetText {
         note:
           `A Rust port built for WASI where it can be: each Ceph feature costs its Rust figure × ${f}, an assumption, ` +
           'and dependency work is costed for each target on its own, by how that target gets the library. ' +
-          'WASI has no parallel threads, block devices, process execution or kernel interfaces, so the parts of Ceph ' +
-          'that need them have no WASI form, and the host-side code that would stand in for them is not costed. ' +
+          "An adversarial review of this estimate reports that WASI lacks parallel threads, block devices and process " +
+          'execution, details it rated plausible rather than confirmed; no WASI build was attempted. On that reading the ' +
+          'parts of Ceph that need them have no WASI form, and the host-side code that would stand in for them is not costed. ' +
           'Read this as the price of the attempt, not of a working system.',
         secondary: true,
       };

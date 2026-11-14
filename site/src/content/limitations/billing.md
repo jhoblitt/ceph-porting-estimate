@@ -1,0 +1,1 @@
+**Dollars are list-price valuations.** The rgw-go session does not know whether its tokens were billed at list price or under a plan, so every dollar figure here values tokens at list price; it is not a record of what anyone paid. Negotiated prices, plans and batch tiers would change the dollars, not the tokens.

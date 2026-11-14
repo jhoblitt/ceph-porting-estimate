@@ -1,0 +1,15 @@
+## Gaps
+
+What the measurement may miss, counts in a way worth knowing, or the session has since made clear:
+
+- **Thinking tokens are inside the output total.**
+- **The billing basis is unknown.** The session does not know whether the tokens were billed at list price or under a plan; every dollar figure here is a list-price valuation.
+- **No Ceph test was translated wholesale.** s3-tests and go-ceph's admin suite ran unmodified as parity gates, and rgw-go's own tests were written new.
+- **The security-review hook reviews rgw-go's own commits,** so it is arguably port work; it stays with the work around the port. Counted as port work, it would move the central headline by {{computed.securityHook | signedPercent}}.
+
+- **Compaction and advisor calls.** Calls that summarise a long context, and calls to an advisor model, may not be written to the transcripts. If they are not, the token totals above are too low, and so is the overhead `H`. The input ratios per output token and the split of cache writes between lifetimes could move either way, since a missing call takes tokens from both sides of each ratio. The test ratio and the expansion come from sizes measured in git and do not depend on the transcripts.
+- **Server-side web tools.** Web search and fetch run on the vendor's side and are not counted.
+- **Roles are assigned by keyword.** The split between controller, implementation, review and the rest comes from each agent's type and the words in its task description, and review fix rounds count as implementation. The port's total does not depend on it.
+- **More than the port.** The measured session also wrote plans, registers of behaviour that differs from radosgw, changes to its go-ceph fork and to s3-tests, and benchmarks. Whatever of this ran in the port row and left no counted Go raises `H`. The benchmarks under `hack/` are counted, as tooling Go, and the data does not say whether the go-ceph and s3-tests work ran in the port row or in upstream PR servicing.
+- **Unfinished work.** Phase 2 was still in progress, and phases 3 and 4 had not started. The ratios describe the port as it stood at the measurement, which may not be the work pattern of its last phases.
+- **Two aggregations, a few calls apart.** The first gave {{calibration.measurement.port.calls | countExact}} calls; the second, cut later, {{calibration.measurement_detail.calls | countExact}}, with the same cache-write total. The central scenario's ratios use the first; the phase table, the scales taken from it, and the cache-lifetime and prompt-size shares come from the second.

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type AppState, type Route, hashFromState } from '../lib/state';
+  import { type AppState, type Route, routeHash } from '../lib/state';
 
   interface Props {
     selection: AppState;
@@ -20,7 +20,7 @@
       <li>
         <!-- Each link carries the whole selection, so a prose page and back keeps it. -->
         <a
-          href={hashFromState({ ...selection, route: link.route })}
+          href={routeHash(selection, link.route)}
           aria-current={selection.route === link.route ? 'page' : undefined}
         >
           {link.label}

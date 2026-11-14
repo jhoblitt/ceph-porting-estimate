@@ -8,6 +8,9 @@ import {
   magnitude,
   multiplier,
   percent,
+  cardinal,
+  rate,
+  signedPercent,
   times,
   tokens,
   usd,
@@ -298,5 +301,39 @@ describe('no output ever spells a non-number', () => {
   const inputs = [...NON_FINITE, 0, -0, 1e-300, -1e-300, 1e300, Number.MAX_VALUE, Number.MIN_VALUE];
   it.each(all.map((f) => [f.name, f] as const))('%s', (_name, f) => {
     for (const n of inputs) expect(f(n)).not.toMatch(/NaN|Infinity|e[+-]/);
+  });
+});
+
+describe('signedPercent', () => {
+  it('gives a change its sign on the shared percentage', () => {
+    expect(signedPercent(0.0356)).toBe(`+${percent(0.0356)}`);
+    expect(signedPercent(-0.3109)).toBe(`−${percent(0.3109)}`);
+    expect(signedPercent(0.0356)).toBe('+3.6%');
+  });
+
+  it('prints no change as 0%, and a change below what percent prints as a bound', () => {
+    expect(signedPercent(0)).toBe('0%');
+    expect(signedPercent(0.00001)).toBe('<+0.01%');
+    expect(signedPercent(-0.00001)).toBe('>−0.01%');
+  });
+
+  it.each(NON_FINITE)('prints a dash for %s', (n) => {
+    expect(signedPercent(n)).toBe('—');
+  });
+});
+
+describe('cardinal', () => {
+  it('writes a small count in words and a large one in figures', () => {
+    expect([0, 2, 4, 10].map(cardinal)).toEqual(['zero', 'two', 'four', 'ten']);
+    expect(cardinal(11)).toBe(countExact(11));
+    expect(cardinal(Number.NaN)).toBe('—');
+  });
+});
+
+describe('rate', () => {
+  it('prints two decimals whatever the value, so paired rates line up', () => {
+    expect([rate(3.1), rate(3.7142)]).toEqual(['3.10', '3.71']);
+    expect(rate(2920.7)).toBe('2,920.70');
+    expect(rate(Number.POSITIVE_INFINITY)).toBe('—');
   });
 });

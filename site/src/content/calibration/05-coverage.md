@@ -1,0 +1,11 @@
+## Coverage
+
+The estimate takes rgw-go to have replaced {{calibration.coverage.value | percent}} of the source it ports, within a range of {{calibration.coverage.low | percent}} to {{calibration.coverage.high | percent}}. It is an assumption. {{computed.coverageSentence | text}}
+
+**This project's classification.** The value is this project's classification of the {{calibration.sizes.source.total.bytes | countExact}}-byte source file by file, by bytes, against rgw-go's exclusions list and phase plan: {{calibration.coverage.byte_classification.ported_bytes | countExact}} bytes ported. In its own note: {{calibration.coverage.byte_classification.note}} The range's top is what counting every materially touched file in full gives; its bottom is about what crediting each file only for the share of its lines rgw-go's citations cover gives.
+
+**The session's position.** The rgw-go session's own estimate, by lines, is {{calibration.coverage.session_estimate.value | percent}}, within {{calibration.coverage.session_estimate.low | percent}} to {{calibration.coverage.session_estimate.high | percent}}. Its position, as recorded: {{calibration.coverage.session_estimate.position}}
+
+**A ceiling.** rgw-go's product code cites {{calibration.coverage.cited_files.files_cited | countExact}} of the source files, {{calibration.coverage.cited_files.share_of_bytes | percent}} of its bytes; that includes files it barely touches, and the line ranges it cites cover {{calibration.coverage.cited_files.share_of_lines_inside_cited_ranges | percent}} of the source's lines.
+
+**The caution.** The share of the source rgw-go leaves out is a separate figure from its coverage: by the session's count of bytes it is "{{calibration.coverage.session_bytes.excluded}}". By the session's account most of that is multisite and the other storage drivers, which a full Ceph port could not skip, and `E` is calibrated on the ported share only. The estimate's headline includes those parts at their own difficulty: multisite sync, for one, is rated hard, and only the experimental DAOS driver is shown separately. `E` describes how much Go rgw-go wrote for what it did port; it says nothing direct about code it never touched.

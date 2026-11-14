@@ -55,8 +55,8 @@ describe('canonicalOverrides', () => {
   });
 
   it('compares against the scaled scenario value', () => {
-    // pessimistic scales overhead 4.1 by 1.25.
-    expect(canonicalOverrides(report, 'pessimistic', { overhead: 4.1 * 1.25 })).toEqual({});
+    // pessimistic scales overhead 4.1 by 1.1971, phase 2's rate over all phases'.
+    expect(canonicalOverrides(report, 'pessimistic', { overhead: 4.1 * 1.1971 })).toEqual({});
   });
 
   it('clamps to what the model uses', () => {
