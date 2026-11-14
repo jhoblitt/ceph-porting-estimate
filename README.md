@@ -43,8 +43,26 @@ so its bucket in `sloc.json`, is `cephest`'s own table.
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/);
 commitlint enforces this on every pull request. Every GitHub Action is pinned
 to a commit SHA: run `pinact run` after editing a workflow and `actionlint`
-before committing it. Where a `Makefile` is present, `make check` is the local gate,
-`make tools` installs the pinned linter, and that pin lives in the `Makefile`.
+before committing it. `make check` is the local gate, `make tools` installs
+the pinned linter, and that pin lives in the `Makefile`.
+
+## Site
+
+The report is a Vite, Svelte and TypeScript site under `site/`, built with
+the Node version in `.nvmrc`. It reads one generated file,
+`site/src/generated/report.json`, which `cephest rollup` writes.
+
+```sh
+make site-install   # npm ci
+make site-build     # cephest rollup, then vite build into site/dist
+make site-test      # typecheck and unit tests
+```
+
+To work on the site without the Go side, `make site-dev-data` copies the
+test fixture into place; then run `npm run dev` in `site/` for a live
+server, or `npm run build` and `npm run preview` to serve the built site
+under its Pages base path, `/ceph-porting-estimate/`. A build takes its
+version from `APP_VERSION`; without it the footer reads `dev`.
 
 ## License
 

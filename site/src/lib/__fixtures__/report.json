@@ -1,0 +1,296 @@
+{
+  "ceph": {
+    "repo": "ceph/ceph",
+    "rev": "ec322a5b1f0d6c4e8a7b39d2f5c1e08a64b7d913",
+    "commit_date": "2026-11-13T09:41:27Z"
+  },
+  "components": [
+    {
+      "id": "rgw",
+      "name": "RADOS Gateway",
+      "description": "S3 and Swift object gateway over RADOS.",
+      "root": ["src/rgw"],
+      "features": [
+        {
+          "id": "rgw-core",
+          "name": "Request handling",
+          "description": "Frontends, auth, the S3 and Swift REST ops.",
+          "globs": ["src/rgw/rgw_*.cc", "src/rgw/rgw_*.h"],
+          "scope": "headline",
+          "kind": "product",
+          "difficulty": "hard",
+          "why": "Wide protocol surface with byte-compatible on-RADOS formats.",
+          "langs": {
+            "C++": { "files": 412, "code": 186204, "comment": 21877, "blank": 30551, "bytes": 8123590 },
+            "Python": { "files": 6, "code": 1210, "comment": 140, "blank": 260, "bytes": 51322 }
+          }
+        },
+        {
+          "id": "rgw-multisite",
+          "name": "Multisite sync",
+          "description": "Zone, zonegroup and period replication.",
+          "globs": ["src/rgw/driver/rados/rgw_sync*", "src/rgw/driver/rados/rgw_data_sync*"],
+          "scope": "headline",
+          "kind": "product",
+          "difficulty": "extreme",
+          "why": "Distributed state machines with years of edge-case fixes.",
+          "langs": {
+            "C++": { "files": 58, "code": 41388, "comment": 3011, "blank": 6104, "bytes": 1902114 }
+          }
+        },
+        {
+          "id": "rgw-tests",
+          "name": "Unit tests",
+          "description": "GoogleTest suites under src/test/rgw.",
+          "globs": ["src/test/rgw/**"],
+          "scope": "headline",
+          "kind": "test",
+          "difficulty": "standard",
+          "why": "Ported once as code; no test ratio applies.",
+          "langs": {
+            "C++": { "files": 97, "code": 52310, "comment": 2204, "blank": 8890, "bytes": 2210448 },
+            "Python": { "files": 11, "code": 4022, "comment": 310, "blank": 802, "bytes": 160337 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "osd",
+      "name": "OSD",
+      "description": "Object storage daemon, peering, recovery and the classic backend.",
+      "root": ["src/osd", "src/os"],
+      "features": [
+        {
+          "id": "osd-core",
+          "name": "Peering and recovery",
+          "description": "PG state machine, peering, backfill and scrub.",
+          "globs": ["src/osd/**"],
+          "scope": "headline",
+          "kind": "product",
+          "difficulty": "extreme",
+          "why": "Core consistency logic; a defect loses data.",
+          "langs": {
+            "C++": { "files": 236, "code": 148920, "comment": 17204, "blank": 21877, "bytes": 6730015 }
+          }
+        },
+        {
+          "id": "bluestore",
+          "name": "BlueStore",
+          "description": "Raw block device object store with RocksDB metadata.",
+          "globs": ["src/os/bluestore/**"],
+          "scope": "headline",
+          "kind": "product",
+          "difficulty": "extreme",
+          "why": "On-disk format compatibility and allocator correctness.",
+          "langs": {
+            "C++": { "files": 121, "code": 97644, "comment": 9120, "blank": 12408, "bytes": 4402871 }
+          }
+        },
+        {
+          "id": "osd-build",
+          "name": "Build files",
+          "description": "CMake lists for the OSD tree.",
+          "globs": ["src/osd/CMakeLists.txt", "src/os/CMakeLists.txt"],
+          "scope": "not-ported",
+          "kind": "config",
+          "difficulty": "config",
+          "why": "Replaced by the target language's own build.",
+          "langs": {
+            "CMake": { "files": 2, "code": 188, "comment": 12, "blank": 30, "bytes": 7311 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qa",
+      "name": "Integration suites",
+      "description": "Teuthology tasks, workunits and suite YAML under qa/.",
+      "root": ["qa"],
+      "features": [
+        {
+          "id": "qa-tasks",
+          "name": "Tasks and workunits",
+          "description": "Python tasks and shell workunits.",
+          "globs": ["qa/tasks/**", "qa/workunits/**"],
+          "scope": "headline",
+          "kind": "test",
+          "difficulty": "standard",
+          "why": "Ported at normal cost; the harness itself is out of scope.",
+          "langs": {
+            "Python": { "files": 402, "code": 98204, "comment": 9874, "blank": 17330, "bytes": 4120554 },
+            "Bourne Shell": { "files": 611, "code": 30112, "comment": 4021, "blank": 5873, "bytes": 1060227 }
+          }
+        },
+        {
+          "id": "qa-suites",
+          "name": "Suite YAML",
+          "description": "Suite definitions carried over as configuration.",
+          "globs": ["qa/suites/**"],
+          "scope": "headline",
+          "kind": "config",
+          "difficulty": "config",
+          "why": "Low-cost carry-over of declarative YAML.",
+          "langs": {
+            "YAML": { "files": 9180, "code": 61022, "comment": 410, "blank": 2210, "bytes": 1508332 }
+          }
+        },
+        {
+          "id": "qa-dashboard-e2e",
+          "name": "Dashboard end-to-end",
+          "description": "Cypress tests for the Angular dashboard.",
+          "globs": ["src/pybind/mgr/dashboard/frontend/cypress/**"],
+          "scope": "shown",
+          "kind": "test",
+          "difficulty": "glue",
+          "why": "Follows the dashboard, which stays outside the headline.",
+          "langs": {
+            "TypeScript": { "files": 88, "code": 6120, "comment": 210, "blank": 940, "bytes": 221904 }
+          }
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "rocksdb",
+      "name": "RocksDB",
+      "used_for": "BlueStore metadata and the monitor store.",
+      "submodules": ["src/rocksdb"],
+      "submodule_size": { "available": true, "files": 1210, "code": 412300, "comment": 61200, "blank": 70110, "bytes": 18630221, "unavailable_nested": 0 },
+      "targets": {
+        "go": { "strategy": "bindings", "package": "github.com/linxGnu/grocksdb", "sloc_equivalent": 6000, "difficulty": "hard", "note": "cgo bindings exist; Ceph's merge operators and env need wrapping." },
+        "rust": { "strategy": "bindings", "package": "rust-rocksdb", "sloc_equivalent": 4000, "difficulty": "standard", "note": "Mature crate; custom comparators and env shims remain." },
+        "wasm": { "strategy": "port", "package": null, "sloc_equivalent": 60000, "difficulty": "extreme", "note": "No WASI build; the subset BlueStore uses must be ported." }
+      }
+    },
+    {
+      "id": "boost",
+      "name": "Boost",
+      "used_for": "Asio, intrusive containers, program options and more.",
+      "submodules": [],
+      "submodule_size": null,
+      "targets": {
+        "go": { "strategy": "native", "package": null, "sloc_equivalent": 0, "difficulty": "glue", "note": "The standard library covers what Ceph uses." },
+        "rust": { "strategy": "native", "package": "tokio", "sloc_equivalent": 0, "difficulty": "glue", "note": "Covered by std and common crates." },
+        "wasm": { "strategy": "drop", "package": null, "sloc_equivalent": 0, "difficulty": "glue", "note": "Nothing to carry over." }
+      }
+    }
+  ],
+  "models": [
+    {
+      "id": "fable-5-2",
+      "name": "Claude Fable 5.2",
+      "vendor": "Anthropic",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "read_on": "2026-11-13",
+      "usd_per_mtok": { "input": 8, "cache_write_short": 10, "cache_write_long": 16, "cache_read": 0.2, "output": 40 },
+      "cache_write_ttl": { "short": "5m", "long": "1h" },
+      "long_context": null
+    },
+    {
+      "id": "opus-5-5",
+      "name": "Claude Opus 5.5",
+      "vendor": "Anthropic",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "read_on": "2026-11-13",
+      "usd_per_mtok": { "input": 4, "cache_write_short": 5, "cache_write_long": 8, "cache_read": 0.2, "output": 20 },
+      "cache_write_ttl": { "short": "5m", "long": "1h" },
+      "long_context": null
+    },
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "vendor": "OpenAI",
+      "source": "https://developers.openai.com/api/docs/pricing",
+      "read_on": "2026-11-13",
+      "usd_per_mtok": { "input": 10, "cache_write_short": 12.5, "cache_write_long": 25, "cache_read": 1, "output": 50 },
+      "cache_write_ttl": { "short": "30m", "long": "12h" },
+      "long_context": { "threshold_tokens": 272000, "input": 20, "cache_write_short": 25, "cache_write_long": 50, "cache_read": 2, "output": 75 }
+    }
+  ],
+  "assumptions": {
+    "bytes_per_token": {
+      "default": { "value": 4, "measured": false, "source": "assumption", "reason": "Typical for source code across tokenizers." },
+      "C++": { "value": 3.6, "measured": false, "source": "assumption", "reason": "Dense punctuation and templates." },
+      "Python": { "value": 4, "measured": false, "source": "assumption", "reason": "Close to the default." },
+      "Go": { "value": 3.9, "measured": false, "source": "assumption", "reason": "Needed to compute the expansion from rgw-go." },
+      "YAML": { "value": 4.5, "measured": false, "source": "assumption", "reason": "Repetitive keys tokenize well." }
+    },
+    "params": {
+      "expansion": { "value": 1.62, "measured": true, "source": "data/calibration.yaml", "reason": "rgw-go product Go tokens per replaced C++ token." },
+      "test_ratio": { "value": 1.31, "measured": true, "source": "data/calibration.yaml", "reason": "rgw-go test and tooling Go per product Go." },
+      "overhead": { "value": 4.1, "measured": true, "source": "data/calibration.yaml", "reason": "Output tokens per surviving Go token in rgw-go." },
+      "uncached_per_output": { "value": 0.0078, "measured": true, "source": "data/calibration.yaml", "reason": "0.35M uncached over 45.01M output." },
+      "cache_write_per_output": { "value": 25.27, "measured": true, "source": "data/calibration.yaml", "reason": "1,137.2M cache write over 45.01M output." },
+      "cache_read_per_output": { "value": 1248.9, "measured": true, "source": "data/calibration.yaml", "reason": "56,213.6M cache read over 45.01M output." },
+      "source_read_passes": { "value": 0, "measured": false, "source": "assumption", "reason": "The measured ratios already hold all input." },
+      "difficulty": {
+        "config": { "value": 0.1, "measured": false, "source": "assumption", "reason": "Declarative carry-over." },
+        "glue": { "value": 0.5, "measured": false, "source": "assumption", "reason": "Thin wiring code." },
+        "standard": { "value": 1, "measured": false, "source": "assumption", "reason": "The rgw-go baseline." },
+        "hard": { "value": 1.5, "measured": false, "source": "assumption", "reason": "Compatibility-bound protocol code." },
+        "extreme": { "value": 2, "measured": false, "source": "assumption", "reason": "Core consistency and on-disk formats." }
+      },
+      "rust_factor": { "value": 1.15, "measured": false, "source": "assumption", "reason": "Ownership and lifetimes add rework rounds." },
+      "wasm_overhead": { "value": 1.25, "measured": false, "source": "assumption", "reason": "WASI lacks threads, sockets and raw devices." },
+      "clean_break_discount": { "value": 0.8, "measured": false, "source": "assumption", "reason": "No on-disk or wire compatibility to keep." },
+      "long_cache_write_share": { "value": 0.5, "measured": false, "source": "assumption", "reason": "Half of writes outlive the short TTL." },
+      "long_context_share": {
+        "uncached": { "value": 0.3, "measured": false, "source": "assumption", "reason": "Long agent sessions cross the threshold." },
+        "cache_write": { "value": 0.3, "measured": false, "source": "assumption", "reason": "Follows the uncached share." },
+        "cache_read": { "value": 0.4, "measured": false, "source": "assumption", "reason": "Reads concentrate in long contexts." },
+        "output": { "value": 0.3, "measured": false, "source": "assumption", "reason": "Follows the uncached share." }
+      },
+      "model_efficiency": {
+        "fable-5-2": { "value": 1, "measured": false, "source": "assumption", "reason": "No benchmark claim is made." },
+        "opus-5-5": { "value": 1, "measured": false, "source": "assumption", "reason": "The calibration model." },
+        "gpt-6-astra": { "value": 1, "measured": false, "source": "assumption", "reason": "No benchmark claim is made." }
+      },
+      "sloc_equivalent_bytes_per_line": { "value": 43.6, "measured": true, "source": "data/generated/sloc.json", "reason": "Bytes per code line of Ceph's C++." },
+      "adjacent_uplift": {
+        "uncached": { "value": 0.14, "measured": true, "source": "data/calibration.yaml", "reason": "Defect reproduction and PR servicing." },
+        "cache_write": { "value": 0.16, "measured": true, "source": "data/calibration.yaml", "reason": "Defect reproduction and PR servicing." },
+        "cache_read": { "value": 0.09, "measured": true, "source": "data/calibration.yaml", "reason": "Defect reproduction and PR servicing." },
+        "output": { "value": 0.3, "measured": true, "source": "data/calibration.yaml", "reason": "Defect reproduction and PR servicing." }
+      }
+    },
+    "toggles": { "include_adjacent": false, "clean_break": false },
+    "scenarios": {
+      "naive": {
+        "label": "Naive",
+        "description": "Read every file once and write the target once. A lower bound.",
+        "overrides": {
+          "test_ratio": 0,
+          "overhead": 1,
+          "uncached_per_output": 0,
+          "cache_write_per_output": 0,
+          "cache_read_per_output": 0,
+          "source_read_passes": 1,
+          "difficulty.config": 1,
+          "difficulty.glue": 1,
+          "difficulty.standard": 1,
+          "difficulty.hard": 1,
+          "difficulty.extreme": 1,
+          "rust_factor": 1,
+          "wasm_overhead": 1
+        }
+      },
+      "calibrated": {
+        "label": "Calibrated",
+        "description": "rgw-go as measured: tests, review rounds, plans and docs."
+      },
+      "pessimistic": {
+        "label": "Pessimistic",
+        "description": "Calibrated, with harder core daemons and adjacent work included.",
+        "overrides": { "difficulty.hard": 2, "difficulty.extreme": 3 },
+        "scale": { "overhead": 1.25 },
+        "toggles": { "include_adjacent": true }
+      }
+    },
+    "default_scenario": "calibrated"
+  },
+  "calibration": {
+    "rgw_go": { "repo": "jhoblitt/rgw-go", "rev": "239f789", "measured_on": "2026-11-13" },
+    "port_tokens_m": { "calls": 163109, "uncached": 0.35, "cache_write": 1137.2, "cache_read": 56213.6, "output": 45.01 }
+  }
+}

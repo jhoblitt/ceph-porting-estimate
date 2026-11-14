@@ -78,3 +78,29 @@ test: ## Run every suite with the race detector
 
 .PHONY: check
 check: generate-check fmt-check vet lint fix-check tidy-check test ## The local gate
+
+# The report site under site/ (Vite, Svelte, TypeScript). Outside the
+# go-conventions contract above.
+SITE_DIR := site
+SITE_REPORT := $(SITE_DIR)/src/generated/report.json
+
+.PHONY: site-install
+site-install: ## Install the site's npm dependencies from the lockfile
+	cd $(SITE_DIR) && npm ci
+
+.PHONY: site-data
+site-data: ## Roll the counts and data up into the site's report.json
+	go run ./cmd/cephest rollup --out $(SITE_REPORT)
+
+.PHONY: site-dev-data
+site-dev-data: ## Use the test fixture as the site's report.json (no Go side needed)
+	mkdir -p $(dir $(SITE_REPORT))
+	cp $(SITE_DIR)/src/lib/__fixtures__/report.json $(SITE_REPORT)
+
+.PHONY: site-build
+site-build: site-data ## Build the site into site/dist from freshly rolled-up data
+	cd $(SITE_DIR) && npm run build
+
+.PHONY: site-test
+site-test: ## Typecheck and unit-test the site
+	cd $(SITE_DIR) && npm run typecheck && npm test
