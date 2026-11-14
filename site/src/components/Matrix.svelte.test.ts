@@ -98,6 +98,22 @@ describe('Matrix', () => {
     expect(caption).not.toMatch(/above all the price of re-read context/);
   });
 
+  it('scales the measured row by the efficiency the reader gives the measured model', () => {
+    const { rowText } = setup({ overrides: { 'model_efficiency.opus-5-5': 1.3 } });
+    expect(rowText('Claude Opus 5.5')).toContain(
+      'Token use measured with this model, on rgw-go, × 1.3 (the model efficiency you set).',
+    );
+    expect(rowText('Claude Opus 5.5')).not.toContain('every row uses');
+  });
+
+  it('says every row shares the scaled token counts when every efficiency is equal but not 1', () => {
+    const all = Object.fromEntries(report.models.map((m) => [`model_efficiency.${m.id}`, 1.3]));
+    const { rowText } = setup({ overrides: all });
+    expect(rowText('Claude Opus 5.5')).toContain(
+      'Token use measured with this model, on rgw-go, × 1.3 (the model efficiency you set); every row uses these scaled token counts.',
+    );
+  });
+
   it('words an extreme break-even as a share of the tokens, never "100% fewer"', () => {
     const { rowText } = setup({ overrides: { 'model_efficiency.gpt-6-astra': 200 } });
     expect(rowText('GPT-6 Astra')).toMatch(/only if it needed less than 1% of the tokens this row assumes\./);

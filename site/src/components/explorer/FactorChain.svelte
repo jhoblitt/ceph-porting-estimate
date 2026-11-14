@@ -12,13 +12,18 @@
     steps: ChainStep[];
     /** Names the difficulty step's class, e.g. "hard". */
     difficulty: string;
+    /** What the difficulty factor is relative to, from the data. */
+    difficultyNote: string;
   }
 
-  let { steps, difficulty }: Props = $props();
+  let { steps, difficulty, difficultyNote }: Props = $props();
 </script>
 
 <table class="chain">
-  <caption class="visually-hidden">From source tokens to output tokens, one factor at a time</caption>
+  <caption>
+    <span class="visually-hidden">From source tokens to output tokens, one factor at a time.</span>
+    Model output, not measurements; the factors are the assumptions in effect.
+  </caption>
   <thead>
     <tr>
       <th scope="col">Step</th>
@@ -32,7 +37,7 @@
       <tr>
         <th scope="row">
           <span class="label">{text.label}{s.key === 'difficulty' ? ` (${difficulty})` : ''}</span>
-          <span class="note">{text.note}</span>
+          <span class="note">{s.key === 'difficulty' ? difficultyNote : text.note}</span>
         </th>
         <td class="factor">{s.factor === null ? '' : `× ${decimal(s.factor)}`}</td>
         <td class="value"><Amount value={s.value} kind="tokens" spellExact /></td>
@@ -48,6 +53,14 @@
 </table>
 
 <style>
+  caption {
+    caption-side: bottom;
+    padding: var(--space-2) 0;
+    text-align: start;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
   .chain {
     width: 100%;
     border-collapse: collapse;

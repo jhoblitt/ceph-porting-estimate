@@ -7,6 +7,7 @@ import {
   type CellBox,
   type Rect,
   type TreemapNode,
+  figureFits,
   labelFit,
   layoutTreemap,
   mapHeight,
@@ -168,6 +169,16 @@ describe('mapHeight', () => {
     [1400, 560],
   ])('is %d high at %d wide', (width, want) => {
     expect(mapHeight(width)).toBe(want);
+  });
+});
+
+describe('figureFits', () => {
+  const box = (w: number): Rect => ({ x: 0, y: 0, w, h: 60 });
+
+  it('fits a figure line whole or not at all', () => {
+    expect(figureFits(box(200), '412k lines · ported tests')).toBe(true);
+    expect(figureFits(box(120), '412k lines · ported tests')).toBe(false);
+    expect(figureFits(box(120), '412k lines')).toBe(true);
   });
 });
 

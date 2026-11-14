@@ -9,6 +9,7 @@ import {
   factorChain,
   filterGroups,
   hasContent,
+  largestRow,
   perLineRange,
   requiredMode,
   sortRows,
@@ -212,6 +213,22 @@ describe('hasContent', () => {
     expect(hasContent(feature('rgw', 'rgw-core'))).toBe(true);
     expect(hasContent(feature('dependencies', 'rocksdb'))).toBe(true);
     expect(hasContent(feature('dependencies', 'boost'))).toBe(false);
+  });
+});
+
+describe('largestRow', () => {
+  it('is the row the map draws largest, by code lines or by cost', () => {
+    const rows = explorerLevel(report, root, 'rgw', 'all').groups[0]!.rows;
+    const byCode = [...rows].sort((a, b) => b.figures.code - a.figures.code)[0]!;
+    const byCost = [...rows].sort((a, b) => b.figures.usd - a.figures.usd)[0]!;
+    expect(largestRow(rows, 'code')?.id).toBe(byCode.id);
+    expect(largestRow(rows, 'cost')?.id).toBe(byCost.id);
+    expect(largestRow([], 'code')).toBeUndefined();
+  });
+
+  it('breaks a tie by id, as the layout does', () => {
+    const rows = explorerLevel(report, root, 'rgw', 'all').groups[0]!.rows.map((r) => ({ ...r, figures: { ...r.figures, code: 5 } }));
+    expect(largestRow(rows, 'code')?.id).toBe([...rows.map((r) => r.id)].sort()[0]);
   });
 });
 

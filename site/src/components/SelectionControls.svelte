@@ -87,7 +87,7 @@
     text-decoration: underline;
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .controls {
       flex-direction: column;
       padding: var(--space-4);

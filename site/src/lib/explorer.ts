@@ -307,6 +307,19 @@ export function perLineRange(l: Level): { min: number; max: number } | null {
   return positiveRange(l.groups.flatMap((g) => g.rows.flatMap((r) => r.parts.map((p) => p.perLine ?? 0))));
 }
 
+/**
+ * The row the map draws largest for an area mode — its cell's value is the
+ * sum of its parts — with ties to the lower id, as the layout breaks them.
+ */
+export function largestRow(rows: readonly Row[], area: AreaMode): Row | undefined {
+  const size = (r: Row) => (area === 'code' ? r.figures.code : r.figures.usd);
+  let best: Row | undefined;
+  for (const r of rows) {
+    if (!best || size(r) > size(best) || (size(r) === size(best) && r.id < best.id)) best = r;
+  }
+  return best;
+}
+
 export type SortKey = 'name' | 'code' | 'sourceTokens' | 'outputTokens' | 'cacheReadTokens' | 'usd' | 'share';
 export interface Sort {
   key: SortKey;

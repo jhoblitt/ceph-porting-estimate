@@ -5,6 +5,7 @@
 -->
 <script lang="ts">
   import { CATEGORY_META, categoryParts, shares } from '../../lib/categories';
+  import { difficultyText, inputText, paramOrigin } from '../../lib/chain';
   import { factorChain } from '../../lib/explorer';
   import { countExact, percent, usd, usdExact } from '../../lib/format';
   import {
@@ -15,7 +16,7 @@
     STRATEGY_MEANINGS,
     difficultyMeaning,
   } from '../../lib/labels';
-  import type { FeatureEstimate, Params } from '../../lib/model';
+  import type { FeatureEstimate, ParamInfo, Params } from '../../lib/model';
   import { type Dependency, type Feature, type Report, TARGET_LABELS, type Target } from '../../lib/report';
   import Amount from '../Amount.svelte';
   import SegmentedBar from '../SegmentedBar.svelte';
@@ -25,6 +26,10 @@
   interface Props {
     report: Report;
     params: Params;
+    /** Every param's baseline and scenario value, to say who moved a factor. */
+    paramInfo: ParamInfo[];
+    /** The reader's overrides. */
+    overrides: Record<string, number>;
     target: Target;
     estimate: FeatureEstimate;
     /** The taxonomy's entry, or for dependency work the dependency. */
@@ -36,7 +41,19 @@
     headingId: string;
   }
 
-  let { report, params, target, estimate: f, source, componentName, modelName, share, headingId }: Props = $props();
+  let {
+    report,
+    params,
+    paramInfo,
+    overrides,
+    target,
+    estimate: f,
+    source,
+    componentName,
+    modelName,
+    share,
+    headingId,
+  }: Props = $props();
 
   const feature = $derived('feature' in source ? source.feature : null);
   const dep = $derived('dependency' in source ? source.dependency : null);
@@ -44,6 +61,9 @@
   const ported = $derived(f.scope !== 'not-ported');
   const chain = $derived(factorChain(f, params));
   const difficulty = $derived(DIFFICULTY_LABELS[f.difficulty]);
+  const origin = (path: string) => paramOrigin(path, paramInfo, overrides);
+  const cls = $derived(f.featureKind === 'config' ? 'config' : f.difficulty);
+  const difficultyWords = $derived(difficultyText(report, cls, f.factors.difficulty, origin(`difficulty.${cls}`)));
   const dollarShares = $derived(shares(f.usdByCategory));
   const parts = $derived(
     categoryParts(dollarShares, (c) => ({
@@ -90,10 +110,8 @@
           <dt>Difficulty</dt>
           <dd>
             <strong>{difficulty}</strong>{#if f.featureKind === 'config' && f.difficulty !== 'config'}, weighed as
-              configuration{/if}, × {f.factors.difficulty} the work of standard code: {difficultyMeaning(
-              report,
-              f.featureKind === 'config' ? 'config' : f.difficulty,
-            )}.
+              configuration{/if}, {difficultyWords.factor}. {difficultyMeaning(report, cls)}.
+            {#if difficultyWords.detail}<span class="note">{difficultyWords.detail}</span>{/if}
           </dd>
         </div>
       </dl>
@@ -127,6 +145,7 @@
         <SegmentedBar label="{f.name}: cost by token category" {parts} size="thin" />
         <div class="scroll">
         <table class="cats">
+          <caption>Model output, not measurements, printed in full.</caption>
           <thead>
             <tr><th scope="col">Category</th><th scope="col">Tokens</th><th scope="col">Cost</th></tr>
           </thead>
@@ -142,11 +161,8 @@
         </table>
         </div>
         <h4>From size to output tokens</h4>
-        <FactorChain steps={chain} difficulty={difficulty.toLowerCase()} />
-        <p class="note">
-          Input follows output: each output token brings the measured amounts of uncached input, cache writes and cache reads,
-          and {modelName}'s price sheet turns the four into dollars.
-        </p>
+        <FactorChain steps={chain} difficulty={difficulty.toLowerCase()} difficultyNote={difficultyWords.step} />
+        <p class="note">{inputText(report, params, modelName, origin)}</p>
       {:else}
         <div class="free">
           <p class="figure">$0</p>
@@ -265,6 +281,14 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .cats caption {
+    caption-side: bottom;
+    padding-top: var(--space-1);
+    text-align: start;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
   .cats th,
   .cats td {
     padding: var(--space-1) var(--space-2);
@@ -297,7 +321,7 @@
   .free {
     padding: var(--space-4);
     border-radius: var(--radius);
-    background: repeating-linear-gradient(-45deg, var(--grid) 0 3px, var(--page) 3px 7px);
+    background: var(--hatch-not-ported);
   }
 
   .free p {
@@ -311,7 +335,7 @@
     margin-top: var(--space-2);
   }
 
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .columns {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -322,7 +346,7 @@
     }
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .detail {
       padding: var(--space-4) var(--space-3);
     }

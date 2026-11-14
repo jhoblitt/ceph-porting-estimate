@@ -50,7 +50,7 @@
     color: var(--text-muted);
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .card {
       padding: var(--space-5) var(--space-4);
     }

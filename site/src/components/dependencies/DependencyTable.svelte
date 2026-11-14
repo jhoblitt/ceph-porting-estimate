@@ -4,7 +4,7 @@
   code's size. Each row opens a comparison of all three targets' plans.
 -->
 <script lang="ts">
-  import type { DependencyRow } from '../../lib/dependencies';
+  import { type DependencyRow, vendoredText } from '../../lib/dependencies';
   import { countExact, usdExact } from '../../lib/format';
   import { DIFFICULTY_LABELS, STRATEGY_LABELS } from '../../lib/labels';
   import { TARGET_LABELS, type Target } from '../../lib/report';
@@ -28,23 +28,33 @@
 </script>
 
 <div class="scroll">
-  <table>
-    <caption class="visually-hidden">Dependencies, with the plan for {TARGET_LABELS[target]}, its work and its cost</caption>
-    <thead>
-      <tr>
-        <th scope="col">Dependency</th>
-        <th scope="col">Ceph uses it for</th>
-        <th scope="col">Plan for {TARGET_LABELS[target]}</th>
-        <th scope="col" class="n">Lines of work</th>
-        <th scope="col" class="n">Cost</th>
-        <th scope="col" class="n">Vendored code</th>
+  <!-- Explicit roles: the phone layout restyles these as blocks, which drops table semantics in some browsers. -->
+  <!-- svelte-ignore a11y_no_redundant_roles -->
+  <table role="table">
+    <caption>
+      <span class="visually-hidden">Dependencies, with the plan for {TARGET_LABELS[target]}, its work and its cost.</span>
+      Lines of work are the data's own estimates; costs are model output, not measurements, printed in full.
+    </caption>
+    <!-- svelte-ignore a11y_no_redundant_roles -->
+    <thead role="rowgroup">
+      <!-- svelte-ignore a11y_no_redundant_roles -->
+      <tr role="row">
+        <th scope="col" role="columnheader">Dependency</th>
+        <th scope="col" role="columnheader">Ceph uses it for</th>
+        <th scope="col" role="columnheader">Plan for {TARGET_LABELS[target]}</th>
+        <th scope="col" role="columnheader" class="n">Lines of work</th>
+        <th scope="col" role="columnheader" class="n">Cost</th>
+        <th scope="col" role="columnheader" class="n">Vendored code</th>
       </tr>
     </thead>
-    <tbody>
+    <!-- svelte-ignore a11y_no_redundant_roles -->
+    <tbody role="rowgroup">
       {#each rows as r (r.id)}
         {@const expanded = open.has(r.id)}
-        <tr class="row" class:expanded>
-          <th scope="row">
+        {@const size = vendoredText(r)}
+        <!-- svelte-ignore a11y_no_redundant_roles -->
+        <tr class="row" role="row" class:expanded>
+          <th scope="row" role="rowheader">
             <span class="name">{r.name}</span>
             <span class="actions">
               <button
@@ -63,27 +73,22 @@
               {/if}
             </span>
           </th>
-          <td class="used">{r.usedFor}</td>
-          <td class="plan">
+          <td class="used" role="cell" data-label="Ceph uses it for">{r.usedFor}</td>
+          <td class="plan" role="cell" data-label="Plan for {TARGET_LABELS[target]}">
             <span class="strategy {r.strategy}">{STRATEGY_LABELS[r.strategy]}</span>
             {#if r.package}<code>{r.package}</code>{/if}
             <span class="note">{r.note}</span>
           </td>
-          <td class="n">{r.lines > 0 ? countExact(r.lines) : '—'}</td>
-          <td class="n">{r.lines > 0 ? usdExact(r.usd) : '—'}</td>
-          <td class="n">
-            {#if r.submodule}
-              {countExact(r.submodule.code)} lines<span class="sub">in {countExact(r.submodule.files)} files{r.submodule.nestedUnavailable > 0
-                  ? `; ${r.submodule.nestedUnavailable} nested not counted`
-                  : ''}</span>
-            {:else}
-              Not available{#if r.submodules.length === 0}<span class="sub">not vendored</span>{/if}
-            {/if}
+          <td class="n" role="cell" data-label="Lines of work">{r.lines > 0 ? countExact(r.lines) : '—'}</td>
+          <td class="n" role="cell" data-label="Cost">{r.lines > 0 ? usdExact(r.usd) : '—'}</td>
+          <td class="n size" role="cell" data-label="Vendored code">
+            {size.text}{#if size.note}<span class="sub">{size.note}</span>{/if}
           </td>
         </tr>
         {#if expanded}
-          <tr class="compare" id="dep-{r.id}-targets">
-            <td colspan="6">
+          <!-- svelte-ignore a11y_no_redundant_roles -->
+          <tr class="compare" role="row" id="dep-{r.id}-targets">
+            <td colspan="6" role="cell">
               <ul>
                 {#each r.targets as t (t.target)}
                   <li class:current={t.current}>
@@ -108,10 +113,24 @@
 </div>
 
 <style>
+  caption {
+    caption-side: bottom;
+    padding: var(--space-2) var(--space-3);
+    text-align: start;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
   .scroll {
     overflow-x: auto;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
+  }
+
+  td.size {
+    min-width: 9rem;
+    max-width: 14rem;
+    white-space: normal;
   }
 
   table {
@@ -140,11 +159,6 @@
     text-align: end;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
-  }
-
-  td.n:last-child {
-    min-width: 7.5rem;
-    white-space: normal;
   }
 
   th[scope='row'] {
@@ -251,5 +265,97 @@
 
   .target {
     font-weight: 600;
+  }
+
+  /*
+   * A phone: one card per dependency, each figure under its own label, so
+   * nothing sits off-screen and the comparison stacks instead of scrolling.
+   */
+  @media (width < 720px) {
+    .scroll {
+      overflow-x: visible;
+    }
+
+    caption {
+      display: block;
+      padding-inline: 0;
+    }
+
+    table,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+    }
+
+    thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    tr.row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-2) var(--space-3);
+      padding: var(--space-3);
+      border-bottom: 1px solid var(--grid);
+    }
+
+    tr.row.expanded {
+      border-bottom: 0;
+    }
+
+    th,
+    td {
+      padding: 0;
+      border-bottom: 0;
+    }
+
+    th[scope='row'],
+    td.used,
+    td.plan {
+      grid-column: 1 / -1;
+      min-width: 0;
+      max-width: none;
+    }
+
+    .actions {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0 var(--space-4);
+    }
+
+    td.n {
+      text-align: start;
+      white-space: normal;
+    }
+
+    td.size {
+      grid-column: 1 / -1;
+      min-width: 0;
+      max-width: none;
+    }
+
+    td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .compare td {
+      padding: var(--space-3);
+      border-bottom: 1px solid var(--grid);
+    }
+
+    .compare ul {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 </style>

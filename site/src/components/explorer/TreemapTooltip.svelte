@@ -1,9 +1,10 @@
 <!--
-  The figures of the cell under the pointer or the focus, exactly. It only
+  The figures of the cell under the pointer or the focus, in full. It only
   repeats what the table holds, so it is hidden from screen readers; the
   cell's own accessible name carries the short figures.
 -->
 <script lang="ts">
+  import { type TestComponentNote, testNoteText } from '../../lib/counterfactual';
   import { type Row, costPerThousandLines } from '../../lib/explorer';
   import { countExact, percent, usd, usdExact } from '../../lib/format';
   import { DIFFICULTY_LABELS, KIND_LABELS, SCOPE_LABELS } from '../../lib/labels';
@@ -11,6 +12,8 @@
   interface Props {
     row: Row;
     groupName: string | null;
+    /** For a component of ported tests, what leaving it out would do to the headline. */
+    testNote?: TestComponentNote | undefined;
     /** The point to sit beside, in the map's coordinates. */
     x: number;
     y: number;
@@ -18,7 +21,7 @@
     frameHeight: number;
   }
 
-  let { row, groupName, x, y, frameWidth, frameHeight }: Props = $props();
+  let { row, groupName, testNote, x, y, frameWidth, frameHeight }: Props = $props();
 
   let width = $state(0);
   let height = $state(0);
@@ -33,7 +36,9 @@
 </script>
 
 <div class="tip" style:left="{left}px" style:top="{top}px" bind:offsetWidth={width} bind:offsetHeight={height} aria-hidden="true">
-  <p class="value">{row.figures.usd > 0 ? usdExact(row.figures.usd) : 'No cost'}</p>
+  <p class="value">
+    {#if row.figures.usd > 0}{usdExact(row.figures.usd)} <span class="basis">model output</span>{:else}No cost{/if}
+  </p>
   <p class="name">{row.name}</p>
   {#if groupName}<p class="group">{groupName}</p>{/if}
   <dl>
@@ -62,6 +67,10 @@
       <dd>{countExact(notPorted)} lines</dd>
     {/if}
   </dl>
+  {#if testNote}
+    {@const text = testNoteText(testNote)}
+    <p class="tests">{text.lead} {text.effect}</p>
+  {/if}
 </div>
 
 <style>
@@ -95,7 +104,20 @@
     font-weight: 600;
   }
 
+  .basis {
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
   .group {
+    color: var(--text-muted);
+  }
+
+  .tests {
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--grid);
     color: var(--text-muted);
   }
 

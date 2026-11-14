@@ -9,11 +9,13 @@
   import { tick, untrack } from 'svelte';
   import { cubicInOut } from 'svelte/easing';
   import type { TransitionConfig } from 'svelte/transition';
+  import { type TestComponentNote, testNoteText } from '../../lib/counterfactual';
   import { type AreaMode, type Level, type Row, matchesFilter } from '../../lib/explorer';
   import { count, percent, usd } from '../../lib/format';
   import { SCOPE_LABELS } from '../../lib/labels';
   import {
     DEFAULT_LAYOUT,
+    SHADE_STEPS,
     type Direction,
     type Rect,
     type TreemapLayout,
@@ -39,17 +41,18 @@
     /** A row the table has under the pointer. */
     highlightId: string | null;
     query: string;
+    /** What leaving out each component of ported tests would do to the headline. */
+    testNotes: Map<string, TestComponentNote>;
     /** The map's accessible name. */
     label: string;
-    onopen: (row: Row, fromKeyboard: boolean) => void;
+    onopen: (row: Row) => void;
     onhover: (id: string | null) => void;
     onup: () => void;
   }
 
-  let { level, rootLevel, area, range, selectedId, highlightId, query, label, onopen, onhover, onup }: Props = $props();
+  let { level, rootLevel, area, range, selectedId, highlightId, query, testNotes, label, onopen, onhover, onup }: Props =
+    $props();
 
-  /** --seq-1 … --seq-7 in tokens.css. */
-  const STEPS = 7;
   const ZOOM_MS = 450;
 
   let width = $state(0);
@@ -130,7 +133,9 @@
     const scope = row.scope && row.scope !== 'headline' ? `. ${SCOPE_LABELS[row.scope]}` : '';
     const notPorted = row.kind === 'component' ? (row.parts.find((p) => p.scope === 'not-ported')?.code ?? 0) : 0;
     const rest = notPorted > 0 ? `, of which ${count(notPorted)} not ported` : '';
-    return `${row.name}${where}: ${cost}, ${count(row.figures.code)} code lines${rest}, ${percent(row.share)} of the headline${scope}`;
+    const note = row.kind === 'component' ? testNotes.get(row.id) : undefined;
+    const tests = note ? `. Ported existing tests. ${testNoteText(note).effect.replace(/\.$/, '')}` : '';
+    return `${row.name}${where}: ${cost}, ${count(row.figures.code)} code lines${rest}, ${percent(row.share)} of the headline${scope}${tests}`;
   }
 
   // Roving focus: one cell is in the tab order, the arrows move it.
@@ -241,15 +246,16 @@
           <TreemapCell
             {cell}
             row={entry.row}
-            steps={shadeSteps(entry.row, range, STEPS)}
+            steps={shadeSteps(entry.row, range, SHADE_STEPS)}
             fit={labelFit(cell.rect, entry.row.name)}
             {area}
             name={accessibleName(entry.row, entry.group)}
+            tag={entry.row.kind === 'component' && testNotes.has(entry.row.id) ? 'ported tests' : undefined}
             active={cell.id === activeCell}
             selected={cell.id === selectedId}
             highlighted={cell.id === highlightId}
             dimmed={query.trim() !== '' && !matchesFilter(entry.row.name, query)}
-            onactivate={(e) => onopen(entry.row, e.detail === 0)}
+            onactivate={() => onopen(entry.row)}
             onfocus={(visible) => focused(cell.id, visible)}
             onhover={(on, e) => hover(cell.id, on, e)}
           />
@@ -258,7 +264,15 @@
     </div>
   {/each}
   {#if tip && tipRow}
-    <TreemapTooltip row={tipRow.row} groupName={tipRow.group} x={tip.x} y={tip.y} frameWidth={width} frameHeight={height} />
+    <TreemapTooltip
+      row={tipRow.row}
+      groupName={tipRow.group}
+      testNote={tipRow.row.kind === 'component' ? testNotes.get(tipRow.row.id) : undefined}
+      x={tip.x}
+      y={tip.y}
+      frameWidth={width}
+      frameHeight={height}
+    />
   {/if}
 </div>
 

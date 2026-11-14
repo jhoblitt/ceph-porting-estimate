@@ -82,6 +82,36 @@ describe('round trip through the hash', () => {
   });
 });
 
+describe('path segments with reserved characters', () => {
+  /** The fixture with a component and a feature whose ids need escaping. */
+  const odd = (componentId: string, featureId: string): Report => {
+    const c = report.components[0]!;
+    return { ...report, components: [...report.components, { ...c, id: componentId, features: [{ ...c.features[0]!, id: featureId }] }] };
+  };
+
+  it.each([
+    ['a slash', 'a/b', 'c/d'],
+    ['query and fragment characters', 'a?b#c', 'd&e=f'],
+    ['a percent sign and a plus', '50%+more', 'x%2Fy'],
+    ['spaces and non-ASCII', 'a b', 'é ✓'],
+  ])('round-trips %s', (_name, componentId, featureId) => {
+    const r = odd(componentId, featureId);
+    const state = { ...defaults, path: [componentId, featureId] };
+    const hash = hashFromState(state);
+    expect(stateFromHash(hash, r)).toEqual(state);
+    expect(parseHash(hash).path).toEqual([componentId, featureId]);
+  });
+
+  it('splits only on a literal slash, and decodes each segment', () => {
+    expect(parseHash('#/?path=a%2Fb/c').path).toEqual(['a/b', 'c']);
+    expect(parseHash('#/?target=go&path=x%20y/z&model=m').path).toEqual(['x y', 'z']);
+  });
+
+  it('drops a path with a broken escape rather than guessing', () => {
+    expect(parseHash('#/?path=rgw/%E0%A4%A').path).toEqual([]);
+  });
+});
+
 describe('malformed hashes', () => {
   it.each([
     ['a broken percent escape', '#%E0%A4%A'],

@@ -59,7 +59,7 @@
     box-shadow: inset 0 -2px 0 var(--accent);
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     ul {
       margin-inline-start: calc(-1 * var(--space-3));
     }

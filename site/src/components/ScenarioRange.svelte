@@ -12,6 +12,7 @@
   import type { Derived, ScenarioTotal } from '../lib/derived.svelte';
   import { usd } from '../lib/format';
   import { TARGET_LABELS } from '../lib/report';
+  import { labelRows } from '../lib/placement';
   import { linearScale } from '../lib/scale';
   import type { AppState } from '../lib/state';
   import Amount from './Amount.svelte';
@@ -38,13 +39,14 @@
   const outcomes = $derived(
     [range.low, range.central, range.high, ...range.unplaced].filter((s): s is ScenarioTotal => s !== undefined),
   );
-  /**
-   * Every other figure label, left to right, sits a line higher, so labels
-   * of scenarios close together on a narrow screen never overlap.
-   */
-  const raised = $derived(
-    new Set([...outcomes].sort((a, b) => a.preset.usd - b.preset.usd).flatMap((s, i) => (i % 2 === 1 ? [s.id] : []))),
+  let plotWidth = $state(0);
+  /** Each figure label's rendered width, by scenario id. */
+  let labelWidths: Record<string, number> = $state({});
+  /** A figure label goes up a row only when it would overlap a neighbour on its own row. */
+  const rows = $derived(
+    labelRows(outcomes.map((s) => ({ id: s.id, center: scale.position(s.preset.usd) * plotWidth, width: labelWidths[s.id] ?? 0 }))),
   );
+  const topRow = $derived(Math.max(0, ...rows.values()));
   /** The selected scenario with the reader's changes, drawn as its own mark. */
   const yours = $derived(d.scenarioTotals.find((s) => s.custom));
   const scale = $derived(linearScale(d.scenarioTotals.flatMap((s) => [s.preset.usd, s.cost.usd])));
@@ -80,7 +82,7 @@
   {/if}
 
   <div class="chart" role="img" aria-label={chartLabel}>
-    <div class="plot">
+    <div class="plot" bind:clientWidth={plotWidth} style:--rows={topRow + 1}>
       {#each scale.ticks as t (t)}
         <span class="grid" style:left={pct(t)}></span>
       {/each}
@@ -93,7 +95,8 @@
         <span
           class="figure"
           class:current={s.current}
-          class:raised={raised.has(s.id)}
+          bind:offsetWidth={labelWidths[s.id]}
+          style:--row={rows.get(s.id) ?? 0}
           style:left={pct(s.preset.usd)}>{usd(s.preset.usd)}</span
         >
       {/each}
@@ -157,9 +160,10 @@
     margin-bottom: var(--space-5);
   }
 
+  /* Room for every row of figure labels the placement needs, two at least. */
   .plot {
     position: relative;
-    height: 4.75rem;
+    height: calc(3.5rem + max(var(--rows), 2) * 1.25rem - 1.25rem);
   }
 
   .plot::before {
@@ -219,16 +223,12 @@
 
   .figure {
     position: absolute;
-    bottom: 1.6rem;
+    bottom: calc(1.6rem + var(--row) * 1.25rem);
     transform: translateX(-50%);
     font-size: var(--text-sm);
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-  }
-
-  .figure.raised {
-    bottom: 2.85rem;
   }
 
   .figure.current {
@@ -377,7 +377,7 @@
     line-height: 1.45;
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     li {
       grid-template-columns: 1fr auto;
       grid-template-areas:
