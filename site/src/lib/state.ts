@@ -3,11 +3,13 @@
 //   #/<route>?target=rust&model=fable-5-2&scenario=naive&path=rgw/rgw-core&o.difficulty.hard=2
 //
 // <route> is empty for the report, `methods` or `calibration`. `path` is the
-// drill-down, `o.<dotted param path>` an override of an assumption. Parsing
-// never throws: what is unknown or malformed falls back to its default.
+// drill-down, `o.<dotted param path>` an override of an assumption and
+// `o.toggles.<id>=0|1` of a toggle. Parsing never throws: what is unknown or
+// malformed falls back to its default.
 
 import { type Readable, writable } from 'svelte/store';
-import { DEPENDENCIES_COMPONENT_ID, type Report, TARGETS, type Target } from './report';
+import { canonicalOverrides } from './overrides';
+import { DEPENDENCIES_COMPONENT_ID, type Report, TARGETS, type Target, type ToggleId } from './report';
 
 export const ROUTES = ['report', 'methods', 'calibration'] as const;
 export type Route = (typeof ROUTES)[number];
@@ -23,7 +25,10 @@ export interface AppState {
   scenario: string;
   /** [], [componentId] or [componentId, featureId]. */
   path: string[];
-  /** Dotted param path, e.g. `difficulty.hard`, → value. */
+  /**
+   * Dotted param path, e.g. `difficulty.hard`, → value; or `toggles.<id>` →
+   * 0 or 1.
+   */
   overrides: Record<string, number>;
 }
 
@@ -125,27 +130,43 @@ function isQuantityPath(params: unknown, dotted: string): boolean {
   );
 }
 
+const TOGGLE_PREFIX = 'toggles.';
+
+/** The override key for a toggle, e.g. `toggles.clean_break`; its value is 0 (off) or 1 (on). */
+export function toggleKey(id: ToggleId): string {
+  return `${TOGGLE_PREFIX}${id}`;
+}
+
+function isToggleKey(key: string, report: Report): boolean {
+  return key.startsWith(TOGGLE_PREFIX) && Object.hasOwn(report.assumptions.toggles, key.slice(TOGGLE_PREFIX.length));
+}
+
 function validOverrides(raw: Record<string, string>, report: Report): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [key, text] of Object.entries(raw)) {
-    if (!DECIMAL.test(text) || !isQuantityPath(report.assumptions.params, key)) continue;
+    if (!DECIMAL.test(text)) continue;
     const value = Number(text);
-    if (Number.isFinite(value)) out[key] = value;
+    if (isToggleKey(key, report)) {
+      if (value === 0 || value === 1) out[key] = value;
+    } else if (isQuantityPath(report.assumptions.params, key) && Number.isFinite(value)) {
+      out[key] = value;
+    }
   }
   return out;
 }
 
 export function validateState(raw: RawState, report: Report): AppState {
   const d = defaultState(report);
-  const { model, scenario } = raw;
+  const { model } = raw;
+  const scenario =
+    raw.scenario !== undefined && Object.hasOwn(report.assumptions.scenarios, raw.scenario) ? raw.scenario : d.scenario;
   return {
     route: raw.route === '' || !isRoute(raw.route) ? 'report' : raw.route,
     target: isTarget(raw.target) ? raw.target : d.target,
     model: model !== undefined && report.models.some((m) => m.id === model) ? model : d.model,
-    scenario:
-      scenario !== undefined && Object.hasOwn(report.assumptions.scenarios, scenario) ? scenario : d.scenario,
+    scenario,
     path: validPath(raw.path, report),
-    overrides: validOverrides(raw.overrides, report),
+    overrides: canonicalOverrides(report, scenario, validOverrides(raw.overrides, report)),
   };
 }
 

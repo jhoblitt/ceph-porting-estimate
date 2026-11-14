@@ -60,7 +60,7 @@ function feat(id: string, kind: Kind, difficulty: Difficulty, scope: Scope, byte
 }
 
 function comp(id: string, features: Feature[]): Component {
-  return { id, name: id, description: '', root: [], features };
+  return { id, name: id, description: '', group: 'g', root: [], features };
 }
 
 function depTarget(strategy: Strategy, sloc_equivalent: number, difficulty: Difficulty): DependencyTarget {
@@ -72,7 +72,8 @@ function dep(id: string, go: DependencyTarget, rust: DependencyTarget, wasm: Dep
 }
 
 function report(components: Component[], dependencies: Dependency[] = [], models: Model[] = STAGED_MODELS): Report {
-  return { ceph: fixture.ceph, components, dependencies, models, assumptions: STAGED_ASSUMPTIONS, calibration: {} };
+  const groups = [{ id: 'g', name: 'G', description: '' }];
+  return { ceph: fixture.ceph, groups, components, dependencies, models, assumptions: STAGED_ASSUMPTIONS, calibration: {} };
 }
 
 function searchFeature(g: GroupEstimate, id: string): FeatureEstimate | undefined {

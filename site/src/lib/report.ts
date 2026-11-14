@@ -48,10 +48,19 @@ export interface Feature {
   langs: Record<string, LineCounts>;
 }
 
+/** A top-level area of Ceph (RADOS core, RGW, CephFS, …) that components belong to. */
+export interface Group {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface Component {
   id: string;
   name: string;
   description: string;
+  /** The id of the group the component belongs to. */
+  group: string;
   root: string[];
   features: Feature[];
 }
@@ -148,6 +157,8 @@ export interface Assumptions {
 
 export interface Report {
   ceph: Ceph;
+  /** In display order; rollup may end it with a synthetic `unclassified` group. */
+  groups: Group[];
   components: Component[];
   dependencies: Dependency[];
   models: Model[];
@@ -192,13 +203,17 @@ export function parseReport(raw: unknown): Report {
     throw new Error(`report.json: ${what}`);
   };
   if (!isObject(raw)) return fail('not an object');
-  const { ceph, components, dependencies, models, assumptions } = raw;
+  const { ceph, groups, components, dependencies, models, assumptions } = raw;
   if (!isObject(ceph) || typeof ceph['rev'] !== 'string' || typeof ceph['repo'] !== 'string') {
     fail('ceph.repo and ceph.rev must be strings');
   }
+  if (!hasIds(groups)) fail('groups must be a list of objects with ids');
+  const groupIds = new Set((groups as { id: string }[]).map((g) => g.id));
   if (!hasIds(components)) fail('components must be a list of objects with ids');
   for (const c of components as Record<string, unknown>[]) {
     if (!hasIds(c['features'])) fail(`component ${String(c['id'])}: features must have ids`);
+    const group = c['group'];
+    if (typeof group !== 'string' || !groupIds.has(group)) fail(`component ${String(c['id'])}: group must name a group`);
   }
   if (!hasIds(dependencies)) fail('dependencies must be a list of objects with ids');
   if (!hasIds(models) || (models as unknown[]).length === 0) fail('models must be a non-empty list');

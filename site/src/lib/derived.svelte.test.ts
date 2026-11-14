@@ -1,0 +1,248 @@
+// @vitest-environment jsdom
+// jsdom makes vitest compile runes for the client, where $derived memoises.
+import { describe, expect, it } from 'vitest';
+import fixture from './__fixtures__/report.json';
+import { Derived } from './derived.svelte';
+import { describeParams, estimate, matrix, resolveParams } from './model';
+import { parseReport } from './report';
+import { type AppState, defaultState } from './state';
+
+const report = parseReport(fixture);
+
+/** A Derived over a reactive selection the test can change. */
+function setup(patch: Partial<AppState> = {}) {
+  let selection = $state<AppState>({ ...defaultState(report), ...patch });
+  const d = new Derived(report, () => selection);
+  return {
+    d,
+    set(next: Partial<AppState>) {
+      selection = { ...selection, ...next };
+    },
+  };
+}
+
+/** Reads every output, so the next change can be compared against these exact objects. */
+function snapshot(d: Derived) {
+  return {
+    params: d.params,
+    root: d.root,
+    matrix: d.matrix,
+    paramInfo: d.paramInfo,
+    scenarioTotals: d.scenarioTotals,
+    toggles: d.toggles,
+  };
+}
+
+describe('Derived', () => {
+  it('turns the selection into the model outputs', () => {
+    const { d } = setup({ target: 'rust', model: 'fable-5-2', scenario: 'pessimistic', overrides: { overhead: 3 } });
+    const params = resolveParams(report, 'pessimistic', { overhead: 3 });
+    expect(d.params).toEqual(params);
+    expect(d.root).toEqual(estimate(report, 'rust', 'fable-5-2', params));
+    expect(d.matrix).toEqual(matrix(report, params));
+    expect(d.paramInfo).toEqual(describeParams(report, 'pessimistic'));
+    expect(d.model.id).toBe('fable-5-2');
+    expect(d.scenario.label).toBe('Pessimistic');
+  });
+
+  it('on a new target, recomputes the estimate and the scenario totals only', () => {
+    const { d, set } = setup();
+    const before = snapshot(d);
+    set({ target: 'wasm' });
+    expect(d.params).toBe(before.params);
+    expect(d.matrix).toBe(before.matrix);
+    expect(d.paramInfo).toBe(before.paramInfo);
+    expect(d.toggles).toBe(before.toggles);
+    expect(d.root).not.toBe(before.root);
+    expect(d.root.headline.usd).toBeGreaterThan(before.root.headline.usd);
+    expect(d.scenarioTotals).not.toBe(before.scenarioTotals);
+  });
+
+  it('on a new model, recomputes the estimate and the scenario totals only', () => {
+    const { d, set } = setup();
+    const before = snapshot(d);
+    set({ model: 'gpt-6-astra' });
+    expect(d.params).toBe(before.params);
+    expect(d.matrix).toBe(before.matrix);
+    expect(d.paramInfo).toBe(before.paramInfo);
+    expect(d.root).not.toBe(before.root);
+    expect(d.root.headline.usd).toBeCloseTo(d.matrix.go['gpt-6-astra']!.usd, 6);
+    expect(d.scenarioTotals).not.toBe(before.scenarioTotals);
+  });
+
+  it('on a new scenario, recomputes everything that depends on params', () => {
+    const { d, set } = setup();
+    const before = snapshot(d);
+    set({ scenario: 'naive' });
+    expect(d.params).not.toBe(before.params);
+    expect(d.paramInfo).not.toBe(before.paramInfo);
+    expect(d.root.headline.usd).toBeLessThan(before.root.headline.usd);
+    expect(d.matrix).not.toBe(before.matrix);
+    expect(d.scenarioTotals.find((s) => s.current)?.id).toBe('naive');
+  });
+
+  it('on an override, recomputes params and costs but not the scenario description', () => {
+    const { d, set } = setup();
+    const before = snapshot(d);
+    set({ overrides: { overhead: 20 } });
+    expect(d.paramInfo).toBe(before.paramInfo);
+    expect(d.params).not.toBe(before.params);
+    expect(d.params.overhead).toBe(20);
+    expect(d.root.headline.usd).toBeGreaterThan(before.root.headline.usd);
+    expect(d.matrix.go['opus-5-5']!.usd).toBeCloseTo(d.root.headline.usd, 6);
+  });
+
+  it('ignores a new overrides object with the same contents', () => {
+    const { d, set } = setup({ overrides: { overhead: 20, expansion: 2 } });
+    const before = snapshot(d);
+    set({ overrides: { expansion: 2, overhead: 20 } });
+    expect(d.params).toBe(before.params);
+    expect(d.root).toBe(before.root);
+    expect(d.matrix).toBe(before.matrix);
+  });
+
+  it('scenarioTotals applies the overrides to the current scenario only', () => {
+    const { d, set } = setup();
+    const presets = d.scenarioTotals.map((s) => s.preset.usd);
+    set({ overrides: { overhead: 20 } });
+    const totals = d.scenarioTotals;
+    expect(totals.map((s) => s.id)).toEqual(Object.keys(report.assumptions.scenarios));
+    expect(totals.map((s) => s.preset.usd)).toEqual(presets);
+    for (const s of totals) {
+      if (s.id === 'calibrated') {
+        expect(s.current).toBe(true);
+        expect(s.custom).toBe(true);
+        expect(s.cost.usd).toBeCloseTo(d.root.headline.usd, 6);
+        expect(s.cost.usd).toBeGreaterThan(s.preset.usd);
+      } else {
+        expect(s.current).toBe(false);
+        expect(s.custom).toBe(false);
+        expect(s.cost).toBe(s.preset);
+      }
+    }
+  });
+
+  it('scenarioTotals marks nothing custom without overrides', () => {
+    const { d } = setup();
+    for (const s of d.scenarioTotals) {
+      expect(s.custom).toBe(false);
+      expect(s.cost).toBe(s.preset);
+    }
+    expect(d.customised).toBe(false);
+  });
+
+  it('reports each toggle with its scenario value and the value in effect', () => {
+    const { d, set } = setup({ scenario: 'pessimistic' });
+    expect(d.toggles).toEqual([
+      { id: 'include_adjacent', key: 'toggles.include_adjacent', scenario: true, value: true },
+      { id: 'clean_break', key: 'toggles.clean_break', scenario: false, value: false },
+    ]);
+    set({ overrides: { 'toggles.include_adjacent': 0, 'toggles.clean_break': 1 } });
+    expect(d.toggles.map((t) => [t.id, t.value])).toEqual([
+      ['include_adjacent', false],
+      ['clean_break', true],
+    ]);
+    expect(d.params.toggles).toEqual({ includeAdjacent: false, cleanBreak: true });
+    expect(d.customised).toBe(true);
+  });
+
+  it('summarises the scope from the estimate', () => {
+    const { d } = setup();
+    const { scope } = d;
+    expect(scope.ceph.headline.code).toBe(186_204 + 1_210 + 41_388 + 52_310 + 4_022 + 148_920 + 97_644 + 98_204 + 30_112 + 61_022);
+    expect(scope.ceph.notPorted.code).toBe(188);
+    expect(scope.dependencies?.headline.sloc.code).toBe(6_000);
+    expect(scope.dependenciesWithWork).toBe(1);
+    expect(scope.shown.map((c) => c.name)).toEqual(['Integration suites']);
+    expect(scope.notPortedByGroup).toEqual([{ id: 'rados', name: 'RADOS core', code: 188 }]);
+  });
+
+  it('gives each param its value in effect', () => {
+    const { d, set } = setup({ scenario: 'pessimistic' });
+    expect(d.values.get('difficulty.hard')).toBe(2);
+    expect(d.values.get('overhead')).toBeCloseTo(4.1 * 1.25, 12);
+    set({ overrides: { 'difficulty.hard': 2.5 } });
+    expect(d.values.get('difficulty.hard')).toBe(2.5);
+    expect(d.values.size).toBe(d.paramInfo.length);
+  });
+
+  it('says whether every model is priced on the same token volumes', () => {
+    const { d, set } = setup();
+    expect(d.sameVolumes).toBe(true);
+    set({ overrides: { 'model_efficiency.gpt-6-astra': 1.3 } });
+    expect(d.sameVolumes).toBe(false);
+  });
+
+  it('lists the long-context billing of models that have long-context prices', () => {
+    const { d } = setup();
+    expect(d.longContext).toEqual([
+      {
+        model: report.models[2],
+        threshold: 272_000,
+        shares: { uncached: 0.3, cacheWrite: 0.3, cacheRead: 0.4, output: 0.3 },
+      },
+    ]);
+  });
+
+  it('draws the per-model dollar bars on one scale, so their lengths are in proportion to the totals', () => {
+    const { d, set } = setup();
+    set({ target: 'rust' });
+    const bars = d.dollarBars;
+    const totals = bars.map((b) => b.cost.usd);
+    const max = Math.max(...totals);
+    expect(d.maxModelUsd).toBe(max);
+    for (const b of bars) {
+      expect(b.length).toBeCloseTo(b.cost.usd / max, 12);
+      const segmentSum = b.segments.uncached + b.segments.cacheWrite + b.segments.cacheRead + b.segments.output;
+      expect(segmentSum).toBeCloseTo(b.length, 12);
+      expect(b.segments.cacheRead).toBeCloseTo(b.cost.usdByCategory.cacheRead / max, 12);
+      // Within the bar, each segment's share of the bar is its share of the model's dollars.
+      expect(b.shares.cacheRead * b.length).toBeCloseTo(b.segments.cacheRead, 12);
+    }
+    expect(Math.max(...bars.map((b) => b.length))).toBe(1);
+    // Two bars' lengths stand in the ratio of their totals.
+    expect(bars[0]!.length / bars[2]!.length).toBeCloseTo(totals[0]! / totals[2]!, 12);
+    // The axis ticks sit on the same scale.
+    for (const t of d.dollarAxis) expect(t.at).toBeCloseTo(t.value / max, 12);
+    expect(d.dollarAxis[0]).toEqual({ value: 0, at: 0 });
+    expect(d.dollarAxis.at(-1)!.at).toBeLessThanOrEqual(1);
+  });
+
+  it('gives empty bars rather than NaN when every model costs nothing', () => {
+    const { d } = setup({ scenario: 'naive', overrides: { expansion: 0, source_read_passes: 0 } });
+    expect(d.maxModelUsd).toBe(0);
+    for (const b of d.dollarBars) {
+      expect(b.length).toBe(0);
+      expect(Object.values(b.segments)).toEqual([0, 0, 0, 0]);
+    }
+  });
+
+  it('gives the token and dollar splits of the headline', () => {
+    const { d } = setup();
+    const t = d.root.headline.tokens;
+    expect(d.tokenTotal).toBeCloseTo(t.uncached + t.cacheWrite + t.cacheRead + t.output, 3);
+    expect(d.tokenShares.cacheRead).toBeCloseTo(t.cacheRead / d.tokenTotal, 12);
+    const u = d.root.headline.usdByCategory;
+    expect(d.dollarShares.output).toBeCloseTo(u.output / d.root.headline.usd, 12);
+  });
+
+  it('counts the changed assumptions once', () => {
+    const { d, set } = setup();
+    expect(d.changedCount).toBe(0);
+    set({ overrides: { overhead: 2, 'toggles.clean_break': 1 } });
+    expect(d.changedCount).toBe(2);
+  });
+
+  it('reads a matrix cell, and fails loudly on one the matrix lacks', () => {
+    const { d } = setup();
+    expect(d.matrixCell('wasm', 'gpt-6-astra')).toBe(d.matrix.wasm['gpt-6-astra']);
+    expect(() => d.matrixCell('go', 'gpt-2')).toThrow(/gpt-2/);
+  });
+
+  it('lists every model at the current target', () => {
+    const { d, set } = setup();
+    set({ target: 'rust' });
+    expect(d.byModel.map((m) => m.model.id)).toEqual(['fable-5-2', 'opus-5-5', 'gpt-6-astra']);
+    for (const m of d.byModel) expect(m.cost).toBe(d.matrix.rust[m.model.id]);
+  });
+});
