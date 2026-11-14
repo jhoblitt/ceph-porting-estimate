@@ -28,7 +28,10 @@ modelling choice:
 The only quantity that needs an assumption about rgw-go's coverage is the
 expansion `E`: product Go tokens ÷ the source tokens they replaced. `E`,
 `T` and `H` multiply to one calibrated number, output tokens per source
-token ported, so every figure is inversely proportional to coverage.
+token ported, so every estimate scaled from rgw-go to Ceph is inversely
+proportional to the coverage it is computed at. rgw-go's own measured cost
+is not, and in the naive scenario the written translation is but the single
+read of the source (`p`) is not.
 
 The calibration is computed in bytes with the same bytes-per-token values
 the model applies to Ceph. The Go value cancels entirely (`E ∝ 1 ÷ go`,
@@ -167,8 +170,10 @@ The phase-derived scales are checked: `calibration.yaml`
 long prompts would be configured to stay under the threshold; rgw-go's
 shares (0.550, 0.748, 0.797, 0.699 of uncached, cache-write, cache-read and
 output tokens in calls above 272K) were measured on a harness with a
-one-million-token window and no surcharge, and are the pessimistic preset's
-upper case. Either way the token volumes are held fixed, which a different
+one-million-token window and no surcharge, and are what a preset applies
+when it takes prompts to be as long as rgw-go's;
+`measurement_detail.prompt_size_tokens.long_context_scenarios` names those
+presets. Either way the token volumes are held fixed, which a different
 prompt size would not do. Only models with long-context prices (GPT-6
 Astra) are affected.
 
@@ -237,12 +242,14 @@ models:
 
 `calibration.yaml` is free-form for display: the measurement table, the
 sizes measured from git, and each derived ratio with its arithmetic in a
-comment. The rule is that every number in `assumptions.yaml` that is a copy
-or a function of `calibration.yaml`, and every derived figure
-`calibration.yaml` records, is recomputed by `cephest check`, which fails,
-naming the key and both values, when they differ by more than 0.1%:
+comment. `cephest check` recomputes every number in `assumptions.yaml` that
+is a copy or a function of `calibration.yaml` or of `generated/sloc.json`,
+and the derived figures `calibration.yaml` records that the table below
+lists, and fails, naming the key and both values, when they differ by more
+than 0.1% (0.5% for the figures recorded so coarsely that their rounding
+exceeds 0.1%, marked †):
 
-| Checked | Recomputed from `calibration.yaml` |
+| Checked | Recomputed from |
 |---|---|
 | `params.expansion` | `sizes.rgw_go.product_go.bytes ÷ bpt[go]` ÷ (`sizes.source.by_language` in tokens × `coverage.value`) |
 | `params.test_ratio` | (`test_go` + `tooling_go`) ÷ `product_go`, in tokens |
@@ -251,17 +258,43 @@ naming the key and both values, when they differ by more than 0.1%:
 | `params.long_cache_write_share` | `measurement_detail.cache_write_ttl_tokens` `long_1h ÷ total` |
 | `params.adjacent_uplift.*` | Σ `measurement.adjacent` category (null as 0) ÷ port category |
 | `params.difficulty.*` | `ported_mix.relative_difficulty` ÷ `ported_mix.mean_relative_difficulty`; the mean against its shares; `Σ share × D = 1` and the shares' sum (0.5%) |
+| `params.sloc_equivalent_bytes_per_line` | `generated/sloc.json`: bytes ÷ code lines of C++ in headline features of kind `product` |
 | scale `overhead`, `cache_read_per_output`, `cache_write_per_output` of each preset in `phases.scenario_phase` | that phase's ratio over all phases' in `phases.rows` (rows in phase order, each row's Go bytes at its end) |
 | `overrides.expansion` of each preset in `coverage.scenario_end` | the expansion at that coverage end (`low`, `value` or `high`) |
 | `overrides.long_context_share.*` of each preset in `measurement_detail.prompt_size_tokens.long_context_scenarios` | `share_over_threshold`, all four |
-| `calibration.yaml` `derived.*`, `phases.derived.*`, `sizes.source.tokens`, `measurement_detail.cache_write_ttl_tokens.long_share` | the same arithmetic from their sources |
+| `calibration.yaml` `derived.*` other than the dollars below, `sizes.source.tokens`, `measurement_detail.cache_write_ttl_tokens.long_share` | the same arithmetic as the parameters, from their sources |
+| `phases.derived.*` | each row of `phases.rows`, and all of them; one block per row, plus `all_phases` |
+| `derived.sanity_opus_5_5_usd.{measured_ttl_split,all_5m,all_1h}` and `.per_product_go_line.*` | `measurement.port` at the list prices `models.yaml` gives the model `measurement.model_id` names, with cache writes at the measured TTL split, all short or all long; per line ÷ `sizes.rgw_go.product_go.lines` |
+| `derived.sanity_opus_5_5_usd.review_share.value` † | the `measurement.roles` row its `role_scope` names, over the port row, both at those prices |
+| `measurement.review_passes_per_task` † | `review_passes ÷ tasks` |
+| `sizes.rgw_go.product_go_comments.share_of_product_go_bytes` † | `product_go_comments.bytes ÷ product_go.bytes` |
+| `sizes.source.total.bytes`; `sizes.source.<group>.bytes` for each group of `by_language` | Σ `sizes.source.by_language`; Σ that group's languages |
+| `sizes.source.total.lines` | Σ `sizes.source.<group>.lines` over the groups of `by_language` |
+| `measurement_detail.cache_write_ttl_tokens.total` | `short_5m + long_1h` |
+| `measurement_detail.cache_write_by_call.low_cache_read_calls.share_of_calls` † | its `calls ÷ measurement_detail.calls` |
 | `ported_mix.share_by_difficulty`, `coverage.byte_classification.ported_bytes` | bytes by class in `ported_mix.features` ÷ all; their sum |
 | `coverage.byte_classification.ported_share_bytes`, `coverage.value` | ported bytes ÷ `sizes.source.by_language` bytes; `coverage.value` is that share |
 
+Every other number in `calibration.yaml` is a count or a report taken as
+given: the measurement table (the port row, its role breakdown and the
+adjacent rows, which the session reported separately and which agree within
+rounding; `check` does not sum the roles), its detail and notes as the
+session reported them, the sizes counted from git (bytes, lines and files,
+including each source group's lines and `product_go_comments.bytes`), the
+phase rows, the judgements (`coverage.low` and `high`,
+`ported_mix.features` and `relative_difficulty`), the review's citation
+counts (`coverage.cited_files`), and the session's own estimates. Two of
+them are shares whose numerators are not in the data, so `check` cannot
+redo them: `coverage.byte_classification.ported_share_lines` (the ported
+line count is not recorded) and `sizes.source.cpp_bytes_per_line.value`
+(the C++ line count is not recorded). No recorded figure is a function of
+other recorded figures that `check` does not redo.
+
 A preset that scales a harness parameter, overrides `expansion` or overrides
 a long-context share must be named in the matching mapping, so deleting a
-mapping entry fails the check rather than switching it off. A divisor that
-is zero or negative — a phase that added no Go, a coverage of 0 — is an
-error naming the operand, and so is a `scale` on a parameter whose baseline
-is 0 (it would stay 0; use `overrides`). `measurement.model_id` must name a
-model in `models.yaml`. A missing key is an error naming the key.
+mapping entry fails the check rather than switching it off; `expansion` and
+the long-context shares may be set only through `overrides`, never `scale`.
+A divisor that is zero or negative — a phase that added no Go, a coverage of
+0 — is an error naming the operand, and so is a `scale` on a parameter
+whose baseline is 0 (it would stay 0; use `overrides`). `measurement.model_id`
+must name a model in `models.yaml`. A missing key is an error naming the key.

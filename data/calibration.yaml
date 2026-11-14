@@ -17,6 +17,11 @@ measurement:
     2026-09-25 to 2026-11-13; 98% of the port's calls ran on Claude Opus 5.5
   supplied_on: "2026-11-13"
   model_id: opus-5-5                 # models.yaml id of the model the port ran on
+  model_calls_share:                 # share of the port's calls that ran on the model model_id names
+    value: 0.98
+    source: >-
+      rgw-go session, aggregated by script from its Claude Code transcripts,
+      2026-09-25 to 2026-11-13 (as measurement.source), supplied 2026-11-13
   unit: millions of tokens
   # Columns: calls, uncached input, cache write, cache read, output.
   # null = "—" in the supplied table; approx: true = values given with "~".
@@ -182,8 +187,11 @@ coverage:
     product code cites at all are a ceiling that includes files it barely
     touches (cited_files). The low end, 0.30, is about what crediting each file
     only for the share of its lines rgw-go's citations cover gives (0.27–0.34
-    by threshold, adversarial review of 2026-11-14). Every figure in the report
-    is inversely proportional to this value.
+    by threshold, adversarial review of 2026-11-14). Every estimate scaled from
+    rgw-go to Ceph is inversely proportional to the coverage it is computed at,
+    this value or the end of the range a scenario takes; rgw-go's own measured
+    cost is not, and in the reference scenario the written translation is but
+    the single read of the source is not.
   # The coverage end each scenario's expansion override is taken at (low,
   # value or high); cephest check verifies the overrides, and fails on an
   # expansion override in a scenario not mapped here.
@@ -337,9 +345,11 @@ phases:
     #          cache write 18.424 / 25.270 = 0.7291
     # phase 2: overhead 12.9996 / 10.8589 = 1.1971; cache read 1,443.49 / 1,249.20 = 1.1555;
     #          cache write 32.070 / 25.270 = 1.2691
+  # The note's provenance is phases.source above.
   note: >-
-    The session's: the ratios are rising; phase 2 is more review-heavy and
-    carries larger contexts, and is unfinished (about 81% done at the cut).
+    The rgw-go session reports that its ratios rise from phase to phase, that
+    phase 2 was more review-heavy and carried larger contexts than phase 1, and
+    that phase 2 was about 81% done at the cut.
   # Scenarios whose overhead, cache_read_per_output and cache_write_per_output
   # scales are a phase's ratio over all phases'; cephest check verifies them.
   # Optimistic takes phase 1, the cheaper of the two implementation phases
@@ -385,6 +395,7 @@ derived:
       all_1h: 0.1708
     review_share:                    # review agents' share of the port row's dollars
       value: 0.130                   # 2,357.15 / 18,078.68 = 0.1304
+      role_scope: "review (475 agents)"   # the measurement.roles row it prices; cephest check recomputes value from it
       method: >-
         measurement.roles "review (475 agents)" at the same prices and TTL split:
         0.08 × $4 + 171.4 × $5.2184 + 6,733.0 × $0.20 + 5.79 × $20 = $2,357.15,

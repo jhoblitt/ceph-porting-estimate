@@ -24,16 +24,18 @@ dependencies:
         package: github.com/linxGnu/grocksdb
         sloc_equivalent: 2500
         difficulty: hard
-        note: grocksdb is a maintained cgo binding; ~2.5k lines of glue to expose a custom Env/FileSystem
-          over BlueFS, merge operators and column-family sharding. cockroachdb/pebble is native but not
-          RocksDB-format compatible with existing OSDs.
+        note: grocksdb is a maintained cgo binding to the RocksDB library, which Ceph vendors as src/rocksdb
+          and uses through src/kv/RocksDBStore.cc and BlueStore's BlueRocksEnv; ~2.5k lines of glue to
+          expose a custom Env/FileSystem over BlueFS, merge operators and column-family sharding.
+          cockroachdb/pebble is native but not RocksDB-format compatible with existing OSDs.
       rust:
         strategy: bindings
         package: rocksdb (rust-rocksdb)
         sloc_equivalent: 2500
         difficulty: hard
-        note: Maintained binding, but a custom Env/FileSystem for BlueFS is not exposed by the crate;
-          ~2.5k lines of FFI glue to add it.
+        note: Maintained binding (the rocksdb crate, rust-rocksdb) to the RocksDB library, which Ceph
+          vendors as src/rocksdb and uses through src/kv/RocksDBStore.cc and BlueStore's BlueRocksEnv, but a
+          custom Env/FileSystem for BlueFS is not exposed by the crate; ~2.5k lines of FFI glue to add it.
       wasm:
         strategy: native
         package: fjall
@@ -79,15 +81,17 @@ dependencies:
         package: null
         sloc_equivalent: 1000
         difficulty: hard
-        note: No maintained Go SPDK binding known; cgo glue for the ~1k-line NVMEDevice surface (probe,
-          qpairs, submit/complete).
+        note: No maintained Go SPDK binding known; cgo glue over SPDK's NVMe driver (spdk/nvme.h, whose
+          spdk_nvme_* functions BlueStore's NVMEDevice calls in src/blk/spdk/NVMEDevice.cc; vendored as
+          src/spdk) for the ~1k-line NVMEDevice surface (probe, qpairs, submit/complete).
       rust:
         strategy: bindings
         package: null
         sloc_equivalent: 1000
         difficulty: hard
         note: No established crate, only young SPDK FFI crates first released in 2026 (ironspdk, spdk-io);
-          ~1k lines of FFI glue over spdk_nvme.
+          ~1k lines of FFI glue over SPDK's NVMe driver (spdk/nvme.h, whose spdk_nvme_* functions
+          BlueStore's NVMEDevice calls in src/blk/spdk/NVMEDevice.cc; vendored as src/spdk).
       wasm:
         strategy: drop
         package: null
@@ -261,14 +265,27 @@ dependencies:
         package: null
         sloc_equivalent: 600
         difficulty: standard
-        note: No maintained Go binding known; ~600 lines of cgo over the QATzip/qatlib session API mirroring
-          QatAccel.
+        note: No maintained Go binding known; ~600 lines of cgo over QATzip (qatzip.h, whose qzInit,
+          qzSetupSessionDeflate, qzCompress and qzDecompress Ceph's QatAccel calls for the zlib compressor
+          plugin; the lz4 plugin links QatAccel, but its init accepts only zlib) and the qatlib it runs on
+          (src/qatzip, src/qatlib), mirroring QatAccel. Whether these lines also cover the QAT crypto plugin
+          (src/crypto/qat, over qatlib's cpaCySymDp* API) is unverified. UADK is not bound. Ceph fetches it
+          at build time from ceph/uadk, on aarch64 only (cmake/modules/Builduadk.cmake), and uses it only in
+          the zlib compressor plugin's UadkAccel (libwd_comp); on those hosts the port compresses zlib in
+          software, as Ceph does when uadk_compressor_enabled is off, its default.
       rust:
         strategy: bindings
         package: null
         sloc_equivalent: 600
         difficulty: standard
-        note: No QAT or QATzip crate on crates.io; ~600 lines of FFI.
+        note: No QAT or QATzip crate on crates.io; ~600 lines of FFI to QATzip (qatzip.h, whose qzInit,
+          qzSetupSessionDeflate, qzCompress and qzDecompress Ceph's QatAccel calls for the zlib compressor
+          plugin; the lz4 plugin links QatAccel, but its init accepts only zlib) and the qatlib it runs on
+          (src/qatzip, src/qatlib), mirroring QatAccel. Whether these lines also cover the QAT crypto plugin
+          (src/crypto/qat, over qatlib's cpaCySymDp* API) is unverified. UADK is not bound. Ceph fetches it
+          at build time from ceph/uadk, on aarch64 only (cmake/modules/Builduadk.cmake), and uses it only in
+          the zlib compressor plugin's UadkAccel (libwd_comp); on those hosts the port compresses zlib in
+          software, as Ceph does when uadk_compressor_enabled is off, its default.
       wasm:
         strategy: drop
         package: null
@@ -516,7 +533,9 @@ dependencies:
         package: rdkafka
         sloc_equivalent: 0
         difficulty: glue
-        note: Maintained binding.
+        note: Maintained binding to librdkafka, the C client RGW's Kafka push endpoint calls through
+          librdkafka/rdkafka.h (src/rgw/rgw_kafka.cc) and Ceph vendors as src/librdkafka. Whether the crate
+          builds its own copy or links Ceph's is unverified.
       wasm:
         strategy: port
         package: rskafka
@@ -1072,7 +1091,11 @@ dependencies:
         package: mlua
         sloc_equivalent: 0
         difficulty: glue
-        note: Maintained binding that can vendor Lua 5.3/5.4.
+        note: Maintained binding that can vendor Lua 5.3/5.4. LuaRocks is not linked. RGW runs the luarocks
+          command as a child process to install the allowlisted packages into rgw_luarocks_location and
+          points Lua's package.path and package.cpath at that tree (src/rgw/rgw_lua.cc,
+          src/rgw/rgw_lua_utils.cc); the port does the same. Whether rocks with C modules load into an
+          mlua-vendored Lua is unverified.
       wasm:
         strategy: bindings
         package: mlua

@@ -663,13 +663,33 @@
           "cache_read": 80,
           "output": 0.1
         }
-      ]
+      ],
+      "roles": [
+        {
+          "scope": "review",
+          "uncached": 0.01,
+          "cache_write": 10,
+          "cache_read": 500,
+          "output": 0.5
+        }
+      ],
+      "tasks": 10,
+      "review_passes": 17,
+      "review_passes_per_task": 1.7
     },
     "measurement_detail": {
+      "calls": 1000,
       "cache_write_ttl_tokens": {
         "total": 1000,
+        "short_5m": 500,
         "long_1h": 500,
         "long_share": 0.5
+      },
+      "cache_write_by_call": {
+        "low_cache_read_calls": {
+          "calls": 10,
+          "share_of_calls": 0.01
+        }
       },
       "prompt_size_tokens": {
         "share_over_threshold": {
@@ -686,7 +706,12 @@
     "sizes": {
       "rgw_go": {
         "product_go": {
-          "bytes": 1400000
+          "bytes": 1400000,
+          "lines": 40000
+        },
+        "product_go_comments": {
+          "bytes": 700000,
+          "share_of_product_go_bytes": 0.5
         },
         "test_go": {
           "bytes": 1050000
@@ -696,6 +721,14 @@
         }
       },
       "source": {
+        "src_rgw": {
+          "bytes": 1315000,
+          "lines": 30000
+        },
+        "src_cls": {
+          "bytes": 38000,
+          "lines": 1000
+        },
         "by_language": {
           "src_rgw": {
             "cpp": 1280000,
@@ -704,6 +737,10 @@
           "src_cls": {
             "python": 38000
           }
+        },
+        "total": {
+          "bytes": 1353000,
+          "lines": 31000
         },
         "tokens": 420000
       }
@@ -817,7 +854,21 @@
         "cache_read": 0.1,
         "output": 0.1
       },
-      "long_cache_write_share": 0.5
+      "long_cache_write_share": 0.5,
+      "sanity_opus_5_5_usd": {
+        "measured_ttl_split": 1314.92,
+        "all_5m": 1200.92,
+        "all_1h": 1428.92,
+        "per_product_go_line": {
+          "measured_ttl_split": 0.032873,
+          "all_5m": 0.030023,
+          "all_1h": 0.035723
+        },
+        "review_share": {
+          "value": 0.133,
+          "role_scope": "review"
+        }
+      }
     }
   }
 }

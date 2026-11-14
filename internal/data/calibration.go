@@ -11,10 +11,14 @@ import (
 // Tolerances, in percent, between a value in the data and the value its
 // source gives. Derived values are written to four or five significant
 // figures, well inside derivedTolerancePct; mixTolerancePct bounds how far
-// the difficulty scale's mean over rgw-go's mix may sit from 1.
+// the difficulty scale's mean over rgw-go's mix may sit from 1;
+// reportedTolerancePct is for the few figures calibration.yaml records to
+// three significant figures, whose rounding alone can exceed
+// derivedTolerancePct.
 const (
-	derivedTolerancePct = 0.1
-	mixTolerancePct     = 0.5
+	derivedTolerancePct  = 0.1
+	mixTolerancePct      = 0.5
+	reportedTolerancePct = 0.5
 )
 
 // calibration reads the keys of calibration.yaml that the assumptions are
@@ -42,6 +46,7 @@ func validateCalibration(p *Problems, s *Set) {
 	c.checkModel(s.Models)
 	sz := c.readSizes(a)
 	c.checkPort(a, sz)
+	c.checkSanity(s.Models)
 	c.checkCoverage(a, sz)
 	c.checkDifficulty(a)
 	c.checkPhases(a)
@@ -152,23 +157,35 @@ func (c *calibration) positive(name string, v float64) float64 {
 // record checks a figure calibration.yaml records against the value its
 // sources give.
 func (c *calibration) record(path string, want float64, how string) {
+	c.recordWithin(path, want, how, derivedTolerancePct)
+}
+
+// recordWithin is record with a tolerance of tolPct percent.
+func (c *calibration) recordWithin(path string, want float64, how string, tolPct float64) {
 	got := c.num(path)
-	if math.IsNaN(got) || math.IsNaN(want) || near(got, want, derivedTolerancePct) {
+	if math.IsNaN(got) || math.IsNaN(want) || near(got, want, tolPct) {
 		return
 	}
 	c.p.Addf("%s: %s is %s, but %s gives %s; they differ by more than %g%%",
-		CalibrationFile, path, show(got), how, show(want), derivedTolerancePct)
+		CalibrationFile, path, show(got), how, show(want), tolPct)
 }
 
 // compare reports an assumptions.yaml value that differs from what
 // calibration.yaml gives by more than derivedTolerancePct. A missing value,
 // or a NaN from an unreadable key, has been reported already.
 func compare(p *Problems, path string, got *float64, want float64, how string) {
+	CompareDerived(p, CalibrationFile, path, got, want, how)
+}
+
+// CompareDerived reports an assumptions.yaml value that differs by more
+// than derivedTolerancePct from want, the value the data file source
+// gives by the arithmetic how.
+func CompareDerived(p *Problems, source, path string, got *float64, want float64, how string) {
 	if got == nil || math.IsNaN(want) || near(*got, want, derivedTolerancePct) {
 		return
 	}
 	p.Addf("%s: %s is %g, but %s gives %s (%s); they differ by more than %g%%",
-		AssumptionsFile, path, *got, CalibrationFile, show(want), how, derivedTolerancePct)
+		AssumptionsFile, path, *got, source, show(want), how, derivedTolerancePct)
 }
 
 // near reports whether got is within tolPct percent of want. NaN is near
