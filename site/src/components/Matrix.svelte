@@ -42,8 +42,11 @@
     if (!measured) return `Token counts priced at ${m.name}'s list prices.`;
     if (m.id === measured.id) {
       const project = d.calibration.projectName;
-      const shared = d.sameVolumes ? '; every row uses these token counts' : '';
-      return `Token use measured with this model${project ? `, on ${project}` : ''}${shared}.`;
+      // The measurement is this model at efficiency 1; any other value scales what was measured.
+      const own = d.params.modelEfficiency[m.id] ?? 1;
+      const scaled = own === 1 ? '' : `, × ${paramValue(own)} (the model efficiency you set)`;
+      const shared = d.sameVolumes ? `; every row uses these ${own === 1 ? '' : 'scaled '}token counts` : '';
+      return `Token use measured with this model${project ? `, on ${project}` : ''}${scaled}${shared}.`;
     }
     const ratio = d.volumeRatios.get(m.id) ?? 1;
     const scaled = ratio === 1 ? '' : ` × ${paramValue(ratio)} (the model efficiency you set)`;
