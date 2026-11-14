@@ -2,8 +2,8 @@
 
 How the report turns Ceph's size into tokens and dollars. `data/assumptions.yaml`
 holds every parameter named here, `data/calibration.yaml` the measurements they
-come from, and `site/src/lib/model.ts` the implementation. This document is the
-specification the two must agree with.
+come from, and `site/src/lib/model/` the implementation (`site/src/lib/model.ts`
+re-exports it). This document is the specification the two must agree with.
 
 ## Why this shape
 
@@ -125,8 +125,11 @@ ported reproduces rgw-go's measured cost:
 `calibration.yaml` `ported_mix` records the mapping (a judgement, not a
 measurement), the shares, the relative scale and the mean. `cephest check`
 fails unless each `D[c]` is its relative value over the mean and
-`Σ share[c] × D[c] = 1` over the mix (within 0.5%). To re-rate a class,
-change its relative value there and divide again.
+`Σ share[c] × D[c] = 1` over the mix (within 0.5%), and unless each feature
+the mix lists is a headline product feature of the taxonomy at the
+taxonomy's own class, so re-rating or renaming one there fails until the
+mix is redone. To re-rate a class, change its relative value there and
+divide again.
 
 ## Scenario presets
 
@@ -236,6 +239,8 @@ models:
   - id: <model id>                                     # e.g. opus-5-5
     name, vendor, source (URL), read_on (YYYY-MM-DD)
     usd_per_mtok: { input, cache_write_short, cache_write_long, cache_read, output }
+    price_sources:                                     # optional: prices read from more than one page
+      - { prices: [<usd_per_mtok key>, ...], source: <URL>, read_on: <YYYY-MM-DD>, note: <optional> }
     cache_write_ttl: { short: "5m", long: "1h" }       # labels shown in the UI
     long_context: null | { threshold_tokens, input, cache_write_short, cache_write_long, cache_read, output }
 ```
@@ -246,8 +251,9 @@ comment. `cephest check` recomputes every number in `assumptions.yaml` that
 is a copy or a function of `calibration.yaml` or of `generated/sloc.json`,
 and the derived figures `calibration.yaml` records that the table below
 lists, and fails, naming the key and both values, when they differ by more
-than 0.1% (0.5% for the figures recorded so coarsely that their rounding
-exceeds 0.1%, marked †):
+than 0.1%; the figures marked † are checked to 0.5%, because they are
+recorded so coarsely that rounding alone puts them more than 0.1% from the
+value they are computed from:
 
 | Checked | Recomputed from |
 |---|---|
@@ -267,27 +273,31 @@ exceeds 0.1%, marked †):
 | `derived.sanity_opus_5_5_usd.{measured_ttl_split,all_5m,all_1h}` and `.per_product_go_line.*` | `measurement.port` at the list prices `models.yaml` gives the model `measurement.model_id` names, with cache writes at the measured TTL split, all short or all long; per line ÷ `sizes.rgw_go.product_go.lines` |
 | `derived.sanity_opus_5_5_usd.review_share.value` † | the `measurement.roles` row its `role_scope` names, over the port row, both at those prices |
 | `measurement.review_passes_per_task` † | `review_passes ÷ tasks` |
-| `sizes.rgw_go.product_go_comments.share_of_product_go_bytes` † | `product_go_comments.bytes ÷ product_go.bytes` |
+| `sizes.rgw_go.product_go_comments.share_of_product_go_bytes` | `product_go_comments.bytes ÷ product_go.bytes` |
 | `sizes.source.total.bytes`; `sizes.source.<group>.bytes` for each group of `by_language` | Σ `sizes.source.by_language`; Σ that group's languages |
 | `sizes.source.total.lines` | Σ `sizes.source.<group>.lines` over the groups of `by_language` |
 | `measurement_detail.cache_write_ttl_tokens.total` | `short_5m + long_1h` |
 | `measurement_detail.cache_write_by_call.low_cache_read_calls.share_of_calls` † | its `calls ÷ measurement_detail.calls` |
 | `ported_mix.share_by_difficulty`, `coverage.byte_classification.ported_bytes` | bytes by class in `ported_mix.features` ÷ all; their sum |
+| `ported_mix.features[].feature` and `.difficulty` | the taxonomy: the feature exists, is `headline` and `product`, and has that class |
 | `coverage.byte_classification.ported_share_bytes`, `coverage.value` | ported bytes ÷ `sizes.source.by_language` bytes; `coverage.value` is that share |
 
 Every other number in `calibration.yaml` is a count or a report taken as
-given: the measurement table (the port row, its role breakdown and the
-adjacent rows, which the session reported separately and which agree within
-rounding; `check` does not sum the roles), its detail and notes as the
-session reported them, the sizes counted from git (bytes, lines and files,
-including each source group's lines and `product_go_comments.bytes`), the
-phase rows, the judgements (`coverage.low` and `high`,
-`ported_mix.features` and `relative_difficulty`), the review's citation
-counts (`coverage.cited_files`), and the session's own estimates. Two of
-them are shares whose numerators are not in the data, so `check` cannot
-redo them: `coverage.byte_classification.ported_share_lines` (the ported
-line count is not recorded) and `sizes.source.cpp_bytes_per_line.value`
-(the C++ line count is not recorded). No recorded figure is a function of
+given: the measurement table (the port row; its role breakdown, which the
+session reported separately and which sums to the port row within
+rounding, though `check` does not sum it; and the adjacent rows), its
+detail and notes as the session reported them, the sizes counted from git
+(bytes, lines and files, including each source group's lines and
+`product_go_comments.bytes`), the phase rows, the judgements
+(`coverage.low` and `high`, the bytes `ported_mix.features` assigns to each
+feature, and `relative_difficulty`), the review's citation counts
+(`coverage.cited_files`), and the session's own estimates. Two of these
+look as if `check` could recompute them from the data and cannot, because
+one of their operands is written only in a comment beside them:
+`coverage.byte_classification.ported_share_lines`, the ported share of the
+source's lines, whose ported line count is not a key; and
+`sizes.source.cpp_bytes_per_line.value`, the bytes per line of `src/rgw`'s
+C++, whose line count is not a key. No recorded figure is a function of
 other recorded figures that `check` does not redo.
 
 A preset that scales a harness parameter, overrides `expansion` or overrides
@@ -298,3 +308,7 @@ A divisor that is zero or negative — a phase that added no Go, a coverage of
 0 — is an error naming the operand, and so is a `scale` on a parameter
 whose baseline is 0 (it would stay 0; use `overrides`). `measurement.model_id`
 must name a model in `models.yaml`. A missing key is an error naming the key.
+
+Every parameter, scenario override and scaled value must be at least 0,
+and a share (`λ`, `σ`) at most 1; `check` rejects any other, since the
+browser would clamp it and show a figure the data does not say.
