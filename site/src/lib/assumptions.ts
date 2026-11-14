@@ -39,7 +39,8 @@ const RULES: readonly GroupRule[] = [
   {
     id: 'difficulty',
     title: 'Difficulty',
-    description: 'How much work a line of each difficulty class takes, relative to standard code.',
+    description:
+      'How much work a line of each difficulty class takes, relative to the average line of the code the measured port ported, which counts as 1.',
     matches: prefixed('difficulty'),
   },
   {
@@ -92,10 +93,20 @@ export function groupParams(info: ParamInfo[], modelIds: readonly string[] = [])
 }
 
 export interface SliderRange {
-  min: number;
-  max: number;
-  step: number;
+  /** The values at the two ends of the track. */
+  lo: number;
+  hi: number;
+  /** A multiplier moves on a log track, so halving and doubling are the same distance; a share on a linear one. */
+  scale: 'linear' | 'log';
+  /** Where the baseline sits along the track, 0 to 1. */
+  baselineAt: number;
 }
+
+/** Positions along every track, 0 to SLIDER_STEPS: the range input's min, max and step 1. */
+export const SLIDER_STEPS = 1000;
+
+/** How far either side of its baseline a multiplier's track runs. */
+const LOG_SPAN = 4;
 
 /** The fraction of output a clean break keeps; a share for the slider though the model does not cap it. */
 const FRACTIONS = new Set(['clean_break_discount']);
@@ -109,14 +120,60 @@ function niceCeil(x: number): number {
 }
 
 /**
- * The slider's range: 0 to 1 for a share, else 0 to a few times the larger
- * of the baseline and scenario values, widened to reach `current`.
+ * The slider's track. A share runs 0 to 1. A multiplier runs from a quarter
+ * of its baseline to four times it on a log track, widened to reach the
+ * scenario's value and `current` where they fall outside. A param with no
+ * positive baseline cannot sit on a log track, so it runs linearly from 0
+ * to a few times its scenario value.
  */
 export function sliderRange(info: ParamInfo, current: number): SliderRange {
-  if (isShare(info.path) || FRACTIONS.has(info.path)) return { min: 0, max: 1, step: 0.001 };
+  if (isShare(info.path) || FRACTIONS.has(info.path)) {
+    return { lo: 0, hi: 1, scale: 'linear', baselineAt: Math.min(1, Math.max(0, info.baseline)) };
+  }
+  if (info.baseline > 0) {
+    const inside = [info.scenario, current].filter((v) => Number.isFinite(v) && v > 0);
+    const lo = Math.min(info.baseline / LOG_SPAN, ...inside);
+    const hi = Math.max(info.baseline * LOG_SPAN, ...inside);
+    return { lo, hi, scale: 'log', baselineAt: Math.log(info.baseline / lo) / Math.log(hi / lo) };
+  }
   const reference = Math.max(Math.abs(info.baseline), Math.abs(info.scenario)) || 1;
-  const max = niceCeil(Math.max(reference * 4, Number.isFinite(current) ? current : 0));
-  return { min: 0, max, step: max / 1000 };
+  const hi = niceCeil(Math.max(reference * LOG_SPAN, Number.isFinite(current) ? current : 0));
+  return { lo: 0, hi, scale: 'linear', baselineAt: Math.max(0, info.baseline) / hi };
+}
+
+/** A value's position along the track, 0 to SLIDER_STEPS; a value a log track cannot place sits at 0. */
+export function toSlider(range: SliderRange, value: number): number {
+  let t: number;
+  if (range.scale === 'log') {
+    t = value > 0 ? Math.log(value / range.lo) / Math.log(range.hi / range.lo) : 0;
+  } else {
+    t = range.hi > range.lo ? (value - range.lo) / (range.hi - range.lo) : 0;
+  }
+  return Math.min(1, Math.max(0, Number.isFinite(t) ? t : 0)) * SLIDER_STEPS;
+}
+
+/**
+ * The value at a position, to three significant figures; within half a step
+ * of one of `snaps` (the baseline and the scenario's value), that value
+ * exactly, so dragging back to it drops the override.
+ */
+export function fromSlider(range: SliderRange, position: number, snaps: readonly number[]): number {
+  for (const s of snaps) if (Math.abs(toSlider(range, s) - position) <= 0.5) return s;
+  const t = Math.min(1, Math.max(0, position / SLIDER_STEPS));
+  const v = range.scale === 'log' ? range.lo * (range.hi / range.lo) ** t : range.lo + t * (range.hi - range.lo);
+  return v === 0 ? 0 : Number(v.toPrecision(3));
+}
+
+/**
+ * Where a quantity comes from, for its badge: "Measured on rgw-go" for one
+ * measured by the calibration project, "Measured on Ceph" for one counted
+ * from Ceph's own tree, "Assumed" for the rest.
+ */
+export function provenance(q: { measured: boolean; source: string }, projectName?: string): string {
+  if (!q.measured) return 'Assumed';
+  if (q.source.includes('calibration')) return `Measured on ${projectName ?? 'the calibration port'}`;
+  if (q.source.includes('generated/')) return 'Measured on Ceph';
+  return 'Measured';
 }
 
 export interface ToggleText {
@@ -133,7 +190,7 @@ const TOGGLES: Record<string, ToggleText> = {
   clean_break: {
     label: 'Clean break',
     description:
-      "Keep no on-disk or wire compatibility with today's Ceph, which removes the bit-exact encoders and the cross-checks against C++. Output is multiplied by the clean-break setting below.",
+      "Keep no on-disk or wire compatibility with today's Ceph, which removes the bit-exact encoders and the cross-checks against C++. Such a port cannot serve existing kernel clients, existing librbd or libcephfs consumers, or existing clusters: it is a new system with Ceph's design, not a replacement. Output is multiplied by the clean-break setting below, and that discount is a guess.",
   },
 };
 

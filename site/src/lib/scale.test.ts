@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linearTicks, logScale, positiveRange, sequentialStep } from './scale';
+import { linearScale, linearTicks, logScale, positiveRange, sequentialStep } from './scale';
 
 describe('logScale', () => {
   it('spans whole decades around the values', () => {
@@ -89,5 +89,30 @@ describe('linearTicks', () => {
 
   it('has only 0 for an empty or broken scale', () => {
     for (const max of [0, -5, Number.NaN]) expect(linearTicks(max)).toEqual([0]);
+  });
+});
+
+describe('linearScale', () => {
+  it('runs from 0 to the first round tick at or above the largest value, in three or so steps', () => {
+    const s = linearScale([178_000, 273_000, 576_000, 683]);
+    expect(s.max).toBe(600_000);
+    expect(s.ticks).toEqual([0, 200_000, 400_000, 600_000]);
+    expect(s.position(300_000)).toBeCloseTo(0.5, 12);
+    expect(s.position(0)).toBe(0);
+  });
+
+  it('ends on a value that is itself a tick', () => {
+    expect(linearScale([400_000]).max).toBe(400_000);
+  });
+
+  it('holds values it cannot place inside the track', () => {
+    const s = linearScale([100]);
+    expect(s.position(-5)).toBe(0);
+    expect(s.position(Number.NaN)).toBe(0);
+    expect(s.position(1e9)).toBe(1);
+  });
+
+  it('gives a unit track when nothing is positive', () => {
+    expect(linearScale([0, Number.NaN])).toMatchObject({ max: 1, ticks: [0, 1] });
   });
 });

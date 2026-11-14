@@ -9,7 +9,7 @@
 <script lang="ts">
   import { CATEGORY_META, categoryParts } from '../lib/categories';
   import type { Derived } from '../lib/derived.svelte';
-  import { countExact, list, percent, tokens, usd, usdExact } from '../lib/format';
+  import { count, countExact, list, percent, tokens, usd, usdExact } from '../lib/format';
   import { TARGET_LABELS } from '../lib/report';
   import Amount from './Amount.svelte';
   import Section from './Section.svelte';
@@ -39,6 +39,9 @@
   );
   const pct = (at: number) => `${at * 100}%`;
 
+  /** From this share of re-read context up, the figure moves almost in proportion to its prices. */
+  const PROPORTIONAL = 0.8;
+
   /** "55% of uncached input, 74.8% of cache writes, …" */
   function longContextShares(s: typeof volumes): string {
     return list(CATEGORY_META.map((c) => `${percent(s[c.key])} of ${c.label.toLowerCase()}`));
@@ -54,6 +57,19 @@
       Model efficiency has been changed, so the models need different token volumes; the token bar shows {d.model.name}'s.
     {/if}
   {/snippet}
+
+  {#if d.cacheShare !== null || d.testShare !== null}
+    <p class="reading">
+      {#if d.cacheShare !== null}
+        Re-read context, the cache reads and writes, is about {percent(d.cacheShare)} of {d.cacheShareModel.name}'s
+        figure{#if d.cacheShare >= PROPORTIONAL}, so the estimate moves almost in proportion to those two prices and to how
+          large the prompts are{/if}.
+      {/if}
+      {#if d.testShare !== null}
+        Test code, new tests and ported ones, is about {percent(d.testShare)} of the headline.
+      {/if}
+    </p>
+  {/if}
 
   <ul class="legend" aria-label="Token categories">
     {#each CATEGORY_META as c (c.key)}
@@ -96,8 +112,9 @@
 
   {#each d.longContext as lc (lc.model.id)}
     <p class="note">
-      {lc.model.name} charges higher prices for calls with more than {tokens(lc.threshold)} tokens of context. The estimate
-      bills {longContextShares(lc.shares)} at those prices; the shares are under Pricing mix in the assumptions.
+      {lc.model.name} charges higher prices for calls with more than {count(lc.threshold)} tokens of context. {#if Object.values(lc.shares).some((s) => s > 0)}The
+        estimate bills {longContextShares(lc.shares)} at those prices{:else}Here the estimate bills none of its tokens at those
+        prices{/if}; the shares are under Pricing mix in the assumptions.
     </p>
   {/each}
 
@@ -132,6 +149,10 @@
 </Section>
 
 <style>
+  .reading {
+    margin: 0 0 var(--space-5);
+  }
+
   .legend {
     display: flex;
     flex-wrap: wrap;
@@ -339,6 +360,11 @@
 
     .track {
       margin-right: 4.5rem;
+    }
+
+    /* Every other tick label, so the labels do not run together; the gridlines stay. */
+    .ticks span:nth-child(even) {
+      display: none;
     }
   }
 </style>

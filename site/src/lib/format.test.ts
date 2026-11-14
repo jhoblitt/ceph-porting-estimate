@@ -1,34 +1,56 @@
 import { describe, expect, it } from 'vitest';
-import { count, countExact, decimal, list, multiplier, percent, tokens, usd, usdExact } from './format';
+import {
+  count,
+  countExact,
+  decimal,
+  paramValue,
+  list,
+  magnitude,
+  multiplier,
+  percent,
+  times,
+  tokens,
+  usd,
+  usdExact,
+} from './format';
 
 const NON_FINITE = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
 
 describe('usd', () => {
   it.each([
     [0, '$0'],
-    [689, '$689'],
-    [689.4, '$689'],
-    [12.345, '$12.3'],
-    [999.4, '$999'],
-    [999.5, '$1k'],
+    [689, '$690'],
+    [683.4, '$680'],
+    [12.345, '$12'],
+    [1.234, '$1.2'],
+    [94.9, '$95'],
+    [99.4, '$99'],
+    [99.5, '$100'],
+    [949, '$950'],
+    [994, '$990'],
+    [995, '$1k'],
     [1000, '$1k'],
-    [18_100, '$18.1k'],
-    [18_000, '$18k'],
-    [12_265, '$12.3k'],
-    [298_782.41, '$299k'],
-    [999_400, '$999k'],
-    [999_500, '$1M'],
-    [2_160_290, '$2.16M'],
+    [9_940, '$9.9k'],
+    [9_950, '$10k'],
+    [18_100, '$18k'],
+    [12_265, '$12k'],
+    [99_400, '$99k'],
+    [99_500, '$100k'],
+    [272_724, '$270k'],
+    [298_782.41, '$300k'],
+    [994_000, '$990k'],
+    [995_000, '$1M'],
+    [2_160_290, '$2.2M'],
     [2_100_000, '$2.1M'],
-    [3_091_705, '$3.09M'],
+    [3_091_705, '$3.1M'],
     [4.2e9, '$4.2B'],
     [0.5, '$0.50'],
     [0.054, '$0.05'],
     [0.999, '$1'],
-    [999_499_999, '$999M'],
-    [999.5e6, '$1B'],
+    [994e6, '$990M'],
+    [995e6, '$1B'],
     [0.004, '<$0.01'],
-    [-298_782, '−$299k'],
+    [-298_782, '−$300k'],
     [-0.004, '>−$0.01'],
   ])('%d → %s', (n, want) => {
     expect(usd(n)).toBe(want);
@@ -60,17 +82,17 @@ describe('usdExact', () => {
 describe('tokens', () => {
   it.each([
     [0, '0'],
-    [689, '689'],
-    [999.5, '1k'],
-    [24_400_000, '24.4M'],
-    [743_900_000, '744M'],
-    [999_500, '1M'],
-    [929e9, '929B'],
-    [999.5e9, '1T'],
-    [1.06e12, '1.06T'],
+    [689, '690'],
+    [995, '1k'],
+    [24_400_000, '24M'],
+    [743_900_000, '740M'],
+    [995_000, '1M'],
+    [929e9, '930B'],
+    [995e9, '1T'],
+    [1.06e12, '1.1T'],
     [0.35, '0.35'],
     [0.004_2, '<0.01'],
-    [-24_400_000, '−24.4M'],
+    [-24_400_000, '−24M'],
   ])('%d → %s', (n, want) => {
     expect(tokens(n)).toBe(want);
   });
@@ -118,9 +140,11 @@ describe('percent', () => {
   it.each([
     [0, '0%'],
     [1, '100%'],
-    [0.533, '53.3%'],
-    [0.979_4, '97.9%'],
-    [0.0728, '7.28%'],
+    [0.533, '53%'],
+    [0.979_4, '98%'],
+    [0.0728, '7.3%'],
+    [0.0995, '10%'],
+    [0.995, '100%'],
     [0.999_95, '100%'],
     [0.000_05, '<0.01%'],
     [-0.25, '−25%'],
@@ -156,6 +180,7 @@ describe('decimal', () => {
     [0, '0'],
     [1, '1'],
     [1.15, '1.15'],
+    [1.2133, '1.2133'],
     [10.939, '10.939'],
     [11.450000000000001, '11.45'],
     [1248.91, '1,248.91'],
@@ -172,6 +197,91 @@ describe('decimal', () => {
   });
 });
 
+describe('paramValue', () => {
+  it.each([
+    [0, '0'],
+    [1, '1'],
+    [1.15, '1.15'],
+    [1.2133, '1.21'],
+    [10.939, '10.9'],
+    [1248.91, '1,250'],
+    [0.007776, '0.00778'],
+    [0.0728, '0.0728'],
+    [39.61, '39.6'],
+    [0.8333, '0.833'],
+    [-0.5, '−0.5'],
+  ])('%d → %s', (n, want) => {
+    expect(paramValue(n)).toBe(want);
+  });
+
+  it.each(NON_FINITE)('shows %d as a dash', (n) => {
+    expect(paramValue(n)).toBe('—');
+  });
+});
+
+describe('times', () => {
+  it.each([
+    [16.3, '16'],
+    [15.5, '16'],
+    [9.94, '9.9'],
+    [9.96, '10'],
+    [1.53, '1.5'],
+    [160.4, '160'],
+    [1234, '1,200'],
+  ])('%d → %s', (x, want) => {
+    expect(times(x)).toBe(want);
+  });
+
+  it.each(NON_FINITE)('shows %d as a dash', (x) => {
+    expect(times(x)).toBe('—');
+  });
+});
+
+describe('magnitude', () => {
+  it.each([
+    [0.8, 'less than a dollar'],
+    [1.2, 'about a dollar'],
+    [6, 'a few dollars'],
+    [45, 'tens of dollars'],
+    [683, 'a few hundred dollars'],
+    [1_200, 'about a thousand dollars'],
+    [5_000, 'a few thousand dollars'],
+    [12_000, 'about ten thousand dollars'],
+    [45_000, 'tens of thousands of dollars'],
+    [120_000, 'about a hundred thousand dollars'],
+    [144_999, 'about a hundred thousand dollars'],
+    [145_000, 'a few hundred thousand dollars'],
+    [149_999, 'a few hundred thousand dollars'],
+    [150_000, 'a few hundred thousand dollars'],
+    [272_724, 'a few hundred thousand dollars'],
+    [994_999, 'a few hundred thousand dollars'],
+    [995_000, 'about a million dollars'],
+    [999_999, 'about a million dollars'],
+    [1_000_000, 'about a million dollars'],
+    [2_130_000, 'a few million dollars'],
+    [45e6, 'tens of millions of dollars'],
+    [3e9, 'a few billion dollars'],
+  ])('%d → %s', (n, want) => {
+    expect(magnitude(n)).toBe(want);
+  });
+
+  it('reads the figure as usd prints it, so the words agree with the hero', () => {
+    for (const n of [0.996, 9.96, 99.6, 995, 9_960, 99_600, 995_000, 9.96e6, 99.6e6, 995e6]) {
+      expect(magnitude(n)).toBe(magnitude(Number(n.toPrecision(2))));
+    }
+    expect(usd(995_000)).toBe('$1M');
+    expect(magnitude(995_000)).toBe('about a million dollars');
+    expect(usd(149_999)).toBe('$150k');
+    expect(magnitude(149_999)).toBe('a few hundred thousand dollars');
+  });
+
+  it('falls back to the figure where it has no words', () => {
+    expect(magnitude(0)).toBe('$0');
+    expect(magnitude(5e15)).toBe(usd(5e15));
+    expect(magnitude(Number.NaN)).toBe('—');
+  });
+});
+
 describe('list', () => {
   it.each([
     [[], ''],
@@ -184,7 +294,7 @@ describe('list', () => {
 });
 
 describe('no output ever spells a non-number', () => {
-  const all = [usd, usdExact, tokens, count, countExact, percent, multiplier, decimal];
+  const all = [usd, usdExact, tokens, count, countExact, percent, multiplier, decimal, paramValue, times, magnitude];
   const inputs = [...NON_FINITE, 0, -0, 1e-300, -1e-300, 1e300, Number.MAX_VALUE, Number.MIN_VALUE];
   it.each(all.map((f) => [f.name, f] as const))('%s', (_name, f) => {
     for (const n of inputs) expect(f(n)).not.toMatch(/NaN|Infinity|e[+-]/);

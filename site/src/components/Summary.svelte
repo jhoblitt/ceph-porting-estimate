@@ -1,29 +1,30 @@
 <!--
-  The answer first: one sentence with one number for the current target,
-  model and scenario, how far the other scenarios move it, what the dollars
-  and tokens are made of, and what the headline covers.
+  The answer first (Headline: the figure, what it is and is not, how far it
+  moves), then what the dollars and tokens are made of, and what the
+  headline covers.
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { CATEGORY_META, categoryParts } from '../lib/categories';
   import type { Derived } from '../lib/derived.svelte';
   import { list, percent, usd } from '../lib/format';
-  import { TARGET_LABELS } from '../lib/report';
+  import type { AppState } from '../lib/state';
   import Amount from './Amount.svelte';
+  import Headline from './Headline.svelte';
   import ScopeNote from './ScopeNote.svelte';
   import SegmentedBar from './SegmentedBar.svelte';
   import StatTile from './StatTile.svelte';
 
   interface Props {
     d: Derived;
+    selection: AppState;
+    /** The selection controls, after the answer: beside it on a wide screen, under it on a narrow one. */
+    controls: Snippet;
   }
 
-  let { d }: Props = $props();
+  let { d, selection, controls }: Props = $props();
 
   const headline = $derived(d.root.headline);
-  const current = $derived(d.scenarioTotals.find((s) => s.current));
-  const others = $derived(d.scenarioTotals.filter((s) => !s.current));
-  const changed = $derived(d.changedCount);
-  const otherFigures = $derived(list(others.map((s) => `${usd(s.cost.usd)} (${s.label})`)));
 
   const categoryList = list(CATEGORY_META.map((c) => c.label.toLowerCase()));
   const allTokensNote = `${categoryList.charAt(0).toUpperCase()}${categoryList.slice(1)}.`;
@@ -41,25 +42,11 @@
 
   <div class="top">
     <div class="answer-block">
-      <p class="answer">
-        <span class="lead">
-          Porting Ceph to <strong>{TARGET_LABELS[d.target]}</strong> with <strong>{d.model.name}</strong> would cost about
-        </span>
-        <span class="hero"><Amount value={headline.usd} kind="usd" /></span>
-        <span class="tail">
-          in model API charges, under the <strong>{d.scenario.label}</strong> scenario{#if changed > 0}{' '}with
-            {changed === 1 ? 'one assumption' : `${changed} assumptions`} changed{/if}.
-        </span>
-      </p>
-
-      <p class="spread">
-        {#if current?.custom}
-          The scenario as published puts it at <Amount value={current.preset.usd} kind="usd" />.
-        {/if}
-        The estimate is rough: {others.length === 1 ? 'the other scenario puts' : 'the other scenarios put'} the same port at
-        {otherFigures}.
-      </p>
+      <Headline {d} {selection} />
     </div>
+
+    <!-- After the answer in the document, so on a phone the figure and what it leaves out come first. -->
+    <div class="controls">{@render controls()}</div>
 
     <div class="made-of">
       <h3>Dollar split</h3>
@@ -105,41 +92,40 @@
     gap: var(--space-5);
   }
 
+  /*
+   * Visual order is document order at every width, so keyboard and
+   * screen-reader order match what is seen. Wide: the answer on the left,
+   * the controls and then the split down the right. Narrow: one column, the
+   * answer and its caveat first.
+   */
   .top {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-areas:
+      'answer controls'
+      'answer split';
+    grid-template-rows: auto 1fr;
     align-items: end;
     gap: var(--space-5) var(--space-7);
   }
 
   .answer-block {
+    grid-area: answer;
+    align-self: start;
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
   }
 
-  .answer {
-    margin: 0;
-    max-width: 44rem;
-    font-size: var(--text-lg);
-    line-height: 1.35;
+  .controls {
+    grid-area: controls;
+    align-self: start;
   }
 
-  .answer > span {
-    display: block;
-  }
-
-  .hero {
-    margin: var(--space-2) 0 var(--space-1);
-    font-size: var(--text-hero);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1;
-  }
-
-  .spread {
-    margin: 0;
-    color: var(--text-muted);
+  .made-of {
+    grid-area: split;
+    /* The split sits on the page, not on a card. */
+    --bar-gap: var(--page);
   }
 
   .made-of {
@@ -209,6 +195,11 @@
   @media (max-width: 959px) {
     .top {
       grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        'answer'
+        'controls'
+        'split';
+      grid-template-rows: none;
     }
   }
 

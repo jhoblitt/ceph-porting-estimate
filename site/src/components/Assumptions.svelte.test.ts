@@ -50,6 +50,38 @@ describe('Assumptions', () => {
     );
   });
 
+  it('says what else the estimate rests on, and what "measured" means', () => {
+    const { container } = setup();
+    const lede = container.querySelector('header .lede')?.textContent ?? '';
+    expect(lede).not.toMatch(/Every number/);
+    expect(lede).toMatch(/bytes per token/);
+    expect(container.querySelector('header .lede a')?.getAttribute('href')).toMatch(/^#\/methods\?/);
+    expect(container.querySelector('.measured-means')?.textContent).toMatch(/Measured on rgw-go” means measured by that project's own script/);
+  });
+
+  it('badges each param by where it was measured, or as assumed', () => {
+    const { container } = setup();
+    const badge = (path: string) => container.querySelector(`[data-param-path="${path}"] .badge`)?.textContent;
+    expect(badge('overhead')).toBe('Measured on rgw-go');
+    expect(badge('sloc_equivalent_bytes_per_line')).toBe('Measured on Ceph');
+    expect(badge('rust_factor')).toBe('Assumed');
+  });
+
+  it('says beside a control when its value zeroes the estimate or does nothing', () => {
+    const { container } = setup({ expansion: 0 });
+    const note = (path: string) => container.querySelector(`[data-param-path="${path}"] .param-note`)?.textContent;
+    expect(note('expansion')).toBe('At 0 this alone makes the estimate $0.');
+    expect(note('clean_break_discount')).toBe('No effect while “Clean break” is off.');
+    expect(note('overhead')).toBeUndefined();
+  });
+
+  it('says what a clean break gives up', () => {
+    const { container } = setup();
+    expect(container.querySelector('.toggles')?.textContent).toMatch(
+      /cannot serve existing kernel clients, existing librbd or libcephfs consumers, or existing clusters: it is a new system with Ceph's design, not a replacement\..*a guess\./,
+    );
+  });
+
   it('opens every closed group with a change when the reader is sent to the panel', () => {
     const { group } = setup({ overhead: 3 });
     group('measured').open = false;

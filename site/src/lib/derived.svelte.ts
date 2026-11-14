@@ -24,16 +24,40 @@ import {
   type Model,
   type Report,
   type Scenario,
+  type ScenarioRole,
   type Target,
   type ToggleId,
 } from './report';
 import { type AppState, toggleKey } from './state';
+import {
+  type CalibrationFacts,
+  type Range,
+  breakEven,
+  cacheTrafficShare,
+  calibrationFacts,
+  scaleUp,
+  scenarioRange,
+  testCodeShare,
+  toggleOf,
+  zeroingParams,
+} from './interpret';
+
+/** Why a param says something beside its control. */
+export type ParamNote =
+  /** On its own, 0 here makes the headline $0. */
+  | { kind: 'zeroes' }
+  /** At or below `threshold` it has no effect: the test ratio against the tests Ceph already has. */
+  | { kind: 'below'; threshold: number }
+  /** It acts only while this switch is on, and the switch is off. */
+  | { kind: 'switch'; toggle: ToggleId };
 
 /** The headline cost of the current target and model under one scenario. */
 export interface ScenarioTotal {
   id: string;
   label: string;
   description: string;
+  /** Where the scenario sits in the range; absent in data without roles. */
+  role?: ScenarioRole;
   /** The scenario the reader has selected. */
   current: boolean;
   /** The current scenario with the reader's overrides on top. */
@@ -61,8 +85,8 @@ export interface ScopeSummary {
   dependencies: GroupEstimate | undefined;
   /** How many dependencies need bindings or a port for the current target. */
   dependenciesWithWork: number;
-  /** Components with work that is costed but kept out of the headline, in report order. */
-  shown: { id: string; name: string }[];
+  /** Components with work that is costed but kept out of the headline, in report order, with that work's cost. */
+  shown: { id: string; name: string; usd: number }[];
   /** Lines that are not ported, by group, largest first; groups with none are left out. */
   notPortedByGroup: { id: string; name: string; code: number }[];
 }
@@ -197,6 +221,7 @@ export class Derived {
         id,
         label: s.label,
         description: s.description,
+        ...(s.role === undefined ? {} : { role: s.role }),
         current,
         custom: isCustom,
         preset,
@@ -226,7 +251,7 @@ export class Derived {
         dependencies = child;
         continue;
       }
-      if (child.shown.sloc.code > 0) shown.push({ id: child.id, name: child.name });
+      if (child.shown.sloc.code > 0) shown.push({ id: child.id, name: child.name, usd: child.shown.usd });
       const group = groups.get(components.get(child.id)?.group ?? '');
       if (group) group.code += child.notPorted.sloc.code;
     }
@@ -254,4 +279,78 @@ export class Derived {
         : [],
     ),
   );
+
+  // What a reader needs to interpret the figure; the arithmetic is lib/interpret.ts's.
+
+  /** What the front page quotes from the calibration data; fixed for the report. */
+  readonly calibration: CalibrationFacts = $derived.by(() => calibrationFacts(this.report));
+
+  /** The model whose token use was measured; every other model is its token counts on another price sheet. */
+  readonly measuredModel: Model | undefined = $derived.by(() =>
+    this.report.models.find((m) => m.id === this.calibration.measuredModelId),
+  );
+
+  /**
+   * For each model at the current target, the factor on its token counts at
+   * which it would cost what the measured model does (1 for the measured
+   * model itself; null where a cost is $0). Empty without a measured model.
+   */
+  readonly breakEvens: Map<string, number | null> = $derived.by(() => {
+    const measured = this.measuredModel;
+    if (!measured) return new Map();
+    const base = this.matrixCell(this.target, measured.id);
+    return new Map(this.byModel.map(({ model, cost }) => [model.id, breakEven(base, cost)]));
+  });
+
+  /**
+   * Each model's token counts relative to the measured model's: 1 unless the
+   * reader has changed a model efficiency. Empty without a measured model.
+   */
+  readonly volumeRatios: Map<string, number> = $derived.by(() => {
+    const measured = this.measuredModel;
+    if (!measured) return new Map();
+    const m = this.params.modelEfficiency;
+    const base = m[measured.id] ?? 1;
+    return new Map(this.report.models.map((model) => [model.id, base > 0 ? (m[model.id] ?? 1) / base : Number.NaN]));
+  });
+
+  /** How many times the measured port's output the headline's output is; undefined where either is unknown or 0. */
+  readonly scaleUp: number | undefined = $derived.by(() =>
+    scaleUp(this.root.headline.tokens.output, this.calibration.portOutputTokens),
+  );
+
+  /** The model whose cache-traffic share the page quotes: the measured one, else the selected one. */
+  readonly cacheShareModel: Model = $derived(this.measuredModel ?? this.model);
+
+  /** Cache reads and writes as a share of that model's dollars at the current target. */
+  readonly cacheShare: number | null = $derived.by(() =>
+    cacheTrafficShare(this.matrixCell(this.target, this.cacheShareModel.id)),
+  );
+
+  /** Test code, new and ported, as a share of the headline dollars. */
+  readonly testShare: number | null = $derived.by(() => testCodeShare(this.root, this.params));
+
+  /** The scenarios placed by role: low, central and high outcomes, and reference points. */
+  readonly range: Range<ScenarioTotal> = $derived.by(() => scenarioRange(this.scenarioTotals));
+
+  /** Params that say something beside their control, by dotted path. */
+  readonly paramNotes: Map<string, ParamNote> = $derived.by(() => {
+    const notes = new Map<string, ParamNote>();
+    const toggles = new Map(this.toggles.map((t) => [t.id as string, t]));
+    for (const p of this.paramInfo) {
+      const toggle = toggles.get(toggleOf(p.path) ?? '');
+      if (toggle && !toggle.value) notes.set(p.path, { kind: 'switch', toggle: toggle.id });
+    }
+    const testRatio = this.values.get('test_ratio');
+    if (testRatio !== undefined && testRatio <= this.existingTestRatio) {
+      notes.set('test_ratio', { kind: 'below', threshold: this.existingTestRatio });
+    }
+    // Only a $0 headline has a param to blame, and the search costs an estimate per zero param.
+    if (this.root.headline.usd === 0) {
+      for (const path of zeroingParams(this.report, this.scenarioId, this.target, this.modelId, this.overrides)) {
+        notes.set(path, { kind: 'zeroes' });
+      }
+    }
+    return notes;
+  });
 }

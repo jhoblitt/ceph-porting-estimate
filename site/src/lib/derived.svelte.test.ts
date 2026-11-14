@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './__fixtures__/report.json';
 import { Derived } from './derived.svelte';
+import { testCodeShare } from './interpret';
 import { describeParams, estimate, matrix, resolveParams } from './model';
 import { parseReport } from './report';
 import { type AppState, defaultState } from './state';
@@ -174,12 +175,12 @@ describe('Derived', () => {
   });
 
   it('lists the long-context billing of models that have long-context prices', () => {
-    const { d } = setup();
+    const { d } = setup({ scenario: 'pessimistic' });
     expect(d.longContext).toEqual([
       {
         model: report.models[2],
         threshold: 272_000,
-        shares: { uncached: 0.3, cacheWrite: 0.3, cacheRead: 0.4, output: 0.3 },
+        shares: { uncached: 0.55, cacheWrite: 0.748, cacheRead: 0.797, output: 0.699 },
       },
     ]);
   });
@@ -239,10 +240,88 @@ describe('Derived', () => {
     expect(() => d.matrixCell('go', 'gpt-2')).toThrow(/gpt-2/);
   });
 
+  it('names the measured model and each model\'s break-even against it at the current target', () => {
+    const { d, set } = setup({ target: 'rust' });
+    expect(d.measuredModel?.id).toBe('opus-5-5');
+    expect(d.breakEvens.get('opus-5-5')).toBe(1);
+    const astra = d.breakEvens.get('gpt-6-astra')!;
+    expect(astra).toBeLessThan(1);
+    expect(astra * d.matrix.rust['gpt-6-astra']!.usd).toBeCloseTo(d.matrix.rust['opus-5-5']!.usd, 6);
+    // A model that costs less could need more tokens.
+    set({ overrides: { 'model_efficiency.kimi-k3': 0.5 } });
+    expect(d.breakEvens.get('kimi-k3')).toBeGreaterThan(1);
+    expect(d.volumeRatios.get('kimi-k3')).toBe(0.5);
+    expect(d.volumeRatios.get('gpt-6-astra')).toBe(1);
+  });
+
+  it('has no measured model or break-evens when the data names none it knows', () => {
+    const other = { ...report, calibration: { measurement: { model_id: 'gpt-2' } } };
+    const d = new Derived(other, () => defaultState(other));
+    expect(d.measuredModel).toBeUndefined();
+    expect(d.breakEvens.size).toBe(0);
+    expect(d.cacheShareModel.id).toBe(d.modelId);
+  });
+
+  it('scales the measured port up to the headline by output tokens', () => {
+    const { d } = setup();
+    expect(d.scaleUp).toBeCloseTo(d.root.headline.tokens.output / 45.01e6, 12);
+  });
+
+  it("gives the measured model's cache-traffic share, whichever model is selected", () => {
+    const { d, set } = setup();
+    const opus = d.matrix.go['opus-5-5']!;
+    set({ model: 'gpt-6-astra' });
+    expect(d.cacheShareModel.id).toBe('opus-5-5');
+    expect(d.cacheShare).toBeCloseTo((opus.usdByCategory.cacheRead + opus.usdByCategory.cacheWrite) / opus.usd, 12);
+  });
+
+  it('gives the test-code share of the headline', () => {
+    const { d } = setup();
+    expect(d.testShare).toBeCloseTo(testCodeShare(d.root, d.params)!, 12);
+  });
+
+  it('places the scenarios by role', () => {
+    const { d } = setup();
+    expect(d.range.low?.id).toBe('optimistic');
+    expect(d.range.central?.id).toBe('calibrated');
+    expect(d.range.high?.id).toBe('pessimistic');
+    expect(d.range.references.map((s) => s.id)).toEqual(['naive']);
+    expect(d.range.central?.current).toBe(true);
+    expect(d.scenarioTotals.map((s) => s.role)).toEqual(['low', 'central', 'high', 'reference']);
+  });
+
+  it('keeps every scenario when one has no role', () => {
+    const { optimistic, ...rest } = report.assumptions.scenarios;
+    const { role: _role, ...noRole } = optimistic!;
+    const other = { ...report, assumptions: { ...report.assumptions, scenarios: { optimistic: noRole, ...rest } } };
+    const d = new Derived(other, () => defaultState(other));
+    expect(d.range.low).toBeUndefined();
+    expect(d.range.high?.id).toBe('pessimistic');
+    expect(d.range.unplaced.map((s) => s.id)).toEqual(['optimistic']);
+  });
+
+  it('names a param that alone zeroes the estimate, and one that has no effect where it is', () => {
+    const { d, set } = setup();
+    set({ overrides: { expansion: 0, test_ratio: 0.1 } });
+    expect(d.paramNotes.get('expansion')).toEqual({ kind: 'zeroes' });
+    expect(d.existingTestRatio).toBeGreaterThan(0.1);
+    expect(d.paramNotes.get('test_ratio')).toEqual({ kind: 'below', threshold: d.existingTestRatio });
+    expect(d.paramNotes.get('clean_break_discount')).toEqual({ kind: 'switch', toggle: 'clean_break' });
+    expect(d.paramNotes.has('overhead')).toBe(false);
+    set({ overrides: { 'toggles.clean_break': 1 } });
+    expect(d.paramNotes.has('clean_break_discount')).toBe(false);
+  });
+
+  it('gives each component shown outside the headline its cost', () => {
+    const { d } = setup();
+    expect(d.scope.shown.map((c) => c.id)).toEqual(['qa']);
+    expect(d.scope.shown[0]!.usd).toBeCloseTo(d.root.shown.usd, 9);
+  });
+
   it('lists every model at the current target', () => {
     const { d, set } = setup();
     set({ target: 'rust' });
-    expect(d.byModel.map((m) => m.model.id)).toEqual(['fable-5-2', 'opus-5-5', 'gpt-6-astra']);
+    expect(d.byModel.map((m) => m.model.id)).toEqual(['fable-5-2', 'opus-5-5', 'gpt-6-astra', 'kimi-k3']);
     for (const m of d.byModel) expect(m.cost).toBe(d.matrix.rust[m.model.id]);
   });
 });
