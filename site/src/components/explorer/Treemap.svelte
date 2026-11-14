@@ -15,6 +15,7 @@
   import { SCOPE_LABELS } from '../../lib/labels';
   import {
     DEFAULT_LAYOUT,
+    SHADE_STEPS,
     type Direction,
     type Rect,
     type TreemapLayout,
@@ -44,7 +45,7 @@
     testNotes: Map<string, TestComponentNote>;
     /** The map's accessible name. */
     label: string;
-    onopen: (row: Row, fromKeyboard: boolean) => void;
+    onopen: (row: Row) => void;
     onhover: (id: string | null) => void;
     onup: () => void;
   }
@@ -52,8 +53,6 @@
   let { level, rootLevel, area, range, selectedId, highlightId, query, testNotes, label, onopen, onhover, onup }: Props =
     $props();
 
-  /** --seq-1 … --seq-7 in tokens.css. */
-  const STEPS = 7;
   const ZOOM_MS = 450;
 
   let width = $state(0);
@@ -247,7 +246,7 @@
           <TreemapCell
             {cell}
             row={entry.row}
-            steps={shadeSteps(entry.row, range, STEPS)}
+            steps={shadeSteps(entry.row, range, SHADE_STEPS)}
             fit={labelFit(cell.rect, entry.row.name)}
             {area}
             name={accessibleName(entry.row, entry.group)}
@@ -256,7 +255,7 @@
             selected={cell.id === selectedId}
             highlighted={cell.id === highlightId}
             dimmed={query.trim() !== '' && !matchesFilter(entry.row.name, query)}
-            onactivate={(e) => onopen(entry.row, e.detail === 0)}
+            onactivate={() => onopen(entry.row)}
             onfocus={(visible) => focused(cell.id, visible)}
             onhover={(on, e) => hover(cell.id, on, e)}
           />

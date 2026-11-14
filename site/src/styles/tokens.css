@@ -65,6 +65,15 @@
   --series-4: light-dark(#eda100, #c98500);
   --on-series: #0b0b0b;
 
+  /*
+   * Code that is not ported: a hatch from the neutral lines, so it can never
+   * pass for a step of the cost scale. One token for the map, its legend and
+   * the views that name such code.
+   */
+  --hatch-not-ported: repeating-linear-gradient(-45deg, var(--grid) 0 3px, var(--page) 3px 7px);
+  /* The same hatch as a border, in ink strong enough to read as a line. */
+  --hatch-not-ported-line: repeating-linear-gradient(-45deg, var(--border-strong) 0 3px, transparent 3px 6px);
+
   /* Type */
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-num: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;

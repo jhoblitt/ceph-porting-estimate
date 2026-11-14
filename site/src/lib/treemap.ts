@@ -84,6 +84,9 @@ export interface LayoutOptions {
   partGap: number;
 }
 
+/** Steps of the sequential scale a cell is shaded on: --seq-1 … --seq-7 in tokens.css. */
+export const SHADE_STEPS = 7;
+
 export const DEFAULT_LAYOUT: LayoutOptions = { headerHeight: 22, groupGap: 6, cellGap: 2, partGap: 2 };
 
 /** A group gets a header only where its name and at least a sliver of cells fit. */

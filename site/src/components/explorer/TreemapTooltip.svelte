@@ -1,5 +1,5 @@
 <!--
-  The figures of the cell under the pointer or the focus, exactly. It only
+  The figures of the cell under the pointer or the focus, in full. It only
   repeats what the table holds, so it is hidden from screen readers; the
   cell's own accessible name carries the short figures.
 -->
@@ -36,7 +36,9 @@
 </script>
 
 <div class="tip" style:left="{left}px" style:top="{top}px" bind:offsetWidth={width} bind:offsetHeight={height} aria-hidden="true">
-  <p class="value">{row.figures.usd > 0 ? usdExact(row.figures.usd) : 'No cost'}</p>
+  <p class="value">
+    {#if row.figures.usd > 0}{usdExact(row.figures.usd)} <span class="basis">model output</span>{:else}No cost{/if}
+  </p>
   <p class="name">{row.name}</p>
   {#if groupName}<p class="group">{groupName}</p>{/if}
   <dl>
@@ -100,6 +102,12 @@
 
   .name {
     font-weight: 600;
+  }
+
+  .basis {
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--text-muted);
   }
 
   .group {

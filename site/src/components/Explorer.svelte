@@ -15,6 +15,8 @@
     type Sort,
     componentScopes,
     explorerLevel,
+    hasContent,
+    largestRow,
     perLineRange,
     requiredMode,
     widerMode,
@@ -76,7 +78,10 @@
   const scopes = $derived(componentId === null ? null : componentScopes(d.root, componentId));
 
   const feature = $derived(
-    component?.children.find((f): f is FeatureEstimate => f.kind === 'feature' && f.id === featureId),
+    // A feature that matches no file, or a dependency with no work for this target, is not drawn: show the component.
+    component?.children.find(
+      (f): f is FeatureEstimate => f.kind === 'feature' && f.id === featureId && hasContent(f),
+    ),
   );
   const featureSource = $derived.by(() => {
     if (!feature) return null;
@@ -136,8 +141,9 @@
   const crumbs: Crumb[] = $derived.by(() => {
     const list: Crumb[] = [{ key: 'root', label: 'Ceph', go: () => void go([], { cell: componentId }) }];
     if (componentId === null) return list;
-    const firstOfGroup = rootLevel.groups.find((g) => g.rows.some((r) => r.id === componentId))?.rows[0]?.id ?? null;
-    list.push({ key: 'group', label: groupName, kind: 'group', go: () => void go([], { cell: firstOfGroup }) });
+    const rows = rootLevel.groups.find((g) => g.rows.some((r) => r.id === componentId))?.rows ?? [];
+    const largest = largestRow(rows, area)?.id ?? null;
+    list.push({ key: 'group', label: groupName, kind: 'group', go: () => void go([], { cell: largest }) });
     list.push({ key: 'component', label: componentName, kind: 'component', go: () => void go([componentId], { cell: featureId }) });
     if (feature) list.push({ key: 'feature', label: feature.name, kind: 'feature', go: () => {} });
     return list;

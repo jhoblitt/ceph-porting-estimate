@@ -20,7 +20,10 @@
 </script>
 
 <table class="chain">
-  <caption class="visually-hidden">From source tokens to output tokens, one factor at a time</caption>
+  <caption>
+    <span class="visually-hidden">From source tokens to output tokens, one factor at a time.</span>
+    Model output, not measurements; the factors are the assumptions in effect.
+  </caption>
   <thead>
     <tr>
       <th scope="col">Step</th>
@@ -50,6 +53,14 @@
 </table>
 
 <style>
+  caption {
+    caption-side: bottom;
+    padding: var(--space-2) 0;
+    text-align: start;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
   .chain {
     width: 100%;
     border-collapse: collapse;

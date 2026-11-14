@@ -173,8 +173,8 @@
 
   .np {
     padding-inline-start: var(--space-3);
-    border-inline-start: 4px solid transparent;
-    border-image: repeating-linear-gradient(-45deg, var(--baseline) 0 3px, transparent 3px 6px) 4;
+    border-inline-start: 6px solid transparent;
+    border-image: var(--hatch-not-ported-line) 6;
   }
 
   @media (max-width: 719px) {

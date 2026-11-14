@@ -28,24 +28,33 @@
 </script>
 
 <div class="scroll">
-  <table>
-    <caption class="visually-hidden">Dependencies, with the plan for {TARGET_LABELS[target]}, its work and its cost</caption>
-    <thead>
-      <tr>
-        <th scope="col">Dependency</th>
-        <th scope="col">Ceph uses it for</th>
-        <th scope="col">Plan for {TARGET_LABELS[target]}</th>
-        <th scope="col" class="n">Lines of work</th>
-        <th scope="col" class="n">Cost</th>
-        <th scope="col" class="n">Vendored code</th>
+  <!-- Explicit roles: the phone layout restyles these as blocks, which drops table semantics in some browsers. -->
+  <!-- svelte-ignore a11y_no_redundant_roles -->
+  <table role="table">
+    <caption>
+      <span class="visually-hidden">Dependencies, with the plan for {TARGET_LABELS[target]}, its work and its cost.</span>
+      Lines of work are the data's own estimates; costs are model output, not measurements, printed in full.
+    </caption>
+    <!-- svelte-ignore a11y_no_redundant_roles -->
+    <thead role="rowgroup">
+      <!-- svelte-ignore a11y_no_redundant_roles -->
+      <tr role="row">
+        <th scope="col" role="columnheader">Dependency</th>
+        <th scope="col" role="columnheader">Ceph uses it for</th>
+        <th scope="col" role="columnheader">Plan for {TARGET_LABELS[target]}</th>
+        <th scope="col" role="columnheader" class="n">Lines of work</th>
+        <th scope="col" role="columnheader" class="n">Cost</th>
+        <th scope="col" role="columnheader" class="n">Vendored code</th>
       </tr>
     </thead>
-    <tbody>
+    <!-- svelte-ignore a11y_no_redundant_roles -->
+    <tbody role="rowgroup">
       {#each rows as r (r.id)}
         {@const expanded = open.has(r.id)}
         {@const size = vendoredText(r)}
-        <tr class="row" class:expanded>
-          <th scope="row">
+        <!-- svelte-ignore a11y_no_redundant_roles -->
+        <tr class="row" role="row" class:expanded>
+          <th scope="row" role="rowheader">
             <span class="name">{r.name}</span>
             <span class="actions">
               <button
@@ -64,21 +73,22 @@
               {/if}
             </span>
           </th>
-          <td class="used" data-label="Ceph uses it for">{r.usedFor}</td>
-          <td class="plan" data-label="Plan for {TARGET_LABELS[target]}">
+          <td class="used" role="cell" data-label="Ceph uses it for">{r.usedFor}</td>
+          <td class="plan" role="cell" data-label="Plan for {TARGET_LABELS[target]}">
             <span class="strategy {r.strategy}">{STRATEGY_LABELS[r.strategy]}</span>
             {#if r.package}<code>{r.package}</code>{/if}
             <span class="note">{r.note}</span>
           </td>
-          <td class="n" data-label="Lines of work">{r.lines > 0 ? countExact(r.lines) : '—'}</td>
-          <td class="n" data-label="Cost">{r.lines > 0 ? usdExact(r.usd) : '—'}</td>
-          <td class="n size" data-label="Vendored code">
+          <td class="n" role="cell" data-label="Lines of work">{r.lines > 0 ? countExact(r.lines) : '—'}</td>
+          <td class="n" role="cell" data-label="Cost">{r.lines > 0 ? usdExact(r.usd) : '—'}</td>
+          <td class="n size" role="cell" data-label="Vendored code">
             {size.text}{#if size.note}<span class="sub">{size.note}</span>{/if}
           </td>
         </tr>
         {#if expanded}
-          <tr class="compare" id="dep-{r.id}-targets">
-            <td colspan="6">
+          <!-- svelte-ignore a11y_no_redundant_roles -->
+          <tr class="compare" role="row" id="dep-{r.id}-targets">
+            <td colspan="6" role="cell">
               <ul>
                 {#each r.targets as t (t.target)}
                   <li class:current={t.current}>
@@ -103,6 +113,14 @@
 </div>
 
 <style>
+  caption {
+    caption-side: bottom;
+    padding: var(--space-2) var(--space-3);
+    text-align: start;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
   .scroll {
     overflow-x: auto;
     border: 1px solid var(--border);
@@ -256,6 +274,11 @@
   @media (width < 720px) {
     .scroll {
       overflow-x: visible;
+    }
+
+    caption {
+      display: block;
+      padding-inline: 0;
     }
 
     table,

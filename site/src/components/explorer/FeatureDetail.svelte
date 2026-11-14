@@ -145,6 +145,7 @@
         <SegmentedBar label="{f.name}: cost by token category" {parts} size="thin" />
         <div class="scroll">
         <table class="cats">
+          <caption>Model output, not measurements, printed in full.</caption>
           <thead>
             <tr><th scope="col">Category</th><th scope="col">Tokens</th><th scope="col">Cost</th></tr>
           </thead>
@@ -280,6 +281,14 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .cats caption {
+    caption-side: bottom;
+    padding-top: var(--space-1);
+    text-align: start;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
   .cats th,
   .cats td {
     padding: var(--space-1) var(--space-2);
@@ -312,7 +321,7 @@
   .free {
     padding: var(--space-4);
     border-radius: var(--radius);
-    background: repeating-linear-gradient(-45deg, var(--grid) 0 3px, var(--page) 3px 7px);
+    background: var(--hatch-not-ported);
   }
 
   .free p {

@@ -2,6 +2,7 @@
 <script lang="ts">
   import { type AreaMode, type ScopeMode, costPerThousandLines } from '../../lib/explorer';
   import { usd } from '../../lib/format';
+  import { SHADE_STEPS } from '../../lib/treemap';
 
   interface Props {
     area: AreaMode;
@@ -11,7 +12,6 @@
 
   let { area, mode, range }: Props = $props();
 
-  const STEPS = 7;
   const low = $derived(range ? costPerThousandLines(range.min) : null);
   const high = $derived(range ? costPerThousandLines(range.max) : null);
 </script>
@@ -28,7 +28,7 @@
       <span class="key" aria-hidden="true">
         <span>{usd(low)}</span>
         <span class="ramp">
-          {#each Array.from({ length: STEPS }, (_, i) => i + 1) as i (i)}
+          {#each Array.from({ length: SHADE_STEPS }, (_, i) => i + 1) as i (i)}
             <span style:background="var(--seq-{i})"></span>
           {/each}
         </span>
@@ -120,7 +120,7 @@
   }
 
   .swatch.not-ported {
-    background: repeating-linear-gradient(-45deg, var(--grid) 0 3px, var(--page) 3px 7px);
+    background: var(--hatch-not-ported);
     box-shadow: inset 0 0 0 1px var(--baseline);
   }
 

@@ -20,7 +20,7 @@
     highlightId: string | null;
     /** What leaving out each component of ported tests would do to the headline. */
     testNotes: Map<string, TestComponentNote>;
-    onopen: (row: Row, fromKeyboard: boolean) => void;
+    onopen: (row: Row) => void;
     onhover: (id: string | null) => void;
   }
 
@@ -78,7 +78,11 @@
 
 <div class="scroll">
   <table>
-    <caption class="visually-hidden">{caption}, with code lines, tokens, cost and share of the headline</caption>
+    <caption>
+      <span class="visually-hidden">{caption}, with code lines, tokens, cost and share of the headline.</span>
+      Code lines are counted from Ceph's source{atRoot ? '; for the dependency work, they are lines of work the data assumes' : ''}.
+      Token and dollar columns are model output, not measurements, printed in full.
+    </caption>
     <thead>
       <tr>
         {#each COLUMNS as col (col.key)}
@@ -117,7 +121,7 @@
                 type="button"
                 class="open"
                 aria-current={r.id === selectedId ? 'true' : undefined}
-                onclick={(e) => onopen(r, e.detail === 0)}
+                onclick={() => onopen(r)}
               >
                 {r.name}
               </button>
@@ -164,6 +168,14 @@
 </div>
 
 <style>
+  caption {
+    caption-side: bottom;
+    padding: var(--space-2) var(--space-3);
+    text-align: start;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
   .toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -320,7 +332,7 @@
   .pill.np {
     border-style: solid;
     border-color: var(--baseline);
-    background: repeating-linear-gradient(-45deg, var(--grid) 0 3px, var(--page) 3px 7px);
+    background: var(--hatch-not-ported);
   }
 
   tbody tr:not(.group-row):hover,

@@ -24,7 +24,7 @@
     selected: boolean;
     highlighted: boolean;
     dimmed: boolean;
-    onactivate: (event: MouseEvent) => void;
+    onactivate: () => void;
     /** `visible` when the browser shows a focus ring, i.e. not after a click. */
     onfocus: (visible: boolean) => void;
     onhover: (hovering: boolean, event: PointerEvent) => void;
@@ -128,7 +128,7 @@
 
   /* Not ported: no cost, so no shade from the cost scale. */
   .part.not-ported {
-    background: repeating-linear-gradient(-45deg, var(--grid) 0 3px, var(--page) 3px 7px);
+    background: var(--hatch-not-ported);
     box-shadow: inset 0 0 0 1px var(--baseline);
   }
 
