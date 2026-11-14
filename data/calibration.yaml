@@ -385,6 +385,7 @@ derived:
       all_1h: 0.1708
     review_share:                    # review agents' share of the port row's dollars
       value: 0.130                   # 2,357.15 / 18,078.68 = 0.1304
+      role_scope: "review (475 agents)"   # the measurement.roles row it prices; cephest check recomputes value from it
       method: >-
         measurement.roles "review (475 agents)" at the same prices and TTL split:
         0.08 × $4 + 171.4 × $5.2184 + 6,733.0 × $0.20 + 5.79 × $20 = $2,357.15,

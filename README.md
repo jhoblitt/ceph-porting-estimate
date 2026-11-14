@@ -97,10 +97,13 @@ report presents them, and each has a `role`: `low`, `central`, `high` or
 `assumptions.yaml` that is a copy or a function of it is checked: `check`
 recomputes the calibrated parameters, the difficulty scale, the scenario
 values taken from rgw-go (the phase-derived scales, the expansion at a
-coverage end and the long-context shares) and the derived figures
-`calibration.yaml` records, and fails, naming the key and both values, on
-any that has drifted. A scenario that copies one of these values must be
-named in the matching mapping in `calibration.yaml` (`phases.scenario_phase`,
+coverage end and the long-context shares) and every figure
+`calibration.yaml` records as a function of other figures in the data, and
+fails, naming the key and both values, on any that has drifted. The counts
+and reports it takes as given are listed in
+[`docs/cost-model.md`](docs/cost-model.md). A scenario that copies one of
+these values must be named in the matching mapping in
+`calibration.yaml` (`phases.scenario_phase`,
 `coverage.scenario_end`, `long_context_scenarios`), or `check` fails.
 After changing coverage, a bytes-per-token value, a relative difficulty, a
 phase row or rgw-go's prompt-size shares, recompute every value `check`
@@ -128,7 +131,8 @@ go run ./cmd/cephest count --repo ~/github/ceph --rev <sha> --out data/generated
 
 `params.sloc_equivalent_bytes_per_line` in `assumptions.yaml` is derived
 from `sloc.json`, as the bytes per code line of C++ in headline features
-of kind `product`, and `check` does not verify it: recompute it on a re-pin.
+of kind `product`; `check` recomputes it and fails until it is updated
+after a re-pin.
 Submodule sizes are counted only for submodules whose pinned commit is
 present locally under `.git/modules`; any other is recorded as unavailable.
 

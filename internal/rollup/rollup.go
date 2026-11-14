@@ -105,6 +105,7 @@ func Build(s *data.Set) *Result {
 		res.Problems = append(res.Problems, t)
 	}
 
+	checkSLOCEquivalent(&res.Problems, s, langs)
 	res.Unclassified.summarize(unclassifiedFiles)
 	if u := res.Unclassified; u.Code*100 > u.TotalCode {
 		res.Problems.Addf("unclassified: %d of %d code lines (%s) match no feature glob, above the 1%% limit",
@@ -113,6 +114,37 @@ func Build(s *data.Set) *Result {
 
 	res.Report = newReport(s, langs, unclassified)
 	return res
+}
+
+// sloclang is the language whose bytes per code line, over the headline
+// product features, params.sloc_equivalent_bytes_per_line is.
+const sloclang = "cpp"
+
+// checkSLOCEquivalent recomputes params.sloc_equivalent_bytes_per_line
+// from the rolled-up counts; langs is indexed like the taxonomy's features
+// in load order.
+func checkSLOCEquivalent(p *data.Problems, s *data.Set, langs []map[string]data.Counts) {
+	var bytes, code int64
+	n := 0
+	for i := range s.Components {
+		for j := range s.Components[i].Features {
+			if f := &s.Components[i].Features[j]; f.Scope == data.ScopeHeadline && f.Kind == data.KindProduct {
+				c := langs[n][sloclang]
+				bytes += c.Bytes
+				code += c.Code
+			}
+			n++
+		}
+	}
+	if code == 0 {
+		p.Addf("%s: params.sloc_equivalent_bytes_per_line cannot be recomputed: %s has no code lines of C++ in headline features of kind product",
+			data.AssumptionsFile, data.SLOCFile)
+		return
+	}
+	want := float64(bytes) / float64(code)
+	data.CompareDerived(p, data.SLOCFile, "params.sloc_equivalent_bytes_per_line",
+		s.Assumptions.Params.SLOCEquivalentBytesPerLine.Value, want,
+		"bytes ÷ code lines of C++ in headline features of kind product")
 }
 
 func describeTie(components []data.Component, m *matcher, path string, tied []int) string {

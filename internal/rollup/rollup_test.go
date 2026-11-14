@@ -307,6 +307,28 @@ var _ = Describe("Build", func() {
 		}))
 	})
 
+	It("recomputes the bytes per code line of headline C++ from the counts", func() {
+		Expect(rollup.Build(s).Problems).To(BeEmpty())
+		wrong := 42.0
+		s.Assumptions.Params.SLOCEquivalentBytesPerLine.Value = &wrong
+		Expect(rollup.Build(s).Problems).To(ConsistOf(
+			"assumptions.yaml: params.sloc_equivalent_bytes_per_line is 42, but generated/sloc.json gives 40 " +
+				"(bytes ÷ code lines of C++ in headline features of kind product); they differ by more than 0.1%"))
+	})
+
+	It("reports bytes per code line it cannot recompute for want of headline C++", func() {
+		for i := range s.Components {
+			for j := range s.Components[i].Features {
+				if f := &s.Components[i].Features[j]; f.Scope == data.ScopeHeadline && f.Kind == data.KindProduct {
+					f.Scope = data.ScopeShown
+				}
+			}
+		}
+		Expect(rollup.Build(s).Problems).To(ContainElement(
+			"assumptions.yaml: params.sloc_equivalent_bytes_per_line cannot be recomputed: " +
+				"generated/sloc.json has no code lines of C++ in headline features of kind product"))
+	})
+
 	It("sizes each dependency's own submodules apart from anything nested under them", func() {
 		r := rollup.Build(s)
 		Expect(r.Problems).To(BeEmpty())

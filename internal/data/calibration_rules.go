@@ -40,30 +40,38 @@ func (c *calibration) readSizes(a *Assumptions) rgwSizes {
 	sz.tooling = c.num("sizes.rgw_go.tooling_go.bytes") / sz.goBPT
 	sz.source, sz.sourceBytes = c.sourceTokens(a)
 	c.record("sizes.source.tokens", sz.source, "Σ sizes.source.by_language ÷ bytes_per_token")
+	c.record("sizes.source.total.bytes", sz.sourceBytes, "Σ sizes.source.by_language")
 	return sz
 }
 
 // sourceTokens converts sizes.source.by_language, bytes per language per
 // source group, to tokens with the bytes per token the model applies, and
-// returns the bytes too.
+// returns the bytes too. It checks each group's recorded byte total against
+// its languages, and the recorded total lines against the groups' lines.
 func (c *calibration) sourceTokens(a *Assumptions) (tokens, bytes float64) {
 	const path = "sizes.source.by_language"
 	groups := c.mapping(path)
 	if groups == nil {
 		return math.NaN(), math.NaN()
 	}
+	lines := 0.0
 	for _, g := range slices.Sorted(maps.Keys(groups)) {
 		langs, ok := groups[g].(map[string]any)
 		if !ok {
 			c.problem(path+"."+g, "is not a mapping")
 			return math.NaN(), math.NaN()
 		}
+		groupBytes := 0.0
 		for _, lang := range slices.Sorted(maps.Keys(langs)) {
 			b := c.numAt(langs, path+"."+g, lang, false)
-			bytes += b
+			groupBytes += b
 			tokens += b / a.bytesPerToken(lang)
 		}
+		c.record("sizes.source."+g+".bytes", groupBytes, "Σ "+path+"."+g)
+		bytes += groupBytes
+		lines += c.num("sizes.source." + g + ".lines")
 	}
+	c.record("sizes.source.total.lines", lines, "Σ the lines of each sizes.source group in "+path)
 	return tokens, bytes
 }
 
@@ -86,6 +94,18 @@ func (c *calibration) checkPort(a *Assumptions, sz rgwSizes) {
 	c.record("derived.tooling_go_tokens", sz.tooling, "sizes.rgw_go.tooling_go.bytes ÷ bytes_per_token.go")
 	c.record("derived.surviving_go_tokens", sz.product+sz.test+sz.tooling, "product + test + tooling Go tokens")
 	c.record(ttl+".long_share", longShare, ttl+" long_1h ÷ total")
+	c.record(ttl+".total", c.num(ttl+".short_5m")+c.num(ttl+".long_1h"), ttl+" short_5m + long_1h")
+	const low = "measurement_detail.cache_write_by_call.low_cache_read_calls"
+	c.recordWithin(low+".share_of_calls",
+		c.num(low+".calls")/c.positive("measurement_detail.calls", c.num("measurement_detail.calls")),
+		low+".calls ÷ measurement_detail.calls", reportedTolerancePct)
+	c.recordWithin("measurement.review_passes_per_task",
+		c.num("measurement.review_passes")/c.positive("measurement.tasks", c.num("measurement.tasks")),
+		"measurement.review_passes ÷ measurement.tasks", reportedTolerancePct)
+	const comments = "sizes.rgw_go.product_go_comments"
+	c.recordWithin(comments+".share_of_product_go_bytes",
+		c.num(comments+".bytes")/c.num("sizes.rgw_go.product_go.bytes"),
+		comments+".bytes ÷ sizes.rgw_go.product_go.bytes", reportedTolerancePct)
 
 	for _, d := range []struct {
 		param string
@@ -180,6 +200,10 @@ func (c *calibration) checkCoverage(a *Assumptions, sz rgwSizes) {
 		compare(c.p, where, &got, expansionAt[end], how(end))
 	}
 	for _, id := range a.ScenarioIDs() {
+		if _, scaled := a.Scenarios[id].Scale["expansion"]; scaled {
+			c.p.Addf("%s: scenarios.%s.scale.expansion: the expansion is taken from %s at a coverage end; set it in overrides and map the scenario in %s",
+				AssumptionsFile, id, CalibrationFile, mapPath)
+		}
 		if _, overrides := a.Scenarios[id].Overrides["expansion"]; overrides && mapping != nil {
 			if _, mapped := mapping[id]; !mapped {
 				c.p.Addf("%s: scenarios.%s.overrides.expansion names no coverage end; map the scenario in %s %s",
@@ -309,6 +333,7 @@ func (c *calibration) checkPhases(a *Assumptions) {
 		all.goTokens += t.goTokens
 	}
 	c.recordPhase("all_phases", all, "phases.rows")
+	c.checkPhaseBlocks(byPhase)
 
 	const path = "phases.scenario_phase"
 	mapping := c.mapping(path)
@@ -359,6 +384,21 @@ func (c *calibration) checkPhases(a *Assumptions) {
 	}
 }
 
+// checkPhaseBlocks reports a phases.derived block that has no row: every
+// block is one row's, or all_phases.
+func (c *calibration) checkPhaseBlocks(byPhase map[float64]phaseTotals) {
+	keys := map[string]bool{"all_phases": true}
+	for n := range byPhase {
+		keys["phase_"+show(n)] = true
+	}
+	const path = "phases.derived"
+	for _, k := range slices.Sorted(maps.Keys(c.mapping(path))) {
+		if !keys[k] {
+			c.problem(path+"."+k, "has no row in phases.rows; each block belongs to one row, or to all_phases")
+		}
+	}
+}
+
 // recordPhase checks the derived figures phases.derived.<key> records for
 // one phase, or for all of them.
 func (c *calibration) recordPhase(key string, t phaseTotals, from string) {
@@ -403,6 +443,14 @@ func (c *calibration) checkLongContext(a *Assumptions) {
 			compare(c.p, where, &got, want, share)
 		}
 	}
+	for _, id := range a.ScenarioIDs() {
+		for _, path := range slices.Sorted(maps.Keys(a.Scenarios[id].Scale)) {
+			if strings.HasPrefix(path, "long_context_share.") {
+				c.p.Addf("%s: scenarios.%s.scale.%s: the long-context shares are taken from %s; set them in overrides and list the scenario in %s",
+					AssumptionsFile, id, path, CalibrationFile, listPath)
+			}
+		}
+	}
 	if c.reported[listPath] {
 		return
 	}
@@ -417,4 +465,64 @@ func (c *calibration) checkLongContext(a *Assumptions) {
 			}
 		}
 	}
+}
+
+// checkSanity recomputes the dollar figures calibration.yaml records for
+// the port row, and the review agents' share of them, at the list prices
+// models.yaml gives for the model measurement.model_id names.
+func (c *calibration) checkSanity(models []Model) {
+	const base = "derived.sanity_opus_5_5_usd"
+	id, ok := c.str("measurement.model_id")
+	if !ok {
+		return
+	}
+	i := slices.IndexFunc(models, func(m Model) bool { return m.ID == id })
+	if i < 0 {
+		return
+	}
+	pr := models[i].USDPerMTok
+	const ttl = "measurement_detail.cache_write_ttl_tokens"
+	long := c.num(ttl+".long_1h") / c.positive(ttl+".total", c.num(ttl+".total"))
+	split := (1-long)*orNaN(pr.CacheWriteShort) + long*orNaN(pr.CacheWriteLong)
+	// usd prices one row of the measurement table, in millions of tokens,
+	// with cache writes at cw dollars per million.
+	usd := func(row any, path string, cw float64) float64 {
+		return c.numAt(row, path, "uncached", true)*orNaN(pr.Input) +
+			c.numAt(row, path, "cache_write", true)*cw +
+			c.numAt(row, path, "cache_read", true)*orNaN(pr.CacheRead) +
+			c.numAt(row, path, "output", true)*orNaN(pr.Output)
+	}
+	port, _, _ := c.at(c.doc, "", "measurement.port")
+	lines := c.positive("sizes.rgw_go.product_go.lines", c.num("sizes.rgw_go.product_go.lines"))
+	prices := fmt.Sprintf("measurement.port at %s list prices", id)
+	measured := usd(port, "measurement.port", split)
+	for _, f := range []struct {
+		key, how string
+		dollars  float64
+	}{
+		{"measured_ttl_split", "cache writes at the measured TTL split", measured},
+		{"all_5m", "every cache write at the short TTL", usd(port, "measurement.port", orNaN(pr.CacheWriteShort))},
+		{"all_1h", "every cache write at the long TTL", usd(port, "measurement.port", orNaN(pr.CacheWriteLong))},
+	} {
+		c.record(base+"."+f.key, f.dollars, prices+", "+f.how)
+		c.record(base+".per_product_go_line."+f.key, f.dollars/lines,
+			prices+", "+f.how+", ÷ sizes.rgw_go.product_go.lines")
+	}
+
+	scope, ok := c.str(base + ".review_share.role_scope")
+	if !ok {
+		return
+	}
+	roles := c.list("measurement.roles")
+	j := slices.IndexFunc(roles, func(r any) bool {
+		v, _, _ := c.at(r, "", "scope")
+		return v == scope
+	})
+	if j < 0 {
+		c.problem(base+".review_share.role_scope", "%q names no row of measurement.roles", scope)
+		return
+	}
+	review := usd(roles[j], fmt.Sprintf("measurement.roles[%d]", j), split)
+	c.recordWithin(base+".review_share.value", review/c.positive(prices, measured),
+		fmt.Sprintf("measurement.roles %q ÷ measurement.port, both at %s list prices", scope, id), reportedTolerancePct)
 }
