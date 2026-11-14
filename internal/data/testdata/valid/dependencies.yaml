@@ -1,0 +1,25 @@
+dependencies:
+  - id: rocksdb
+    name: RocksDB
+    used_for: BlueStore metadata.
+    submodules: [src/rocksdb]
+    targets:
+      go: {strategy: bindings, package: github.com/linxGnu/grocksdb, sloc_equivalent: 2000, difficulty: hard, note: cgo bindings}
+      rust: {strategy: native, package: rust-rocksdb, sloc_equivalent: 0, difficulty: glue, note: maintained crate}
+      wasm: {strategy: port, package: null, sloc_equivalent: 40000, difficulty: extreme, note: no wasm build}
+  - id: seastar
+    name: Seastar
+    used_for: The crimson OSD's reactor.
+    submodules: [src/seastar, src/dpdk]
+    targets:
+      go: {strategy: drop, package: null, sloc_equivalent: 0, difficulty: standard, note: goroutines}
+      rust: {strategy: native, package: tokio, sloc_equivalent: 0, difficulty: glue, note: async runtime}
+      wasm: {strategy: drop, package: null, sloc_equivalent: 0, difficulty: standard, note: no reactor}
+  - id: boost
+    name: Boost
+    used_for: Everything.
+    submodules: []
+    targets:
+      go: {strategy: drop, package: null, sloc_equivalent: 0, difficulty: config, note: standard library}
+      rust: {strategy: drop, package: null, sloc_equivalent: 0, difficulty: config, note: std}
+      wasm: {strategy: drop, package: null, sloc_equivalent: 0, difficulty: config, note: not needed in wasm}

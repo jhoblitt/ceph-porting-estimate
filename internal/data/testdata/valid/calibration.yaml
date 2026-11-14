@@ -1,0 +1,9 @@
+# Free-form: the report carries this file verbatim.
+project: rgw-go
+measured_on: 2026-11-13
+tokens:
+  output: 45010000
+  cache_read: 56213600000
+sizes:
+  - {lang: go, kind: product, bytes: 1200000}
+  - {lang: go, kind: test, bytes: 800000}

@@ -1,0 +1,27 @@
+groups:
+  - id: gateways
+    name: Gateways
+    description: Protocol gateways in front of RADOS.
+components:
+  - id: rgw
+    group: gateways
+    name: RADOS Gateway
+    description: The S3 and Swift gateway.
+    root: [src/rgw, src/pybind/rgw]
+    features:
+      - id: frontend
+        name: Frontend
+        description: The HTTP frontend.
+        globs: ["src/rgw/**/*.cc"]
+        scope: headline
+        kind: product
+        difficulty: extreme
+        why: Wire compatibility with S3.
+      - id: admin
+        name: Admin tooling
+        description: The admin scripts.
+        globs: ["src/rgw/*.py"]
+        scope: not-ported
+        kind: config
+        difficulty: glue
+        why: Python stays Python.

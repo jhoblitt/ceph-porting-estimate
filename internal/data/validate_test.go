@@ -1,0 +1,273 @@
+package data_test
+
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/jhoblitt/ceph-porting-estimate/internal/data"
+)
+
+var _ = Describe("Validate", func() {
+	It("finds nothing wrong with the valid fixture", func() {
+		s, err := data.Load(fixture())
+		Expect(err).NotTo(HaveOccurred())
+		Expect(data.Validate(s)).To(BeEmpty())
+	})
+
+	It("reports problems in a stable order", func() {
+		bad := fixture(
+			edit{File: "assumptions.yaml", Old: "source: assumption, reason: borrow checker friction", New: `source: "", reason: ""`},
+			edit{File: "assumptions.yaml", Old: "difficulty.extreme: 3", New: "difficulty.insane: 3"},
+		)
+		s, err := data.Load(bad)
+		Expect(err).NotTo(HaveOccurred())
+		first := data.Validate(s)
+		Expect(first).To(HaveLen(3))
+		for range 20 {
+			Expect(data.Validate(s)).To(Equal(first))
+		}
+	})
+
+	It("renders problems as one error listing each", func() {
+		p := data.Problems{"a.yaml: one", "b.yaml: two"}
+		Expect(p.Err()).To(MatchError("2 problems:\n  a.yaml: one\n  b.yaml: two"))
+		var none data.Problems
+		Expect(none.Err()).To(Succeed())
+	})
+
+	DescribeTable("a minimal bad fixture",
+		func(e edit, want string) {
+			s, err := data.Load(fixture(e))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(data.Validate(s)).To(ContainElement(want))
+		},
+
+		// Taxonomy schema.
+		Entry("component without an id",
+			edit{File: "taxonomy/mgr.yaml", Old: "  - id: mgr\n    group:", New: "  - group:"},
+			`taxonomy/mgr.yaml: component #1: id is empty`),
+		Entry("component without a name",
+			edit{File: "taxonomy.yaml", Old: "    name: Monitor\n", New: ""},
+			`taxonomy.yaml: component "mon": name is empty`),
+		Entry("component without features",
+			edit{File: "taxonomy/zz.yaml", New: "components:\n  - {id: empty, name: Empty, description: Nothing., features: []}\n"},
+			`taxonomy/zz.yaml: component "empty": features is empty`),
+		Entry("feature without an id",
+			edit{File: "taxonomy/mgr.yaml", Old: "      - id: dashboard\n        name:", New: "      - name:"},
+			`taxonomy/mgr.yaml: component "mgr" feature #1: id is empty`),
+		Entry("feature without a name",
+			edit{File: "taxonomy/mgr.yaml", Old: "        name: Dashboard\n", New: ""},
+			`taxonomy/mgr.yaml: component "mgr" feature "dashboard": name is empty`),
+		Entry("feature without globs",
+			edit{File: "taxonomy/mgr.yaml", Old: `globs: ["src/pybind/mgr/dashboard/**"]`, New: "globs: []"},
+			`taxonomy/mgr.yaml: component "mgr" feature "dashboard": globs is empty`),
+		Entry("glob that is not a valid pattern",
+			edit{File: "taxonomy.yaml", Old: `"src/test/mon/**"`, New: `"src/test/mon/[**"`},
+			`taxonomy.yaml: component "mon" feature "tests": glob "src/test/mon/[**" is not a valid pattern`),
+		Entry("unknown scope",
+			edit{File: "taxonomy/rgw.yaml", Old: "scope: not-ported", New: "scope: everything"},
+			`taxonomy/rgw.yaml: component "rgw" feature "admin": scope "everything" is not one of headline, shown, not-ported`),
+		Entry("unknown kind",
+			edit{File: "taxonomy/rgw.yaml", Old: "kind: config", New: "kind: docs"},
+			`taxonomy/rgw.yaml: component "rgw" feature "admin": kind "docs" is not one of product, test, config`),
+		Entry("unknown difficulty",
+			edit{File: "taxonomy/rgw.yaml", Old: "difficulty: extreme", New: "difficulty: impossible"},
+			`taxonomy/rgw.yaml: component "rgw" feature "frontend": difficulty "impossible" is not one of config, glue, standard, hard, extreme`),
+		Entry("feature id used twice in one component",
+			edit{File: "taxonomy.yaml", Old: "id: tests", New: "id: core"},
+			`taxonomy.yaml: component "mon": feature "core" is defined twice`),
+		Entry("component id used in two taxonomy files",
+			edit{File: "taxonomy/zz.yaml", New: "components:\n  - id: mon\n    name: Again\n    features:\n      - {id: x, name: X, globs: [x], scope: shown, kind: product, difficulty: glue}\n"},
+			`taxonomy/zz.yaml: component "mon" is also defined in taxonomy.yaml`),
+		Entry("reserved component id unclassified",
+			edit{File: "taxonomy/mgr.yaml", Old: "id: mgr", New: "id: unclassified"},
+			`taxonomy/mgr.yaml: component "unclassified": the id is reserved`),
+		Entry("reserved component id dependencies",
+			edit{File: "taxonomy/mgr.yaml", Old: "id: mgr", New: "id: dependencies"},
+			`taxonomy/mgr.yaml: component "dependencies": the id is reserved`),
+
+		// Groups.
+		Entry("group without an id",
+			edit{File: "taxonomy/rgw.yaml", Old: "  - id: gateways\n    name:", New: "  - name:"},
+			`taxonomy/rgw.yaml: group #1: id is empty`),
+		Entry("group without a name",
+			edit{File: "taxonomy/rgw.yaml", Old: "    name: Gateways\n", New: ""},
+			`taxonomy/rgw.yaml: group "gateways": name is empty`),
+		Entry("group without a description",
+			edit{File: "taxonomy.yaml", Old: "    description: The daemons every cluster runs.\n", New: ""},
+			`taxonomy.yaml: group "core": description is empty`),
+		Entry("group id used twice in one file",
+			edit{File: "taxonomy.yaml", Old: "groups:\n", New: "groups:\n  - {id: core, name: Again, description: Again.}\n"},
+			`taxonomy.yaml: group "core" is also defined in taxonomy.yaml`),
+		Entry("group id used in two taxonomy files",
+			edit{File: "taxonomy/zz.yaml", New: "groups:\n  - {id: core, name: Again, description: Again.}\n"},
+			`taxonomy/zz.yaml: group "core" is also defined in taxonomy.yaml`),
+		Entry("reserved group id unclassified",
+			edit{File: "taxonomy/zz.yaml", New: "groups:\n  - {id: unclassified, name: U, description: U.}\n"},
+			`taxonomy/zz.yaml: group "unclassified": the id is reserved`),
+		Entry("reserved group id dependencies",
+			edit{File: "taxonomy/zz.yaml", New: "groups:\n  - {id: dependencies, name: D, description: D.}\n"},
+			`taxonomy/zz.yaml: group "dependencies": the id is reserved`),
+		Entry("component without a group",
+			edit{File: "taxonomy/mgr.yaml", Old: "    group: core\n", New: ""},
+			`taxonomy/mgr.yaml: component "mgr": group is empty`),
+		Entry("component naming a group no groups list defines",
+			edit{File: "taxonomy/mgr.yaml", Old: "group: core", New: "group: ops"},
+			`taxonomy/mgr.yaml: component "mgr": group "ops" is not defined in any groups list`),
+		Entry("group no component uses",
+			edit{File: "taxonomy/zz.yaml", New: "groups:\n  - {id: spare, name: Spare, description: Unused.}\n"},
+			`taxonomy/zz.yaml: group "spare" is used by no component`),
+
+		// Dependencies.
+		Entry("dependency id used twice",
+			edit{File: "dependencies.yaml", Old: "id: boost", New: "id: rocksdb"},
+			`dependencies.yaml: dependency "rocksdb" is defined twice`),
+		Entry("dependency without used_for",
+			edit{File: "dependencies.yaml", Old: "    used_for: Everything.\n", New: ""},
+			`dependencies.yaml: dependency "boost": used_for is empty`),
+		Entry("dependency naming a submodule sloc.json lacks",
+			edit{File: "dependencies.yaml", Old: "submodules: [src/rocksdb]", New: "submodules: [src/leveldb]"},
+			`dependencies.yaml: dependency "rocksdb": submodule "src/leveldb" is not in generated/sloc.json`),
+		Entry("unknown target",
+			edit{File: "dependencies.yaml", Old: "      wasm: {strategy: drop, package: null, sloc_equivalent: 0, difficulty: config, note: not needed in wasm}", New: "      java: {strategy: drop, package: null, sloc_equivalent: 0, difficulty: config, note: not needed in wasm}"},
+			`dependencies.yaml: dependency "boost": target "java" is not one of go, rust, wasm`),
+		Entry("missing target",
+			edit{File: "dependencies.yaml", Old: "      wasm: {strategy: drop, package: null, sloc_equivalent: 0, difficulty: config, note: not needed in wasm}\n", New: ""},
+			`dependencies.yaml: dependency "boost": target "wasm" is missing`),
+		Entry("unknown strategy",
+			edit{File: "dependencies.yaml", Old: "strategy: port", New: "strategy: rewrite"},
+			`dependencies.yaml: dependency "rocksdb" target "wasm": strategy "rewrite" is not one of native, bindings, port, drop`),
+		Entry("target without sloc_equivalent",
+			edit{File: "dependencies.yaml", Old: "sloc_equivalent: 40000, ", New: ""},
+			`dependencies.yaml: dependency "rocksdb" target "wasm": sloc_equivalent is missing`),
+		Entry("native strategy with a nonzero sloc_equivalent",
+			edit{File: "dependencies.yaml", Old: "package: rust-rocksdb, sloc_equivalent: 0", New: "package: rust-rocksdb, sloc_equivalent: 10"},
+			`dependencies.yaml: dependency "rocksdb" target "rust": sloc_equivalent must be 0 for strategy native`),
+		Entry("drop strategy with a nonzero sloc_equivalent",
+			edit{File: "dependencies.yaml", Old: "sloc_equivalent: 0, difficulty: standard, note: goroutines", New: "sloc_equivalent: 5, difficulty: standard, note: goroutines"},
+			`dependencies.yaml: dependency "seastar" target "go": sloc_equivalent must be 0 for strategy drop`),
+		Entry("target without a note",
+			edit{File: "dependencies.yaml", Old: "note: maintained crate", New: `note: ""`},
+			`dependencies.yaml: dependency "rocksdb" target "rust": note is empty`),
+		Entry("submodule listed by two dependencies",
+			edit{File: "dependencies.yaml", Old: "submodules: [src/seastar, src/dpdk]", New: "submodules: [src/seastar, src/rocksdb]"},
+			`dependencies.yaml: dependency "seastar": submodule "src/rocksdb" is also listed by dependency "rocksdb"`),
+		Entry("submodule listed twice by one dependency",
+			edit{File: "dependencies.yaml", Old: "submodules: [src/seastar, src/dpdk]", New: "submodules: [src/seastar, src/seastar]"},
+			`dependencies.yaml: dependency "seastar": submodule "src/seastar" is listed twice`),
+		Entry("bindings target without difficulty",
+			edit{File: "dependencies.yaml", Old: ", difficulty: hard", New: ""},
+			`dependencies.yaml: dependency "rocksdb" target "go": difficulty is missing`),
+		Entry("native target without difficulty",
+			edit{File: "dependencies.yaml", Old: "sloc_equivalent: 0, difficulty: glue, note: maintained crate", New: "sloc_equivalent: 0, note: maintained crate"},
+			`dependencies.yaml: dependency "rocksdb" target "rust": difficulty is missing`),
+		Entry("drop target without difficulty",
+			edit{File: "dependencies.yaml", Old: "difficulty: standard, note: no reactor", New: "note: no reactor"},
+			`dependencies.yaml: dependency "seastar" target "wasm": difficulty is missing`),
+		Entry("dependency difficulty outside the enum",
+			edit{File: "dependencies.yaml", Old: "difficulty: extreme", New: "difficulty: brutal"},
+			`dependencies.yaml: dependency "rocksdb" target "wasm": difficulty "brutal" is not one of config, glue, standard, hard, extreme`),
+
+		// Models.
+		Entry("model id used twice",
+			edit{File: "models.yaml", Old: "id: gpt-6-astra", New: "id: opus-5-5"},
+			`models.yaml: model "opus-5-5" is defined twice`),
+		Entry("model without a source",
+			edit{File: "models.yaml", Old: "    source: https://developers.openai.com/api/docs/pricing\n", New: ""},
+			`models.yaml: model "gpt-6-astra": source is empty`),
+		Entry("model without read_on",
+			edit{File: "models.yaml", Old: "    vendor: Anthropic\n    source: https://platform.claude.com/docs/en/about-claude/pricing\n    read_on: 2026-11-13\n", New: "    vendor: Anthropic\n    source: https://platform.claude.com/docs/en/about-claude/pricing\n"},
+			`models.yaml: model "opus-5-5": read_on is empty`),
+		Entry("model read_on that is not a date",
+			edit{File: "models.yaml", Old: "    vendor: Anthropic\n    source: https://platform.claude.com/docs/en/about-claude/pricing\n    read_on: 2026-11-13\n", New: "    vendor: Anthropic\n    source: https://platform.claude.com/docs/en/about-claude/pricing\n    read_on: last tuesday\n"},
+			`models.yaml: model "opus-5-5": read_on "last tuesday" is not a YYYY-MM-DD date`),
+		Entry("model missing a price",
+			edit{File: "models.yaml", Old: "cache_read: 0.2, ", New: ""},
+			`models.yaml: model "opus-5-5": usd_per_mtok.cache_read is missing`),
+		Entry("model with a negative price",
+			edit{File: "models.yaml", Old: "output: 50}", New: "output: -50}"},
+			`models.yaml: model "gpt-6-astra": usd_per_mtok.output is negative`),
+		Entry("long context without a threshold",
+			edit{File: "models.yaml", Old: "threshold_tokens: 272000, ", New: ""},
+			`models.yaml: model "gpt-6-astra": long_context.threshold_tokens is missing`),
+		Entry("long context missing a price",
+			edit{File: "models.yaml", Old: "cache_read: 2, ", New: ""},
+			`models.yaml: model "gpt-6-astra": long_context.cache_read is missing`),
+		Entry("model with no model_efficiency entry",
+			edit{File: "assumptions.yaml", Old: "    gpt-6-astra: {value: 1.1, measured: false, source: assumption, reason: no measurement yet}\n", New: ""},
+			`models.yaml: model "gpt-6-astra" has no params.model_efficiency entry in assumptions.yaml`),
+
+		// Assumptions.
+		Entry("pinned rev differs from sloc.json",
+			edit{File: "assumptions.yaml", Old: "rev: 0123456789abcdef0123456789abcdef01234567", New: "rev: 1111111111111111111111111111111111111111"},
+			`assumptions.yaml: ceph.rev 1111111111111111111111111111111111111111 does not match generated/sloc.json rev 0123456789abcdef0123456789abcdef01234567`),
+		Entry("pinned repo differs from sloc.json",
+			edit{File: "assumptions.yaml", Old: "repo: ceph/ceph", New: "repo: someone/ceph"},
+			`assumptions.yaml: ceph.repo "someone/ceph" does not match generated/sloc.json repo "ceph/ceph"`),
+		Entry("quantity without a source",
+			edit{File: "assumptions.yaml", Old: "source: assumption, reason: borrow checker friction", New: `source: "", reason: borrow checker friction`},
+			`assumptions.yaml: params.rust_factor: source is empty`),
+		Entry("quantity without a reason",
+			edit{File: "assumptions.yaml", Old: "reason: no threads or sockets", New: `reason: ""`},
+			`assumptions.yaml: params.wasm_overhead: reason is empty`),
+		Entry("quantity without a value",
+			edit{File: "assumptions.yaml", Old: "clean_break_discount: {value: 0.8, ", New: "clean_break_discount: {"},
+			`assumptions.yaml: params.clean_break_discount: value is missing`),
+		Entry("long_context_share missing a category",
+			edit{File: "assumptions.yaml", Old: "    output: {value: 0.2, measured: false, source: assumption, reason: share of output above the threshold}\n", New: ""},
+			`assumptions.yaml: params.long_context_share.output: value is missing`),
+		Entry("bytes_per_token entry without a source",
+			edit{File: "assumptions.yaml", Old: "cpp: {value: 3.2, measured: true, source: calibration.yaml", New: `cpp: {value: 3.2, measured: true, source: ""`},
+			`assumptions.yaml: bytes_per_token.cpp: source is empty`),
+		Entry("bytes_per_token entry that is not positive",
+			edit{File: "assumptions.yaml", Old: "cpp: {value: 3.2", New: "cpp: {value: 0"},
+			`assumptions.yaml: bytes_per_token.cpp: value must be positive`),
+		Entry("language with no bytes_per_token entry and no default",
+			edit{File: "assumptions.yaml", Old: "  default: {value: 3.5, measured: false, source: assumption, reason: fallback for minor languages}\n", New: ""},
+			`assumptions.yaml: bytes_per_token has no entry for language "markdown" in generated/sloc.json and no default`),
+		Entry("model_efficiency entry naming no model",
+			edit{File: "assumptions.yaml", Old: "  model_efficiency:\n", New: "  model_efficiency:\n    fable-5-2: {value: 1, measured: false, source: assumption, reason: unpriced}\n"},
+			`assumptions.yaml: params.model_efficiency.fable-5-2 names no model in models.yaml`),
+		Entry("override naming a param that does not exist",
+			edit{File: "assumptions.yaml", Old: "difficulty.extreme: 3", New: "difficulty.insane: 3"},
+			`assumptions.yaml: scenarios.pessimistic.overrides: "difficulty.insane" is not a param`),
+		Entry("override naming a param group rather than a quantity",
+			edit{File: "assumptions.yaml", Old: "long_context_share.cache_read: 0.5", New: "long_context_share: 0.5"},
+			`assumptions.yaml: scenarios.pessimistic.overrides: "long_context_share" is not a param`),
+		Entry("override naming a model efficiency for a model that does not exist",
+			edit{File: "assumptions.yaml", Old: "overrides: {test_ratio: 0,", New: "overrides: {model_efficiency.fable-5-2: 1, test_ratio: 0,"},
+			`assumptions.yaml: scenarios.naive.overrides: "model_efficiency.fable-5-2" is not a param`),
+		Entry("scale naming a param that does not exist",
+			edit{File: "assumptions.yaml", Old: "scale: {overhead: 1.25}", New: "scale: {overheads: 1.25}"},
+			`assumptions.yaml: scenarios.pessimistic.scale: "overheads" is not a param`),
+		Entry("scale naming a param group rather than a quantity",
+			edit{File: "assumptions.yaml", Old: "scale: {overhead: 1.25}", New: "scale: {adjacent_uplift: 2}"},
+			`assumptions.yaml: scenarios.pessimistic.scale: "adjacent_uplift" is not a param`),
+		Entry("one path both overridden and scaled",
+			edit{File: "assumptions.yaml", Old: "overrides: {difficulty.extreme: 3,", New: "overrides: {overhead: 4, difficulty.extreme: 3,"},
+			`assumptions.yaml: scenarios.pessimistic: "overhead" is in both overrides and scale`),
+		Entry("quantity missing from params",
+			edit{File: "assumptions.yaml", Old: "  source_read_passes: {value: 2.5, measured: true, source: calibration.yaml, reason: rgw-go reads of the replaced source}\n", New: ""},
+			`assumptions.yaml: params.source_read_passes: value is missing`),
+		Entry("scenario toggle that does not exist",
+			edit{File: "assumptions.yaml", Old: "toggles: {include_adjacent: true}", New: "toggles: {include_everything: true}"},
+			`assumptions.yaml: scenarios.pessimistic.toggles: "include_everything" is not a toggle`),
+		Entry("scenario without a label",
+			edit{File: "assumptions.yaml", Old: "    label: Naive\n", New: ""},
+			`assumptions.yaml: scenarios.naive: label is empty`),
+		Entry("unknown scenario",
+			edit{File: "assumptions.yaml", Old: "  naive:\n", New: "  heroic:\n"},
+			`assumptions.yaml: scenarios: "heroic" is not one of naive, calibrated, pessimistic`),
+		Entry("missing scenario",
+			edit{File: "assumptions.yaml", Old: "  naive:\n", New: "  heroic:\n"},
+			`assumptions.yaml: scenarios: "naive" is missing`),
+		Entry("default scenario that does not exist",
+			edit{File: "assumptions.yaml", Old: "default_scenario: calibrated", New: "default_scenario: optimistic"},
+			`assumptions.yaml: default_scenario "optimistic" is not a scenario`),
+
+		// sloc.json.
+		Entry("file listed twice in sloc.json",
+			edit{File: "generated/sloc.json", Old: `"path": "README.md"`, New: `"path": "src/mon/Paxos.h"`},
+			`generated/sloc.json: file "src/mon/Paxos.h" is listed twice`),
+	)
+})

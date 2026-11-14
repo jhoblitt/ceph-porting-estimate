@@ -1,0 +1,54 @@
+ceph: {repo: ceph/ceph, rev: 0123456789abcdef0123456789abcdef01234567}
+bytes_per_token:
+  default: {value: 3.5, measured: false, source: assumption, reason: fallback for minor languages}
+  cpp: {value: 3.2, measured: true, source: calibration.yaml, reason: tokenizer run on ceph C++}
+  python: {value: 3.8, measured: true, source: calibration.yaml, reason: tokenizer run on ceph Python}
+params:
+  expansion: {value: 1.4, measured: true, source: calibration.yaml, reason: rgw-go product Go over replaced C++}
+  test_ratio: {value: 0.9, measured: true, source: calibration.yaml, reason: rgw-go test Go over product Go}
+  overhead: {value: 3.1, measured: true, source: calibration.yaml, reason: output tokens over surviving Go}
+  uncached_per_output: {value: 0.008, measured: true, source: calibration.yaml, reason: rgw-go uncached input ratio}
+  cache_write_per_output: {value: 25.3, measured: true, source: calibration.yaml, reason: rgw-go cache write ratio}
+  cache_read_per_output: {value: 1249, measured: true, source: calibration.yaml, reason: rgw-go cache read ratio}
+  source_read_passes: {value: 2.5, measured: true, source: calibration.yaml, reason: rgw-go reads of the replaced source}
+  difficulty:
+    config: {value: 0.1, measured: false, source: assumption, reason: config is mostly copied}
+    glue: {value: 0.5, measured: false, source: assumption, reason: glue is thin}
+    standard: {value: 1, measured: false, source: assumption, reason: the calibration baseline}
+    hard: {value: 1.5, measured: false, source: assumption, reason: subtle invariants}
+    extreme: {value: 2, measured: false, source: assumption, reason: wire and disk formats}
+  rust_factor: {value: 1.15, measured: false, source: assumption, reason: borrow checker friction}
+  wasm_overhead: {value: 1.25, measured: false, source: assumption, reason: no threads or sockets}
+  clean_break_discount: {value: 0.8, measured: false, source: assumption, reason: no compatibility shims}
+  long_cache_write_share: {value: 0.5, measured: false, source: assumption, reason: half the writes outlive five minutes}
+  long_context_share:
+    uncached: {value: 0.2, measured: false, source: assumption, reason: share of uncached input above the threshold}
+    cache_write: {value: 0.2, measured: false, source: assumption, reason: share of cache writes above the threshold}
+    cache_read: {value: 0.3, measured: false, source: assumption, reason: share of cache reads above the threshold}
+    output: {value: 0.2, measured: false, source: assumption, reason: share of output above the threshold}
+  model_efficiency:
+    opus-5-5: {value: 1, measured: true, source: calibration.yaml, reason: the calibration model}
+    gpt-6-astra: {value: 1.1, measured: false, source: assumption, reason: no measurement yet}
+  sloc_equivalent_bytes_per_line: {value: 40, measured: false, source: assumption, reason: typical C++ line}
+  adjacent_uplift:
+    uncached: {value: 0.1, measured: false, source: assumption, reason: docs and CI}
+    cache_write: {value: 0.1, measured: false, source: assumption, reason: docs and CI}
+    cache_read: {value: 0.1, measured: false, source: assumption, reason: docs and CI}
+    output: {value: 0.1, measured: false, source: assumption, reason: docs and CI}
+toggles: {include_adjacent: false, clean_break: false}
+scenarios:
+  naive:
+    label: Naive
+    description: One pass over the source.
+    overrides: {test_ratio: 0, overhead: 1, difficulty.hard: 1}
+    toggles: {}
+  calibrated:
+    label: Calibrated
+    description: The rgw-go measurement applied as measured.
+  pessimistic:
+    label: Pessimistic
+    description: Hard code is harder and adjacent work counts.
+    overrides: {difficulty.extreme: 3, long_context_share.cache_read: 0.5}
+    scale: {overhead: 1.25}
+    toggles: {include_adjacent: true}
+default_scenario: calibrated
