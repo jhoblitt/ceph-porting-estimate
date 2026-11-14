@@ -11,10 +11,19 @@
 
   let { d }: Props = $props();
 
-  /** Groups named in the not-ported line; the rest are small. */
+  /** Groups named in the not-ported line, and components in the shown line; the rest are counted. */
   const NAMED_GROUPS = 3;
+  const NAMED_SHOWN = 3;
 
   const scope = $derived(d.scope);
+  const shownLargest = $derived([...scope.shown].sort((a, b) => b.usd - a.usd).slice(0, NAMED_SHOWN));
+  const shownRest = $derived(scope.shown.length - shownLargest.length);
+  const shownNames = $derived(
+    list([
+      ...shownLargest.map((c) => c.name),
+      ...(shownRest > 0 ? [`${shownRest === 1 ? 'one other component' : `${shownRest} other components`}`] : []),
+    ]),
+  );
   const dependencyLines = $derived(scope.dependencies?.headline.sloc.code ?? 0);
   const notPortedNames = $derived(scope.notPortedByGroup.slice(0, NAMED_GROUPS).map((g) => g.name));
 </script>
@@ -36,7 +45,7 @@
         <dt>Costed but shown separately</dt>
         <dd>
           <Amount value={d.root.shown.usd} kind="usd" /> for <Amount value={scope.ceph.shown.code} kind="count" unit="lines" />
-          lines in {list(scope.shown.map((c) => c.name))}. This is not in the headline.
+          lines in {shownNames}. This code is costed for reference and is not part of the headline.
         </dd>
       </div>
     {/if}
