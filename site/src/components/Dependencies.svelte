@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { STRATEGIES, dependencySummary } from '../lib/dependencies';
+  import { STRATEGIES, bindingsText, dependencySummary } from '../lib/dependencies';
   import type { Derived } from '../lib/derived.svelte';
   import { countExact, list, percent, usd, usdExact } from '../lib/format';
   import { STRATEGY_LABELS, STRATEGY_MEANINGS } from '../lib/labels';
@@ -34,6 +34,16 @@
   };
   const counts = $derived(list(summary.counts.filter((c) => c.count > 0).map((c) => COUNT_WORDS[c.strategy](c.count))));
 
+  /** "For libnbd and FoundationDB, used through bindings, the data counts no lines of work." */
+  const withoutWork = $derived(
+    STRATEGIES.flatMap((strategy) => {
+      const names = summary.withoutWork.filter((x) => x.strategy === strategy).map((x) => x.name);
+      if (names.length === 0) return [];
+      const how = strategy === 'bindings' ? 'used through bindings' : 'ported';
+      return [`For ${list(names)}, ${how}, the data counts no lines of work.`];
+    }).join(' '),
+  );
+
   async function explore(id: string) {
     onselect({ ...selection, path: [DEPENDENCIES_COMPONENT_ID, id] });
     await tick();
@@ -57,10 +67,12 @@
     <p class="work">
       Bindings and ports leave
       <strong title={`${countExact(summary.lines)} lines`}>{countExact(summary.lines)} lines</strong>
-      of work on {withWork} of them, costing <strong title={usdExact(summary.usd)}>{usd(summary.usd)}</strong>,
-      {percent(summary.share)} of the headline.
+      of work on {withWork} of them, costing <strong title="Model output: {usdExact(summary.usd)}">{usd(summary.usd)}</strong>,
+      {percent(summary.share)} of the headline.{#if withoutWork}{' '}{withoutWork}{/if}
     </p>
   </div>
+
+  <p class="bindings">{bindingsText(targetName, summary.bindings)}</p>
 
   <dl class="strategies">
     {#each STRATEGIES as s (s)}
@@ -88,6 +100,13 @@
 
   .work strong {
     font-variant-numeric: tabular-nums;
+  }
+
+  .bindings {
+    margin: 0 0 var(--space-5);
+    padding: var(--space-2) var(--space-3);
+    border-inline-start: 3px solid var(--accent);
+    background: var(--accent-wash);
   }
 
   .strategies {

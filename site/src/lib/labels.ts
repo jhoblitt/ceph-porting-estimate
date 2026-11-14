@@ -45,7 +45,7 @@ export const STRATEGY_LABELS: Record<Strategy, string> = {
 
 export const STRATEGY_MEANINGS: Record<Strategy, string> = {
   native: "the target's own libraries cover it, so there is no work to cost",
-  bindings: 'call the existing library through bindings, which leaves glue code to write',
+  bindings: 'rely on existing code that is not rewritten, reached across a language boundary; the plan says which code',
   port: 'rewrite the part Ceph uses in the target language',
   drop: 'not needed in the port, so there is no work to cost',
 };

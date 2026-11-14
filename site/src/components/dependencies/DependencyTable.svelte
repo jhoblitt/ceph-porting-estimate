@@ -4,7 +4,7 @@
   code's size. Each row opens a comparison of all three targets' plans.
 -->
 <script lang="ts">
-  import type { DependencyRow } from '../../lib/dependencies';
+  import { type DependencyRow, vendoredText } from '../../lib/dependencies';
   import { countExact, usdExact } from '../../lib/format';
   import { DIFFICULTY_LABELS, STRATEGY_LABELS } from '../../lib/labels';
   import { TARGET_LABELS, type Target } from '../../lib/report';
@@ -43,6 +43,7 @@
     <tbody>
       {#each rows as r (r.id)}
         {@const expanded = open.has(r.id)}
+        {@const size = vendoredText(r)}
         <tr class="row" class:expanded>
           <th scope="row">
             <span class="name">{r.name}</span>
@@ -63,22 +64,16 @@
               {/if}
             </span>
           </th>
-          <td class="used">{r.usedFor}</td>
-          <td class="plan">
+          <td class="used" data-label="Ceph uses it for">{r.usedFor}</td>
+          <td class="plan" data-label="Plan for {TARGET_LABELS[target]}">
             <span class="strategy {r.strategy}">{STRATEGY_LABELS[r.strategy]}</span>
             {#if r.package}<code>{r.package}</code>{/if}
             <span class="note">{r.note}</span>
           </td>
-          <td class="n">{r.lines > 0 ? countExact(r.lines) : '—'}</td>
-          <td class="n">{r.lines > 0 ? usdExact(r.usd) : '—'}</td>
-          <td class="n">
-            {#if r.submodule}
-              {countExact(r.submodule.code)} lines<span class="sub">in {countExact(r.submodule.files)} files{r.submodule.nestedUnavailable > 0
-                  ? `; ${r.submodule.nestedUnavailable} nested not counted`
-                  : ''}</span>
-            {:else}
-              Not available{#if r.submodules.length === 0}<span class="sub">not vendored</span>{/if}
-            {/if}
+          <td class="n" data-label="Lines of work">{r.lines > 0 ? countExact(r.lines) : '—'}</td>
+          <td class="n" data-label="Cost">{r.lines > 0 ? usdExact(r.usd) : '—'}</td>
+          <td class="n size" data-label="Vendored code">
+            {size.text}{#if size.note}<span class="sub">{size.note}</span>{/if}
           </td>
         </tr>
         {#if expanded}
@@ -114,6 +109,12 @@
     border-radius: var(--radius-sm);
   }
 
+  td.size {
+    min-width: 9rem;
+    max-width: 14rem;
+    white-space: normal;
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;
@@ -140,11 +141,6 @@
     text-align: end;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
-  }
-
-  td.n:last-child {
-    min-width: 7.5rem;
-    white-space: normal;
   }
 
   th[scope='row'] {
@@ -251,5 +247,92 @@
 
   .target {
     font-weight: 600;
+  }
+
+  /*
+   * A phone: one card per dependency, each figure under its own label, so
+   * nothing sits off-screen and the comparison stacks instead of scrolling.
+   */
+  @media (width < 720px) {
+    .scroll {
+      overflow-x: visible;
+    }
+
+    table,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+    }
+
+    thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    tr.row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-2) var(--space-3);
+      padding: var(--space-3);
+      border-bottom: 1px solid var(--grid);
+    }
+
+    tr.row.expanded {
+      border-bottom: 0;
+    }
+
+    th,
+    td {
+      padding: 0;
+      border-bottom: 0;
+    }
+
+    th[scope='row'],
+    td.used,
+    td.plan {
+      grid-column: 1 / -1;
+      min-width: 0;
+      max-width: none;
+    }
+
+    .actions {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0 var(--space-4);
+    }
+
+    td.n {
+      text-align: start;
+      white-space: normal;
+    }
+
+    td.size {
+      grid-column: 1 / -1;
+      min-width: 0;
+      max-width: none;
+    }
+
+    td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .compare td {
+      padding: var(--space-3);
+      border-bottom: 1px solid var(--grid);
+    }
+
+    .compare ul {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 </style>
