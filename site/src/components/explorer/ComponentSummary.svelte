@@ -177,7 +177,7 @@
     border-image: var(--hatch-not-ported-line) 6;
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .summary {
       grid-template-columns: minmax(0, 1fr);
       padding: var(--space-4) var(--space-3);

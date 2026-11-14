@@ -272,7 +272,7 @@
     color: var(--text-muted);
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     thead td {
       width: 6.5rem;
     }

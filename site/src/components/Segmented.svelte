@@ -97,7 +97,7 @@
     outline-offset: 2px;
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .options {
       display: flex;
     }

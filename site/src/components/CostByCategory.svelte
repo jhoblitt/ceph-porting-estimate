@@ -330,7 +330,7 @@
     font-weight: 600;
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .volumes {
       grid-template-columns: 1fr;
       gap: var(--space-2);

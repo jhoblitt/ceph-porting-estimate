@@ -335,7 +335,7 @@
     margin-top: var(--space-2);
   }
 
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .columns {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -346,7 +346,7 @@
     }
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .detail {
       padding: var(--space-4) var(--space-3);
     }

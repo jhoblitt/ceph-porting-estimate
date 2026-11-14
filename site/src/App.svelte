@@ -92,7 +92,7 @@
     top: var(--space-4);
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     main {
       padding-top: var(--space-5);
       padding-inline: var(--space-4);

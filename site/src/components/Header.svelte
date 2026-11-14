@@ -78,7 +78,7 @@
     font-size: var(--text-sm);
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .inner {
       grid-template-columns: 1fr auto;
       grid-template-areas:

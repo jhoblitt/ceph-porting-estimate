@@ -278,7 +278,7 @@
     gap: var(--space-3);
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     .scenario {
       flex-direction: column;
     }

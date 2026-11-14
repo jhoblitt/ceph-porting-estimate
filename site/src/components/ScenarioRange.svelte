@@ -377,7 +377,7 @@
     line-height: 1.45;
   }
 
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     li {
       grid-template-columns: 1fr auto;
       grid-template-areas:
