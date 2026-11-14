@@ -5,6 +5,7 @@
 // functions over the model's outputs; Derived wires them to the selection.
 
 import { type Cost, type GroupEstimate, type Params, describeParams, estimate, resolveParams } from './model';
+import { percent } from './format';
 import type { Report, ScenarioRole, Target } from './report';
 
 export interface CalibrationFacts {
@@ -66,6 +67,28 @@ export function calibrationFacts(report: Report): CalibrationFacts {
 export function breakEven(measured: Cost, other: Cost): number | null {
   if (!(measured.usd > 0 && other.usd > 0 && Number.isFinite(measured.usd) && Number.isFinite(other.usd))) return null;
   return measured.usd / other.usd;
+}
+
+/** Closer to 1 than this, a break-even is "the same token counts". */
+const SAME_COUNTS = 0.0005;
+/** Below this factor, "N% fewer" would round to 100%. */
+const TINY_SHARE = 0.01;
+
+/**
+ * A break-even in words, as the front page's matrix and the Methods page
+ * print it: what the model priced on `factor` (from `breakEven`) would
+ * have to need to cost what the measured model does. `sameVolumes` is
+ * false when a model efficiency scales the row's token counts, so the
+ * comparison is with the counts the row assumes, not the same work.
+ */
+export function breakEvenSentence(measuredName: string, factor: number, sameVolumes = true): string {
+  if (Math.abs(factor - 1) < SAME_COUNTS) return `It would cost the same as ${measuredName} at the same token counts.`;
+  if (factor < TINY_SHARE) {
+    const of = sameVolumes ? 'the tokens for the same work' : 'the tokens this row assumes';
+    return `It would cost the same as ${measuredName} only if it needed less than 1% of ${of}.`;
+  }
+  const by = factor < 1 ? `${percent(1 - factor)} fewer` : `${percent(factor - 1)} more`;
+  return `It would cost the same as ${measuredName} if it needed ${by} tokens ${sameVolumes ? 'for the same work' : 'than this row assumes'}.`;
 }
 
 /** How many times the measured port's output the headline's output is. */

@@ -32,9 +32,13 @@ describe('targetText', () => {
       true,
     ]);
     const note = targetText('wasm', p).note ?? '';
-    for (const lack of ['parallel threads', 'block devices', 'process execution', 'kernel interfaces', 'not costed', 'attempt']) {
+    for (const lack of ['parallel threads', 'block devices', 'process execution', 'not costed', 'price of the attempt']) {
       expect(note).toContain(lack);
     }
+    // WASI's limits are the adversarial review's report, as the data's wasm_overhead reason says, not a finding.
+    expect(note).toContain('An adversarial review of this estimate reports that WASI lacks');
+    expect(note).toContain('rated plausible rather than confirmed; no WASI build was attempted');
+    expect(note).not.toMatch(/WASI has no|kernel interfaces/);
   });
 
   it('says the Rust factor is an assumption, and gives Go no basis', () => {

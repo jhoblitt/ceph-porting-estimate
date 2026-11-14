@@ -21,6 +21,12 @@ function withMix(mix: unknown = {}): Report {
   };
 }
 
+/** The fixture without a ported mix: the prose fixture carries one, the case here is data without it. */
+function withoutMix(): Report {
+  const { ported_mix: _, ...calibration } = report.calibration as Record<string, unknown>;
+  return { ...report, calibration };
+}
+
 /** Everything the detail needs for one scenario, with a reader's overrides on top. */
 function under(r: Report, scenario: string, overrides: Record<string, number> = {}) {
   const params = resolveParams(r, scenario, overrides);
@@ -43,7 +49,7 @@ describe('difficultyScale', () => {
   });
 
   it('is null without a usable mix', () => {
-    expect(difficultyScale(report)).toBeNull();
+    expect(difficultyScale(withoutMix())).toBeNull();
     expect(difficultyScale(withMix({ mean_relative_difficulty: 0 }))).toBeNull();
     expect(difficultyScale(withMix({ relative_difficulty: { standard: 'one' } }))).toBeNull();
   });
@@ -88,12 +94,12 @@ describe('difficultyText', () => {
   });
 
   it('falls back to the factor and the baseline without a mix', () => {
-    expect(under(report, 'calibrated').difficulty('hard')).toEqual({
+    expect(under(withoutMix(), 'calibrated').difficulty('hard')).toEqual({
       factor: '× 1.5',
       detail: '',
       step: 'Work per line for this difficulty class.',
     });
-    expect(under(report, 'pessimistic').difficulty('hard').detail).toBe('The baseline is × 1.5. This scenario sets × 2 instead.');
+    expect(under(withoutMix(), 'pessimistic').difficulty('hard').detail).toBe('The baseline is × 1.5. This scenario sets × 2 instead.');
   });
 });
 
@@ -106,7 +112,7 @@ describe('inputText', () => {
 
   it('says when the scenario has moved the ratios (optimistic)', () => {
     expect(under(report, 'optimistic').input()).toBe(
-      "Input is taken as proportional to output, at this scenario's ratios: each output token brings 0.0078 uncached, 25.3 cache-write and 937 cache-read tokens. The ratios measured over the whole of rgw-go are 0.0078, 25.3 and 1,250. That input grows in proportion to output is a modelling choice, not a measurement. Claude Opus 5.5's price sheet turns the four into dollars.",
+      "Input is taken as proportional to output, at this scenario's ratios: each output token brings 0.0078 uncached, 18.4 cache-write and 1,080 cache-read tokens. The ratios measured over the whole of rgw-go are 0.0078, 25.3 and 1,250. That input grows in proportion to output is a modelling choice, not a measurement. Claude Opus 5.5's price sheet turns the four into dollars.",
     );
   });
 

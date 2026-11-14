@@ -11,7 +11,8 @@
 -->
 <script lang="ts">
   import type { Derived } from '../lib/derived.svelte';
-  import { paramValue, percent, usd, usdExact } from '../lib/format';
+  import { paramValue, usd, usdExact } from '../lib/format';
+  import { breakEvenSentence } from '../lib/interpret';
   import type { Model } from '../lib/report';
   import { TARGETS, type Target } from '../lib/report';
   import type { AppState } from '../lib/state';
@@ -27,11 +28,6 @@
   }
 
   let { d, selection, onselect }: Props = $props();
-
-  /** Closer to 1 than this, a break-even is "the same token counts". */
-  const SAME = 0.0005;
-  /** Below this factor, "N% fewer" would round to 100%. */
-  const TINY = 0.01;
 
   const models = $derived(d.report.models);
   const measured = $derived(d.measuredModel);
@@ -58,15 +54,7 @@
     if (!measured || m.id === measured.id) return '';
     const f = d.breakEvens.get(m.id);
     if (f === null || f === undefined) return '';
-    const same = (d.volumeRatios.get(m.id) ?? 1) === 1;
-    const work = same ? 'for the same work' : 'than this row assumes';
-    if (Math.abs(f - 1) < SAME) return `It would cost the same as ${measured.name} at the same token counts.`;
-    if (f < TINY) {
-      const of = same ? 'the tokens for the same work' : 'the tokens this row assumes';
-      return `It would cost the same as ${measured.name} only if it needed less than 1% of ${of}.`;
-    }
-    const by = f < 1 ? `${percent(1 - f)} fewer` : `${percent(f - 1)} more`;
-    return `It would cost the same as ${measured.name} if it needed ${by} tokens ${work}.`;
+    return breakEvenSentence(measured.name, f, (d.volumeRatios.get(m.id) ?? 1) === 1);
   }
 
   function choose(target: Target, model: string) {

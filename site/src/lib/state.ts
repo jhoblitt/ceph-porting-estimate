@@ -4,8 +4,9 @@
 //
 // <route> is empty for the report, `methods` or `calibration`. `path` is the
 // drill-down, `o.<dotted param path>` an override of an assumption and
-// `o.toggles.<id>=0|1` of a toggle. Parsing never throws: what is unknown or
-// malformed falls back to its default.
+// `o.toggles.<id>=0|1` of a toggle. `section` names a heading on a prose
+// page. Parsing never throws: what is unknown or malformed falls back to its
+// default.
 
 import { type Readable, writable } from 'svelte/store';
 import { canonicalOverrides } from './overrides';
@@ -30,6 +31,8 @@ export interface AppState {
    * 0 or 1.
    */
   overrides: Record<string, number>;
+  /** A heading id on a prose page, which the page scrolls to; absent elsewhere. */
+  section?: string;
 }
 
 /** The hash's fields as written, before validation against the report. */
@@ -38,9 +41,13 @@ export interface RawState {
   target?: string;
   model?: string;
   scenario?: string;
+  section?: string;
   path: string[];
   overrides: Record<string, string>;
 }
+
+/** The heading ids each prose page has; a section the page does not have is dropped. */
+export type SectionIds = Partial<Record<Route, ReadonlySet<string>>>;
 
 const OVERRIDE_PREFIX = 'o.';
 const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i;
@@ -79,7 +86,7 @@ export function parseHash(hash: string): RawState {
   const params = new URLSearchParams(q === -1 ? '' : body.slice(q + 1));
 
   const raw: RawState = { route, path: [], overrides: {} };
-  for (const key of ['target', 'model', 'scenario'] as const) {
+  for (const key of ['target', 'model', 'scenario', 'section'] as const) {
     const value = params.get(key);
     if (value !== null) raw[key] = value;
   }
@@ -181,23 +188,26 @@ function validOverrides(raw: Record<string, string>, report: Report): Record<str
   return out;
 }
 
-export function validateState(raw: RawState, report: Report): AppState {
+export function validateState(raw: RawState, report: Report, sections: SectionIds = {}): AppState {
   const d = defaultState(report);
   const { model } = raw;
   const scenario =
     raw.scenario !== undefined && Object.hasOwn(report.assumptions.scenarios, raw.scenario) ? raw.scenario : d.scenario;
-  return {
-    route: raw.route === '' || !isRoute(raw.route) ? 'report' : raw.route,
+  const route = raw.route === '' || !isRoute(raw.route) ? 'report' : raw.route;
+  const state: AppState = {
+    route,
     target: isTarget(raw.target) ? raw.target : d.target,
     model: model !== undefined && report.models.some((m) => m.id === model) ? model : d.model,
     scenario,
     path: validPath(raw.path, report),
     overrides: canonicalOverrides(report, scenario, validOverrides(raw.overrides, report)),
   };
+  if (raw.section !== undefined && sections[route]?.has(raw.section)) state.section = raw.section;
+  return state;
 }
 
-export function stateFromHash(hash: string, report: Report): AppState {
-  return validateState(parseHash(hash), report);
+export function stateFromHash(hash: string, report: Report, sections: SectionIds = {}): AppState {
+  return validateState(parseHash(hash), report, sections);
 }
 
 /**
@@ -211,7 +221,18 @@ export function hashFromState(state: AppState): string {
   for (const key of Object.keys(state.overrides).sort()) {
     parts.push(`${OVERRIDE_PREFIX}${enc(key)}=${enc(String(state.overrides[key]))}`);
   }
+  if (state.section !== undefined) parts.push(`section=${enc(state.section)}`);
   return `#/${state.route === 'report' ? '' : state.route}?${parts.join('&')}`;
+}
+
+/**
+ * The hash of a page, keeping the reader's selection but never a section:
+ * a section names a heading on the page it was set on, and another page
+ * might have a heading with the same id.
+ */
+export function routeHash(state: AppState, route: Route): string {
+  const { section: _, ...rest } = state;
+  return hashFromState({ ...rest, route });
 }
 
 /** Where the store reads and writes the hash; a fake in tests. */
@@ -259,8 +280,9 @@ export interface StateStore extends Readable<AppState> {
  * A store of the validated state, synchronised with the hash both ways. It
  * notifies only when the canonical hash changes.
  */
-export function createStateStore(report: Report, loc: HashLocation): StateStore {
-  let current = stateFromHash(loc.read(), report);
+export function createStateStore(report: Report, loc: HashLocation, sections: SectionIds = {}): StateStore {
+  const fromHash = (hash: string) => stateFromHash(hash, report, sections);
+  let current = fromHash(loc.read());
   let currentHash = hashFromState(current);
   if (loc.read() !== currentHash) loc.replace(currentHash);
   const inner = writable(current);
@@ -272,7 +294,7 @@ export function createStateStore(report: Report, loc: HashLocation): StateStore 
   };
 
   const write = (next: AppState, opts?: WriteOptions) => {
-    const valid = stateFromHash(hashFromState(next), report);
+    const valid = fromHash(hashFromState(next));
     const hash = hashFromState(valid);
     if (hash === currentHash) return;
     if (opts?.replace) loc.replace(hash);
@@ -282,7 +304,7 @@ export function createStateStore(report: Report, loc: HashLocation): StateStore 
 
   const stop = loc.listen(() => {
     const read = loc.read();
-    const next = stateFromHash(read, report);
+    const next = fromHash(read);
     const hash = hashFromState(next);
     if (read !== hash) loc.replace(hash);
     if (hash !== currentHash) accept(next, hash);

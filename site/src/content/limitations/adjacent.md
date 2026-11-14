@@ -1,0 +1,1 @@
+**The work around the port is left out.** rgw-go's defect reproduction, security-review hook, upstream pull-request servicing and feasibility study were measured, and the central figure leaves them out. The figure shown is the change with them counted.

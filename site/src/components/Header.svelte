@@ -1,6 +1,6 @@
 <script lang="ts">
   import { type Ceph, cephCommitUrl, commitDay, shortSha } from '../lib/report';
-  import { type AppState, hashFromState } from '../lib/state';
+  import { type AppState, routeHash } from '../lib/state';
   import Nav from './Nav.svelte';
   import ThemeToggle from './ThemeToggle.svelte';
 
@@ -15,7 +15,7 @@
 <header class="site-header">
   <div class="inner">
     <div class="brand">
-      <a class="title" href={hashFromState({ ...selection, route: 'report' })}>Ceph porting estimate</a>
+      <a class="title" href={routeHash(selection, 'report')}>Ceph porting estimate</a>
       <p class="snapshot">
         <a href={cephCommitUrl(ceph)} title={`${ceph.repo} commit ${ceph.rev}`}>
           ceph@<span class="num">{shortSha(ceph.rev)}</span>

@@ -5,7 +5,9 @@ import { parseReport, type Report } from './report';
 import {
   type AppState,
   type HashLocation,
+  type SectionIds,
   createStateStore,
+  routeHash,
   defaultState,
   hashFromState,
   parseHash,
@@ -412,5 +414,66 @@ describe('parseHash', () => {
       path: ['a', 'b', 'c'],
       overrides: { x: 'y' },
     });
+  });
+});
+
+describe('section', () => {
+  const sections: SectionIds = { methods: new Set(['scope', 'prices']), calibration: new Set(['coverage']) };
+
+  it('keeps a known section of the page in the hash', () => {
+    expect(stateFromHash('#/methods?section=scope', report, sections)).toEqual({
+      ...defaults,
+      route: 'methods',
+      section: 'scope',
+    });
+  });
+
+  it.each([
+    ['an unknown section', '#/methods?section=nope'],
+    ["another page's section", '#/methods?section=coverage'],
+    ['a section on the report page', '#/?section=scope'],
+    ['an inherited key', '#/methods?section=constructor'],
+    ['an empty section', '#/methods?section='],
+  ])('drops %s', (_name, hash) => {
+    expect(stateFromHash(hash, report, sections)).not.toHaveProperty('section');
+  });
+
+  it('drops every section when the store is given none', () => {
+    expect(stateFromHash('#/methods?section=scope', report)).not.toHaveProperty('section');
+  });
+
+  it('round-trips through the hash, last', () => {
+    const state: AppState = { ...defaults, route: 'calibration', target: 'rust', section: 'coverage' };
+    const hash = hashFromState(state);
+    expect(hash).toMatch(/&section=coverage$/);
+    expect(stateFromHash(hash, report, sections)).toEqual(state);
+  });
+
+  it('is followed by the store, so Back returns to the previous section', () => {
+    const { loc, navigate } = fakeLocation('#/methods');
+    const store = createStateStore(report, loc, sections);
+    navigate(hashFromState({ ...get(store), section: 'scope' }));
+    expect(get(store).section).toBe('scope');
+    navigate(hashFromState({ ...get(store), section: 'prices' }));
+    expect(get(store).section).toBe('prices');
+    navigate('#/methods?target=go&model=opus-5-5&scenario=calibrated&section=scope');
+    expect(get(store).section).toBe('scope');
+    store.destroy();
+  });
+});
+
+describe('routeHash', () => {
+  // A heading id both pages have: validation alone would keep it on the other page.
+  const shared: SectionIds = { methods: new Set(['scope']), calibration: new Set(['scope']) };
+  const onMethods: AppState = { ...defaults, route: 'methods', target: 'rust', section: 'scope' };
+
+  it('links to another page without the current section, keeping the rest of the selection', () => {
+    const hash = routeHash(onMethods, 'calibration');
+    expect(hash).toBe('#/calibration?target=rust&model=opus-5-5&scenario=calibrated');
+    expect(stateFromHash(hash, report, shared)).not.toHaveProperty('section');
+  });
+
+  it('links to the top of the same page, too', () => {
+    expect(routeHash(onMethods, 'methods')).toBe('#/methods?target=rust&model=opus-5-5&scenario=calibrated');
   });
 });

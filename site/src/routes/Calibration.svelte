@@ -1,13 +1,22 @@
-<article class="prose">
-  <h1>Calibration</h1>
-  <p>
-    The rgw-go measurements the calibrated scenario is derived from, and how each ratio follows from them. This
-    page is being written.
-  </p>
-</article>
+<!-- The rgw-go measurement and how the calibrated parameters follow from it. The words are src/content/calibration/*.md. -->
+<script lang="ts">
+  import ProsePage from '../components/prose/ProsePage.svelte';
+  import { PAGE_DOCS } from '../lib/prose/content';
+  import type { Report } from '../lib/report';
+  import type { AppState } from '../lib/state';
 
-<style>
-  .prose {
-    max-width: var(--measure);
+  interface Props {
+    report: Report;
+    selection: AppState;
   }
-</style>
+
+  let { report, selection }: Props = $props();
+</script>
+
+<ProsePage
+  title="Calibration"
+  lede="The one real port the central scenario is measured on: what it is, what it consumed, and how each ratio the estimate uses follows from it."
+  docs={PAGE_DOCS.calibration}
+  {report}
+  {selection}
+/>

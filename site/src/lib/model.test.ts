@@ -882,7 +882,7 @@ describe('invariants', () => {
 
   it('lists every component in order, then dependencies', () => {
     const root = estimate(fixtureReport, 'go', 'opus-5-5', resolveParams(fixtureReport, 'calibrated'));
-    expect(root.children.map((c) => c.id)).toEqual(['rgw', 'osd', 'qa', 'dependencies']);
+    expect(root.children.map((c) => c.id)).toEqual(['rgw', 'osd', 'qa', 'crimson', 'dependencies']);
     expect(findGroup(root, 'dependencies').children.map((c) => c.id)).toEqual(['rocksdb', 'boost']);
   });
 

@@ -24,7 +24,7 @@ describe('Headline', () => {
     expect(text('.answer')).toMatch(/^Porting Ceph to Go with Claude Opus 5\.5 would cost about \$/);
     expect(text('.caveat')).toBe(
       `This is the model API bill alone, at list prices, scaled up about ${times(d.scaleUp!)} times from one unfinished port ` +
-        'of roughly 37% of one Ceph component; it does not include people, human review, CI, test clusters or time, and it ' +
+        'of roughly 40% of one Ceph component; it does not include people, human review, CI, test clusters or time, and it ' +
         'is not evidence that the result would work.',
     );
     const links = [...container.querySelectorAll('.caveat a')].map((a) => a.getAttribute('href'));

@@ -1,0 +1,1 @@
+**Two release floors and a workflow under construction.** rgw-go supports two Ceph releases, which the session says roughly doubled verification, and was built while its own way of working was being worked out ([What drove cost](#/calibration?section=what-drove-cost)). A port of one commit by a settled workflow would spend less per line. Neither effect is measured.

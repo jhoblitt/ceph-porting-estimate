@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './__fixtures__/report.json';
+import { percent } from './format';
 import {
   breakEven,
+  breakEvenSentence,
   cacheTrafficShare,
   calibrationFacts,
   scaleUp,
@@ -28,8 +30,8 @@ describe('calibrationFacts', () => {
   it('reads the measured model, the port output, the coverage and the project name', () => {
     expect(calibrationFacts(report)).toEqual({
       measuredModelId: 'opus-5-5',
-      portOutputTokens: 45.01e6,
-      coverage: 0.37,
+      portOutputTokens: 9.471e6,
+      coverage: 0.4,
       projectName: 'rgw-go',
     });
   });
@@ -79,6 +81,21 @@ describe('breakEven', () => {
     expect(breakEven(cost(0), cost(200))).toBeNull();
     expect(breakEven(cost(300), cost(0))).toBeNull();
     expect(breakEven(cost(Number.NaN), cost(200))).toBeNull();
+  });
+});
+
+describe('breakEvenSentence', () => {
+  it('words a break-even for a model priced on the same token counts', () => {
+    expect(breakEvenSentence('M', 0.85)).toBe(`It would cost the same as M if it needed ${percent(0.15)} fewer tokens for the same work.`);
+    expect(breakEvenSentence('M', 1.2)).toBe(`It would cost the same as M if it needed ${percent(0.2)} more tokens for the same work.`);
+    expect(breakEvenSentence('M', 1.0001)).toBe('It would cost the same as M at the same token counts.');
+    expect(breakEvenSentence('M', 0.004)).toBe('It would cost the same as M only if it needed less than 1% of the tokens for the same work.');
+  });
+
+  it('words it against the counts a row assumes when a model efficiency scales them', () => {
+    expect(breakEvenSentence('M', 0.85, false)).toBe(`It would cost the same as M if it needed ${percent(0.15)} fewer tokens than this row assumes.`);
+    expect(breakEvenSentence('M', 0.004, false)).toBe('It would cost the same as M only if it needed less than 1% of the tokens this row assumes.');
+    expect(breakEvenSentence('M', 1.0001, false)).toBe('It would cost the same as M at the same token counts.');
   });
 });
 

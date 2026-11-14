@@ -150,7 +150,7 @@ describe('Derived', () => {
   it('summarises the scope from the estimate', () => {
     const { d } = setup();
     const { scope } = d;
-    expect(scope.ceph.headline.code).toBe(186_204 + 1_210 + 41_388 + 52_310 + 4_022 + 148_920 + 97_644 + 98_204 + 30_112 + 61_022);
+    expect(scope.ceph.headline.code).toBe(186_204 + 1_210 + 41_388 + 52_310 + 4_022 + 148_920 + 97_644 + 98_204 + 30_112 + 61_022 + 1_000);
     expect(scope.ceph.notPorted.code).toBe(188);
     expect(scope.dependencies?.headline.sloc.code).toBe(6_000);
     expect(scope.dependenciesWithWork).toBe(1);
@@ -161,7 +161,7 @@ describe('Derived', () => {
   it('gives each param its value in effect', () => {
     const { d, set } = setup({ scenario: 'pessimistic' });
     expect(d.values.get('difficulty.hard')).toBe(2);
-    expect(d.values.get('overhead')).toBeCloseTo(4.1 * 1.25, 12);
+    expect(d.values.get('overhead')).toBeCloseTo(4.1 * 1.1971, 12);
     set({ overrides: { 'difficulty.hard': 2.5 } });
     expect(d.values.get('difficulty.hard')).toBe(2.5);
     expect(d.values.size).toBe(d.paramInfo.length);
@@ -264,7 +264,7 @@ describe('Derived', () => {
 
   it('scales the measured port up to the headline by output tokens', () => {
     const { d } = setup();
-    expect(d.scaleUp).toBeCloseTo(d.root.headline.tokens.output / 45.01e6, 12);
+    expect(d.scaleUp).toBeCloseTo(d.root.headline.tokens.output / 9.471e6, 12);
   });
 
   it("gives the measured model's cache-traffic share, whichever model is selected", () => {
