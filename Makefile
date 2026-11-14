@@ -117,3 +117,9 @@ site-build: $(SITE_DEPS) site-data ## Build the site into site/dist from freshly
 .PHONY: site-test
 site-test: $(SITE_DEPS) ## Typecheck and unit-test the site
 	cd $(SITE_DIR) && npm run typecheck && npm test
+
+# Playwright's Chromium is installed once per machine (CI installs it in the
+# workflow); without it, run `npx playwright install chromium` in site/.
+.PHONY: site-e2e
+site-e2e: site-build ## Build the site from the data and run the browser smoke test
+	cd $(SITE_DIR) && npm run e2e
