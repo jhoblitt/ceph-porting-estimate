@@ -28,7 +28,10 @@ modelling choice:
 The only quantity that needs an assumption about rgw-go's coverage is the
 expansion `E`: product Go tokens ÷ the source tokens they replaced. `E`,
 `T` and `H` multiply to one calibrated number, output tokens per source
-token ported, so every figure is inversely proportional to coverage.
+token ported, so every estimate scaled from rgw-go to Ceph is inversely
+proportional to the coverage it is computed at. rgw-go's own measured cost
+is not, and in the naive scenario the written translation is but the single
+read of the source (`p`) is not.
 
 The calibration is computed in bytes with the same bytes-per-token values
 the model applies to Ceph. The Go value cancels entirely (`E ∝ 1 ÷ go`,
@@ -167,8 +170,10 @@ The phase-derived scales are checked: `calibration.yaml`
 long prompts would be configured to stay under the threshold; rgw-go's
 shares (0.550, 0.748, 0.797, 0.699 of uncached, cache-write, cache-read and
 output tokens in calls above 272K) were measured on a harness with a
-one-million-token window and no surcharge, and are the pessimistic preset's
-upper case. Either way the token volumes are held fixed, which a different
+one-million-token window and no surcharge, and are what a preset applies
+when it takes prompts to be as long as rgw-go's;
+`measurement_detail.prompt_size_tokens.long_context_scenarios` names those
+presets. Either way the token volumes are held fixed, which a different
 prompt size would not do. Only models with long-context prices (GPT-6
 Astra) are affected.
 

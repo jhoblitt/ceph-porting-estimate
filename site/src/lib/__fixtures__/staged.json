@@ -187,7 +187,7 @@
         "value": 1.3117,
         "measured": false,
         "source": "calibration.yaml",
-        "reason": "Product Go tokens rgw-go wrote per token of the v19.2.7 source it ported: its product Go over the size of that source times coverage, the share of it rgw-go has ported (calibration.yaml sizes and coverage). The sizes are measured; coverage is an assumption with a stated range, and every figure in the report is inversely proportional to it. The product Go counts its comment lines, a large share of its bytes (calibration.yaml sizes.rgw_go.product_go_comments), many of them citing the C++ they replace, so this is tokens written per source token ported, not a code-size ratio."
+        "reason": "Product Go tokens rgw-go wrote per token of the v19.2.7 source it ported: its product Go over the size of that source times coverage, the share of it rgw-go has ported (calibration.yaml sizes and coverage). The sizes are measured; coverage is an assumption with a stated range. Every estimate scaled from rgw-go to Ceph is inversely proportional to the coverage it is computed at; rgw-go's own measured cost is not, and in the reference scenario the written translation is but the single read of the source is not. The product Go counts its comment lines, a large share of its bytes (calibration.yaml sizes.rgw_go.product_go_comments), many of them citing the C++ they replace, so this is tokens written per source token ported, not a code-size ratio."
       },
       "test_ratio": {
         "value": 2.076,
@@ -230,31 +230,31 @@
           "value": 0.0855,
           "measured": false,
           "source": "assumption",
-          "reason": "Configuration such as suite YAML is carried over almost mechanically. Its weight relative to the other classes is in calibration.yaml ported_mix, normalised so that the model applied to the source rgw-go ported reproduces rgw-go's measured cost"
+          "reason": "Configuration such as suite YAML is carried over almost mechanically. Its weight relative to the other classes is calibration.yaml ported_mix.relative_difficulty; this value is that weight divided by the relative scale's mean over the source rgw-go ported, so that the model applied to that source reproduces rgw-go's measured cost"
         },
         "glue": {
           "value": 0.4276,
           "measured": false,
           "source": "assumption",
-          "reason": "Wiring, CLI plumbing and thin wrappers, which need much less reasoning than standard code. Its weight relative to the other classes is in calibration.yaml ported_mix, normalised so that the model applied to the source rgw-go ported reproduces rgw-go's measured cost"
+          "reason": "Wiring, CLI plumbing and thin wrappers, which need much less reasoning than standard code. Its weight relative to the other classes is calibration.yaml ported_mix.relative_difficulty; this value is that weight divided by the relative scale's mean over the source rgw-go ported, so that the model applied to that source reproduces rgw-go's measured cost"
         },
         "standard": {
           "value": 0.8551,
           "measured": false,
           "source": "assumption",
-          "reason": "The anchor of the scale is the average of what rgw-go ported: S3 request handling together with the byte-compatible RADOS layout, bucket index and class clients. Standard code is weighted against that average (calibration.yaml ported_mix), so that the model applied to the source rgw-go ported reproduces rgw-go's measured cost"
+          "reason": "The anchor of the scale is the average of what rgw-go ported: S3 request handling together with the byte-compatible RADOS layout, bucket index and class clients. This value is standard code's relative weight (calibration.yaml ported_mix.relative_difficulty) divided by the relative scale's mean over that source, so that the model applied to it reproduces rgw-go's measured cost"
         },
         "hard": {
           "value": 1.2827,
           "measured": false,
           "source": "assumption",
-          "reason": "Consensus, PG peering and recovery, erasure coding, MDS cache and locking, the messenger and wire encodings: concurrency-heavy or protocol-critical code that needs more review and rework per line. Its weight relative to the other classes is in calibration.yaml ported_mix, normalised so that the model applied to the source rgw-go ported reproduces rgw-go's measured cost"
+          "reason": "Consensus, PG peering and recovery, erasure coding, MDS cache and locking, the messenger and wire encodings: concurrency-heavy or protocol-critical code that needs more review and rework per line. Its weight relative to the other classes is calibration.yaml ported_mix.relative_difficulty; this value is that weight divided by the relative scale's mean over the source rgw-go ported, so that the model applied to that source reproduces rgw-go's measured cost"
         },
         "extreme": {
           "value": 1.7103,
           "measured": false,
           "source": "assumption",
-          "reason": "BlueStore and BlueFS allocators and on-disk formats, Crimson and SeaStore: code where a subtle bug loses data, or whose design rests on a runtime the target lacks. Its weight relative to the other classes is in calibration.yaml ported_mix, normalised so that the model applied to the source rgw-go ported reproduces rgw-go's measured cost"
+          "reason": "BlueStore and BlueFS allocators and on-disk formats, Crimson and SeaStore: code where a subtle bug loses data, or whose design rests on a runtime the target lacks. Its weight relative to the other classes is calibration.yaml ported_mix.relative_difficulty; this value is that weight divided by the relative scale's mean over the source rgw-go ported, so that the model applied to that source reproduces rgw-go's measured cost"
         }
       },
       "rust_factor": {
@@ -267,7 +267,7 @@
         "value": 1.25,
         "measured": false,
         "source": "assumption",
-        "reason": "Guess, applied uniformly to every feature on top of Rust: WASI lacks parallel threads, block devices and process execution, so shims and redesigns cost more. Host-side code that would stand in for what WASI cannot host is not costed"
+        "reason": "Guess, applied uniformly to every feature on top of Rust. An adversarial review of this estimate (2026-11-14) reports that WASI lacks parallel threads, block devices and process execution, which would make shims and redesigns cost more; it rated those details plausible rather than confirmed, and no build for WASI was attempted to verify them. Host-side code that would stand in for what WASI cannot host is not costed"
       },
       "clean_break_discount": {
         "value": 0.6,
@@ -286,25 +286,25 @@
           "value": 0,
           "measured": false,
           "source": "assumption",
-          "reason": "Share of uncached input in calls whose prompt exceeds a model's long-context threshold. An agent run against a price sheet that surcharges long prompts would be configured to stay under the threshold. rgw-go's share (calibration.yaml measurement_detail.prompt_size_tokens.share_over_threshold) was measured on a harness with a one-million-token window and no surcharge, and is the pessimistic scenario's upper case. Either way the token volumes are held fixed, which a different prompt size would not do"
+          "reason": "Share of uncached input in calls whose prompt exceeds a model's long-context threshold. An agent run against a price sheet that surcharges long prompts would be configured to stay under the threshold. The share measured on rgw-go (calibration.yaml measurement_detail.prompt_size_tokens.share_over_threshold), on a harness with a one-million-token window and no surcharge, is what a scenario applies when it takes prompts to be as long as rgw-go's; calibration.yaml measurement_detail.prompt_size_tokens.long_context_scenarios names those scenarios. Either way the token volumes are held fixed, which a different prompt size would not do"
         },
         "cache_write": {
           "value": 0,
           "measured": false,
           "source": "assumption",
-          "reason": "Share of cache-write tokens in calls whose prompt exceeds a model's long-context threshold. An agent run against a price sheet that surcharges long prompts would be configured to stay under the threshold. rgw-go's share (calibration.yaml measurement_detail.prompt_size_tokens.share_over_threshold) was measured on a harness with a one-million-token window and no surcharge, and is the pessimistic scenario's upper case. Either way the token volumes are held fixed, which a different prompt size would not do"
+          "reason": "Share of cache-write tokens in calls whose prompt exceeds a model's long-context threshold. An agent run against a price sheet that surcharges long prompts would be configured to stay under the threshold. The share measured on rgw-go (calibration.yaml measurement_detail.prompt_size_tokens.share_over_threshold), on a harness with a one-million-token window and no surcharge, is what a scenario applies when it takes prompts to be as long as rgw-go's; calibration.yaml measurement_detail.prompt_size_tokens.long_context_scenarios names those scenarios. Either way the token volumes are held fixed, which a different prompt size would not do"
         },
         "cache_read": {
           "value": 0,
           "measured": false,
           "source": "assumption",
-          "reason": "Share of cache-read tokens in calls whose prompt exceeds a model's long-context threshold. An agent run against a price sheet that surcharges long prompts would be configured to stay under the threshold. rgw-go's share (calibration.yaml measurement_detail.prompt_size_tokens.share_over_threshold) was measured on a harness with a one-million-token window and no surcharge, and is the pessimistic scenario's upper case. Either way the token volumes are held fixed, which a different prompt size would not do"
+          "reason": "Share of cache-read tokens in calls whose prompt exceeds a model's long-context threshold. An agent run against a price sheet that surcharges long prompts would be configured to stay under the threshold. The share measured on rgw-go (calibration.yaml measurement_detail.prompt_size_tokens.share_over_threshold), on a harness with a one-million-token window and no surcharge, is what a scenario applies when it takes prompts to be as long as rgw-go's; calibration.yaml measurement_detail.prompt_size_tokens.long_context_scenarios names those scenarios. Either way the token volumes are held fixed, which a different prompt size would not do"
         },
         "output": {
           "value": 0,
           "measured": false,
           "source": "assumption",
-          "reason": "Share of output tokens in calls whose prompt exceeds a model's long-context threshold. An agent run against a price sheet that surcharges long prompts would be configured to stay under the threshold. rgw-go's share (calibration.yaml measurement_detail.prompt_size_tokens.share_over_threshold) was measured on a harness with a one-million-token window and no surcharge, and is the pessimistic scenario's upper case. Either way the token volumes are held fixed, which a different prompt size would not do"
+          "reason": "Share of output tokens in calls whose prompt exceeds a model's long-context threshold. An agent run against a price sheet that surcharges long prompts would be configured to stay under the threshold. The share measured on rgw-go (calibration.yaml measurement_detail.prompt_size_tokens.share_over_threshold), on a harness with a one-million-token window and no surcharge, is what a scenario applies when it takes prompts to be as long as rgw-go's; calibration.yaml measurement_detail.prompt_size_tokens.long_context_scenarios names those scenarios. Either way the token volumes are held fixed, which a different prompt size would not do"
         }
       },
       "model_efficiency": {
@@ -318,7 +318,7 @@
           "value": 1.0,
           "measured": false,
           "source": "assumption",
-          "reason": "The calibration model (98% of rgw-go's calls), so 1 by definition"
+          "reason": "The calibration model, which ran nearly all of rgw-go's calls (calibration.yaml measurement.model_calls_share), so 1 by definition"
         },
         "gpt-6-astra": {
           "value": 1.0,
@@ -337,7 +337,7 @@
         "value": 39.58,
         "measured": true,
         "source": "data/generated/sloc.json",
-        "reason": "Bytes per code line of Ceph's own C++ in headline features of kind product: 44,558,059 B ÷ 1,125,779 code lines. A dependency's sloc_equivalent is in code lines, so each one carries the comments and blank lines real source does."
+        "reason": "Bytes per code line of Ceph's own C++ in headline features of kind product, from data/generated/sloc.json through the taxonomy; cephest check recomputes it. A dependency's sloc_equivalent is in code lines, so each one carries the comments and blank lines real source does."
       },
       "adjacent_uplift": {
         "uncached": {
