@@ -1,6 +1,6 @@
-// Scales the charts place marks on. Costs here span more than two orders of
-// magnitude (a naive single pass against the calibrated port), so both scales
-// are logarithmic.
+// Scales the charts place marks on: linear from 0 where the marks are
+// outcomes a reader compares by size, logarithmic where values span orders
+// of magnitude.
 
 export interface LogScale {
   /** The domain, in whole decades around the values. */
@@ -24,6 +24,42 @@ export function linearTicks(max: number): number[] {
   const ticks: number[] = [];
   for (let i = 0; i * step <= max * (1 + 1e-9); i++) ticks.push(i * step);
   return ticks;
+}
+
+export interface LinearScale {
+  /** The domain runs from 0 to max, a round tick at or above the largest value. */
+  max: number;
+  ticks: number[];
+  /** 0 at 0, 1 at max, held inside 0 to 1; anything not a number sits at 0. */
+  position(value: number): number;
+}
+
+/**
+ * A linear scale from 0 that ends on a round tick at or above the largest
+ * value, in about three steps of 1, 2 or 5 × 10^k: few enough labels to fit
+ * a phone's width.
+ */
+export function linearScale(values: number[]): LinearScale {
+  const largest = Math.max(0, ...values.filter((v) => Number.isFinite(v)));
+  let max = 1;
+  let step = 1;
+  if (largest > 0) {
+    const rough = largest / 3;
+    const k = Math.floor(Math.log10(rough));
+    const at = (m: number) => (k < 0 ? m / 10 ** -k : m * 10 ** k);
+    step = [1, 2, 5, 10].map(at).reduce((best, s) => (Math.abs(s - rough) < Math.abs(best - rough) ? s : best));
+    max = Math.ceil(largest / step - 1e-9) * step;
+  }
+  const ticks: number[] = [];
+  for (let i = 0; i * step <= max * (1 + 1e-9); i++) ticks.push(i * step);
+  return {
+    max,
+    ticks,
+    position(value) {
+      if (!Number.isFinite(value)) return 0;
+      return Math.min(1, Math.max(0, value / max));
+    },
+  };
 }
 
 export function logScale(values: number[]): LogScale {

@@ -1,15 +1,18 @@
 <!--
-  The current target and model under every scenario, on a log scale: the
-  naive figure sits more than two orders of magnitude below the others, and
-  a linear axis would flatten it into the left edge. Each row selects its
-  scenario. With overrides, the current row shows the custom figure beside
-  the published one.
+  How far the estimate moves: the low, central and high scenarios as
+  published, on one linear scale from $0, with the band between low and
+  high and the selected one marked, and each reference scenario as a
+  labelled tick, not an outcome. The published figures are the one basis
+  here and in the headline's range sentence; with overrides, the selected
+  scenario's own figure is a separate accent dot. Scenarios are placed by
+  role, never by id. Below the chart, every scenario as a row that selects
+  it, with its figure and description: the chart's text equivalent.
 -->
 <script lang="ts">
-  import type { Derived } from '../lib/derived.svelte';
+  import type { Derived, ScenarioTotal } from '../lib/derived.svelte';
   import { usd } from '../lib/format';
   import { TARGET_LABELS } from '../lib/report';
-  import { logScale } from '../lib/scale';
+  import { linearScale } from '../lib/scale';
   import type { AppState } from '../lib/state';
   import Amount from './Amount.svelte';
   import Section from './Section.svelte';
@@ -22,27 +25,99 @@
 
   let { d, selection, onselect }: Props = $props();
 
-  const rows = $derived([...d.scenarioTotals].sort((a, b) => a.preset.usd - b.preset.usd));
-  const scale = $derived(logScale(d.scenarioTotals.flatMap((s) => [s.preset.usd, s.cost.usd])));
+  const ROLE_TAGS: Record<string, string> = {
+    low: 'Low',
+    central: 'Central',
+    high: 'High',
+    reference: 'Reference: not an outcome',
+  };
+  const NOT_AN_OUTCOME = 'a reference point, not an outcome';
+
+  const range = $derived(d.range);
+  /** The scenarios drawn as outcomes: placed by role, then any without one. */
+  const outcomes = $derived(
+    [range.low, range.central, range.high, ...range.unplaced].filter((s): s is ScenarioTotal => s !== undefined),
+  );
+  /**
+   * Every other figure label, left to right, sits a line higher, so labels
+   * of scenarios close together on a narrow screen never overlap.
+   */
+  const raised = $derived(
+    new Set([...outcomes].sort((a, b) => a.preset.usd - b.preset.usd).flatMap((s, i) => (i % 2 === 1 ? [s.id] : []))),
+  );
+  /** The selected scenario with the reader's changes, drawn as its own mark. */
+  const yours = $derived(d.scenarioTotals.find((s) => s.custom));
+  const scale = $derived(linearScale(d.scenarioTotals.flatMap((s) => [s.preset.usd, s.cost.usd])));
   const pct = (v: number) => `${scale.position(v) * 100}%`;
-  const anyOffScale = $derived(d.scenarioTotals.some((s) => !scale.onScale(s.cost.usd) || !scale.onScale(s.preset.usd)));
+  const describe = (s: ScenarioTotal) => `${s.label} ${usd(s.preset.usd)}${s.current ? ' (selected)' : ''}`;
+  const chartLabel = $derived(
+    [
+      range.low && range.high
+        ? `As published, from ${usd(range.low.preset.usd)} (${range.low.label}) to ${usd(range.high.preset.usd)} (${range.high.label})`
+        : '',
+      outcomes.map(describe).join(', '),
+      ...range.references.map((s) => `${s.label}: ${usd(s.preset.usd)}, ${NOT_AN_OUTCOME}`),
+      yours ? `${yours.label} with your changes: ${usd(yours.cost.usd)}` : '',
+    ]
+      .filter(Boolean)
+      .join('. '),
+  );
 </script>
 
-<Section id="scenarios" title="How much it moves">
+<Section id="scenarios" title="How far it moves">
   {#snippet lede()}
-    Porting Ceph to {TARGET_LABELS[d.target]} with {d.model.name} under each scenario. Choose one to see the whole report
-    under it.
+    Porting Ceph to {TARGET_LABELS[d.target]} at {d.model.name}'s prices under each scenario as published, on one scale
+    from $0.{#if range.low && range.high}{' '}The band runs from the low scenario to the high one; neither end is a limit.{/if}{#if yours}{' '}The
+      accent dot is {yours.label} with your changes.{/if} Choose a scenario to see the whole report under it.
   {/snippet}
 
   {#if d.changedCount > 0}
     <p class="kept">
       Your {d.changedCount === 1 ? 'changed assumption stays' : `${d.changedCount} changed assumptions stay`} in place when you
-      choose another scenario, so its figure may then differ from the published one shown on its row.
+      choose another scenario, except where that scenario already sets the same value: such a change is dropped. So a
+      scenario's figure may then differ from the published one in its row.
     </p>
   {/if}
 
+  <div class="chart" role="img" aria-label={chartLabel}>
+    <div class="plot">
+      {#each scale.ticks as t (t)}
+        <span class="grid" style:left={pct(t)}></span>
+      {/each}
+      {#if range.low && range.high}
+        <span class="band" style:left={pct(range.low.preset.usd)} style:right="calc(100% - {pct(range.high.preset.usd)})"
+        ></span>
+      {/if}
+      {#each outcomes as s (s.id)}
+        <span class="dot" class:current={s.current} class:published={s.custom} style:left={pct(s.preset.usd)}></span>
+        <span
+          class="figure"
+          class:current={s.current}
+          class:raised={raised.has(s.id)}
+          style:left={pct(s.preset.usd)}>{usd(s.preset.usd)}</span
+        >
+      {/each}
+      {#each range.references as s (s.id)}
+        <span class="reference" class:current={s.current} style:left={pct(s.preset.usd)}></span>
+      {/each}
+      {#if yours}
+        <span class="dot yours" style:left={pct(yours.cost.usd)}></span>
+      {/if}
+    </div>
+    <div class="ticks">
+      {#each scale.ticks as t (t)}
+        <span style:left={pct(t)}>{usd(t)}</span>
+      {/each}
+    </div>
+    {#each range.references as s (s.id)}
+      <p class="reference-label" class:current={s.current}>
+        <span class="tick-mark"></span>{s.label}: {usd(s.preset.usd)} — {NOT_AN_OUTCOME}
+      </p>
+    {/each}
+  </div>
+
   <ol class="rows">
-    {#each rows as s (s.id)}
+    {#each d.scenarioTotals as s (s.id)}
       <li class:current={s.current}>
         <button
           type="button"
@@ -52,80 +127,181 @@
         >
           {s.label}
         </button>
-        <p class="description">{s.description}</p>
-        <div class="track" aria-hidden="true">
-          {#each scale.ticks as t (t)}
-            <span class="grid" style:left={pct(t)}></span>
-          {/each}
-          {#if s.custom && scale.onScale(s.preset.usd) && scale.onScale(s.cost.usd)}
-            <span
-              class="link"
-              style:left={pct(Math.min(s.preset.usd, s.cost.usd))}
-              style:right="calc(100% - {pct(Math.max(s.preset.usd, s.cost.usd))})"
-            ></span>
-          {/if}
-          {#if s.custom}
-            {#if scale.onScale(s.preset.usd)}
-              <span class="dot published" style:left={pct(s.preset.usd)}></span>
-            {:else}
-              <span class="off-scale published"></span>
-            {/if}
-          {/if}
-          {#if scale.onScale(s.cost.usd)}
-            <span class="dot" style:left={pct(s.cost.usd)}></span>
-          {:else}
-            <span class="off-scale"></span>
-          {/if}
-        </div>
+        {#if s.role !== undefined && Object.hasOwn(ROLE_TAGS, s.role)}
+          <span class="role">{ROLE_TAGS[s.role]}</span>
+        {/if}
         <div class="value">
           <span class="amount"><Amount value={s.cost.usd} kind="usd" spellExact /></span>
           {#if s.custom}
-            <span class="custom">custom; published <Amount value={s.preset.usd} kind="usd" spellExact /></span>
+            <span class="custom">your changes; published <Amount value={s.preset.usd} kind="usd" spellExact /></span>
           {/if}
         </div>
+        <p class="description">{s.description}</p>
       </li>
     {/each}
   </ol>
-
-  <div class="axis" aria-hidden="true">
-    <div class="ticks">
-      {#each scale.ticks as t, i (t)}
-        <span
-          class:first={i === 0}
-          class:last={i === scale.ticks.length - 1}
-          style:left={pct(t)}>{usd(t)}</span
-        >
-      {/each}
-    </div>
-  </div>
-  <p class="caption">
-    Log scale: each gridline is ten times the one before it. The filled dot is the figure in effect.{#if anyOffScale}{' '}A
-      log scale has no place for $0, so a figure of $0 is marked by an arrow at the left edge.{/if}
-  </p>
 </Section>
 
 <style>
+  .kept {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-2) var(--space-3);
+    border-inline-start: 3px solid var(--accent);
+    background: var(--accent-wash);
+    font-size: var(--text-sm);
+  }
+
+  .chart {
+    /* Room either side for a figure centred on a mark at either end. */
+    padding-inline: 1.75rem;
+    margin-bottom: var(--space-5);
+  }
+
+  .plot {
+    position: relative;
+    height: 4.75rem;
+  }
+
+  .plot::before {
+    content: '';
+    position: absolute;
+    inset: auto 0 0.75rem;
+    height: 1px;
+    background: var(--baseline);
+  }
+
+  .grid {
+    position: absolute;
+    top: 0;
+    bottom: 0.75rem;
+    width: 1px;
+    background: var(--grid);
+  }
+
+  .band {
+    position: absolute;
+    bottom: calc(0.75rem - 4px);
+    height: 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    opacity: 0.3;
+  }
+
+  .dot {
+    position: absolute;
+    bottom: 0.75rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    box-shadow: 0 0 0 2px var(--surface);
+    transform: translate(-50%, 50%);
+  }
+
+  .dot.current {
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+  }
+
+  /* The selected scenario as published, when the reader's changes move it: a ring. */
+  .dot.published {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  /* The selected scenario with the reader's changes. */
+  .dot.yours {
+    width: 12px;
+    height: 12px;
+    background: var(--accent);
+  }
+
+  .figure {
+    position: absolute;
+    bottom: 1.6rem;
+    transform: translateX(-50%);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .figure.raised {
+    bottom: 2.85rem;
+  }
+
+  .figure.current {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  /* A reference scenario: a thin tick through the axis, not a dot. */
+  .reference {
+    position: absolute;
+    bottom: calc(0.75rem - 8px);
+    width: 2px;
+    height: 16px;
+    background: var(--text-muted);
+    transform: translateX(-50%);
+  }
+
+  .reference.current {
+    background: var(--accent);
+  }
+
+  .ticks {
+    position: relative;
+    height: 1.25rem;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ticks span {
+    position: absolute;
+    transform: translateX(-50%);
+  }
+
+  .reference-label {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+
+  .reference-label.current {
+    color: var(--text);
+  }
+
+  .tick-mark {
+    flex: none;
+    width: 2px;
+    height: 0.9em;
+    align-self: center;
+    background: currentColor;
+  }
+
   .rows {
     margin: 0;
     padding: 0;
     list-style: none;
+    border-top: 1px solid var(--grid);
   }
 
   li {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(10rem, 16rem) 1fr 9rem;
+    grid-template-columns: auto 1fr auto;
     grid-template-areas:
-      'pick track value'
-      'description track value';
-    column-gap: var(--space-5);
-    align-items: center;
-    padding: var(--space-3) var(--space-3);
-    border-radius: var(--radius);
-  }
-
-  li + li {
-    margin-top: var(--space-1);
+      'pick role value'
+      'description description value';
+    column-gap: var(--space-3);
+    align-items: baseline;
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--grid);
   }
 
   li.current {
@@ -138,7 +314,6 @@
 
   .pick {
     grid-area: pick;
-    justify-self: start;
     padding: 0;
     border: 0;
     background: none;
@@ -154,7 +329,6 @@
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: var(--radius);
   }
 
   .pick:focus-visible {
@@ -163,65 +337,14 @@
 
   .pick:focus-visible::after {
     outline: 2px solid var(--focus);
-    outline-offset: 2px;
+    outline-offset: -2px;
   }
 
-  .description {
-    grid-area: description;
-    margin: 0;
+  .role {
+    grid-area: role;
+    justify-self: start;
     font-size: var(--text-sm);
     color: var(--text-muted);
-    line-height: 1.45;
-  }
-
-  .track {
-    grid-area: track;
-    position: relative;
-    height: 2rem;
-  }
-
-  .track::before {
-    content: '';
-    position: absolute;
-    inset: 50% 0 auto;
-    height: 1px;
-    background: var(--baseline);
-  }
-
-  .grid {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: var(--grid);
-  }
-
-  .link {
-    position: absolute;
-    top: calc(50% - 1px);
-    height: 2px;
-    background: var(--accent);
-    opacity: 0.5;
-  }
-
-  .dot {
-    position: absolute;
-    top: 50%;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--text-faint);
-    box-shadow: 0 0 0 2px var(--surface);
-    transform: translate(-50%, -50%);
-  }
-
-  .current .dot {
-    background: var(--accent);
-  }
-
-  .current .dot.published {
-    background: var(--surface);
-    border: 2px solid var(--accent);
   }
 
   /* Above the row's hit target, so the figures keep their hover titles. */
@@ -246,68 +369,12 @@
     color: var(--text-muted);
   }
 
-  .axis {
-    display: grid;
-    grid-template-columns: minmax(10rem, 16rem) 1fr 9rem;
-    column-gap: var(--space-5);
-    padding-inline: var(--space-3);
-  }
-
-  .ticks {
-    grid-column: 2;
-    position: relative;
-    height: 1.5rem;
+  .description {
+    grid-area: description;
+    margin: var(--space-1) 0 0;
     font-size: var(--text-sm);
     color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .ticks span {
-    position: absolute;
-    top: 0.25rem;
-    transform: translateX(-50%);
-  }
-
-  .ticks span.first {
-    transform: none;
-  }
-
-  .ticks span.last {
-    transform: translateX(-100%);
-  }
-
-  /* A value a log scale cannot place ($0): an arrow pointing off the left edge. */
-  .off-scale {
-    position: absolute;
-    top: 50%;
-    left: -12px;
-    width: 0;
-    height: 0;
-    border-block: 7px solid transparent;
-    border-inline-end: 10px solid var(--text-faint);
-    transform: translateY(-50%);
-  }
-
-  .current .off-scale {
-    border-inline-end-color: var(--accent);
-  }
-
-  .current .off-scale.published {
-    opacity: 0.5;
-  }
-
-  .kept {
-    margin: 0 0 var(--space-4);
-    padding: var(--space-2) var(--space-3);
-    border-inline-start: 3px solid var(--accent);
-    background: var(--accent-wash);
-    font-size: var(--text-sm);
-  }
-
-  .caption {
-    margin: var(--space-3) 0 0;
-    font-size: var(--text-sm);
-    color: var(--text-muted);
+    line-height: 1.45;
   }
 
   @media (max-width: 719px) {
@@ -315,17 +382,8 @@
       grid-template-columns: 1fr auto;
       grid-template-areas:
         'pick value'
-        'track track'
+        'role value'
         'description description';
-      row-gap: var(--space-1);
-    }
-
-    .axis {
-      grid-template-columns: 1fr;
-    }
-
-    .ticks {
-      grid-column: 1;
     }
   }
 </style>
