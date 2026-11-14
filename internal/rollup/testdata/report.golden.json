@@ -1,0 +1,632 @@
+{
+  "ceph": {
+    "repo": "ceph/ceph",
+    "rev": "0123456789abcdef0123456789abcdef01234567",
+    "commit_date": "2026-11-01T12:00:00Z"
+  },
+  "groups": [
+    {
+      "id": "core",
+      "name": "Core daemons",
+      "description": "The daemons every cluster runs."
+    },
+    {
+      "id": "gateways",
+      "name": "Gateways",
+      "description": "Protocol gateways in front of RADOS."
+    },
+    {
+      "id": "unclassified",
+      "name": "Unclassified",
+      "description": "Files no feature claims"
+    }
+  ],
+  "components": [
+    {
+      "id": "mon",
+      "group": "core",
+      "name": "Monitor",
+      "description": "The cluster map authority.",
+      "root": [
+        "src/mon"
+      ],
+      "features": [
+        {
+          "id": "paxos",
+          "name": "Paxos",
+          "description": "The consensus engine.",
+          "globs": [
+            "src/mon/Paxos*"
+          ],
+          "scope": "headline",
+          "kind": "product",
+          "difficulty": "hard",
+          "why": "Consensus code is subtle.",
+          "langs": {
+            "cpp": {
+              "files": 2,
+              "code": 200,
+              "comment": 30,
+              "blank": 20,
+              "bytes": 8000
+            }
+          }
+        },
+        {
+          "id": "core",
+          "name": "Monitor core",
+          "description": "Everything else in the monitor.",
+          "globs": [
+            "src/mon/**"
+          ],
+          "scope": "headline",
+          "kind": "product",
+          "difficulty": "standard",
+          "why": "Ordinary service code.",
+          "langs": {
+            "cpp": {
+              "files": 1,
+              "code": 300,
+              "comment": 40,
+              "blank": 30,
+              "bytes": 12000
+            }
+          }
+        },
+        {
+          "id": "tests",
+          "name": "Monitor tests",
+          "description": "Unit tests for the monitor.",
+          "globs": [
+            "src/test/mon/**"
+          ],
+          "scope": "shown",
+          "kind": "test",
+          "difficulty": "standard",
+          "why": "Tests port with the code.",
+          "langs": {
+            "cpp": {
+              "files": 1,
+              "code": 80,
+              "comment": 5,
+              "blank": 10,
+              "bytes": 3000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "mgr",
+      "group": "core",
+      "name": "Manager",
+      "description": "The manager daemon and its modules.",
+      "root": [],
+      "features": [
+        {
+          "id": "dashboard",
+          "name": "Dashboard",
+          "description": "The web dashboard module.",
+          "globs": [
+            "src/pybind/mgr/dashboard/**"
+          ],
+          "scope": "shown",
+          "kind": "product",
+          "difficulty": "glue",
+          "why": "Mostly UI glue.",
+          "langs": {
+            "binary": {
+              "files": 1,
+              "code": 0,
+              "comment": 0,
+              "blank": 0,
+              "bytes": 5000
+            },
+            "python": {
+              "files": 1,
+              "code": 100,
+              "comment": 10,
+              "blank": 10,
+              "bytes": 4000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "rgw",
+      "group": "gateways",
+      "name": "RADOS Gateway",
+      "description": "The S3 and Swift gateway.",
+      "root": [
+        "src/rgw",
+        "src/pybind/rgw"
+      ],
+      "features": [
+        {
+          "id": "frontend",
+          "name": "Frontend",
+          "description": "The HTTP frontend.",
+          "globs": [
+            "src/rgw/**/*.cc"
+          ],
+          "scope": "headline",
+          "kind": "product",
+          "difficulty": "extreme",
+          "why": "Wire compatibility with S3.",
+          "langs": {
+            "cpp": {
+              "files": 1,
+              "code": 250,
+              "comment": 30,
+              "blank": 20,
+              "bytes": 10000
+            }
+          }
+        },
+        {
+          "id": "admin",
+          "name": "Admin tooling",
+          "description": "The admin scripts.",
+          "globs": [
+            "src/rgw/*.py"
+          ],
+          "scope": "not-ported",
+          "kind": "config",
+          "difficulty": "glue",
+          "why": "Python stays Python.",
+          "langs": {
+            "python": {
+              "files": 1,
+              "code": 60,
+              "comment": 5,
+              "blank": 5,
+              "bytes": 2000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "unclassified",
+      "group": "unclassified",
+      "name": "Unclassified",
+      "description": "Files no feature glob claims.",
+      "root": [],
+      "features": [
+        {
+          "id": "unclassified",
+          "name": "Unclassified",
+          "description": "Files no feature glob claims.",
+          "globs": [],
+          "scope": "not-ported",
+          "kind": "product",
+          "difficulty": "standard",
+          "why": "Kept so that every counted file appears somewhere; check fails above 1% of code lines.",
+          "langs": {
+            "markdown": {
+              "files": 1,
+              "code": 9,
+              "comment": 0,
+              "blank": 3,
+              "bytes": 400
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "rocksdb",
+      "name": "RocksDB",
+      "used_for": "BlueStore metadata.",
+      "submodules": [
+        "src/rocksdb"
+      ],
+      "targets": {
+        "go": {
+          "strategy": "bindings",
+          "package": "github.com/linxGnu/grocksdb",
+          "sloc_equivalent": 2000,
+          "difficulty": "hard",
+          "note": "cgo bindings"
+        },
+        "rust": {
+          "strategy": "native",
+          "package": "rust-rocksdb",
+          "sloc_equivalent": 0,
+          "difficulty": "glue",
+          "note": "maintained crate"
+        },
+        "wasm": {
+          "strategy": "port",
+          "package": null,
+          "sloc_equivalent": 40000,
+          "difficulty": "extreme",
+          "note": "no wasm build"
+        }
+      },
+      "submodule_size": {
+        "available": true,
+        "files": 15,
+        "code": 6200,
+        "comment": 570,
+        "blank": 450,
+        "bytes": 239000,
+        "unavailable_nested": 1
+      }
+    },
+    {
+      "id": "seastar",
+      "name": "Seastar",
+      "used_for": "The crimson OSD's reactor.",
+      "submodules": [
+        "src/seastar",
+        "src/dpdk"
+      ],
+      "targets": {
+        "go": {
+          "strategy": "drop",
+          "package": null,
+          "sloc_equivalent": 0,
+          "difficulty": "standard",
+          "note": "goroutines"
+        },
+        "rust": {
+          "strategy": "native",
+          "package": "tokio",
+          "sloc_equivalent": 0,
+          "difficulty": "glue",
+          "note": "async runtime"
+        },
+        "wasm": {
+          "strategy": "drop",
+          "package": null,
+          "sloc_equivalent": 0,
+          "difficulty": "standard",
+          "note": "no reactor"
+        }
+      },
+      "submodule_size": {
+        "available": false,
+        "files": 4,
+        "code": 800,
+        "comment": 60,
+        "blank": 50,
+        "bytes": 25000,
+        "unavailable_nested": 0
+      }
+    },
+    {
+      "id": "boost",
+      "name": "Boost",
+      "used_for": "Everything.",
+      "submodules": [],
+      "targets": {
+        "go": {
+          "strategy": "drop",
+          "package": null,
+          "sloc_equivalent": 0,
+          "difficulty": "config",
+          "note": "standard library"
+        },
+        "rust": {
+          "strategy": "drop",
+          "package": null,
+          "sloc_equivalent": 0,
+          "difficulty": "config",
+          "note": "std"
+        },
+        "wasm": {
+          "strategy": "drop",
+          "package": null,
+          "sloc_equivalent": 0,
+          "difficulty": "config",
+          "note": "not needed in wasm"
+        }
+      },
+      "submodule_size": null
+    }
+  ],
+  "models": [
+    {
+      "id": "opus-5-5",
+      "name": "Claude Opus 5.5",
+      "vendor": "Anthropic",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "read_on": "2026-11-13",
+      "usd_per_mtok": {
+        "input": 4,
+        "cache_write_short": 5,
+        "cache_write_long": 8,
+        "cache_read": 0.2,
+        "output": 20
+      },
+      "cache_write_ttl": {
+        "short": "5m",
+        "long": "1h"
+      },
+      "long_context": null
+    },
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "vendor": "OpenAI",
+      "source": "https://developers.openai.com/api/docs/pricing",
+      "read_on": "2026-11-13",
+      "usd_per_mtok": {
+        "input": 10,
+        "cache_write_short": 12.5,
+        "cache_write_long": 25,
+        "cache_read": 1,
+        "output": 50
+      },
+      "cache_write_ttl": {
+        "short": "5m",
+        "long": "1h"
+      },
+      "long_context": {
+        "threshold_tokens": 272000,
+        "input": 20,
+        "cache_write_short": 25,
+        "cache_write_long": 50,
+        "cache_read": 2,
+        "output": 75
+      }
+    }
+  ],
+  "assumptions": {
+    "bytes_per_token": {
+      "cpp": {
+        "value": 3.2,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "tokenizer run on ceph C++"
+      },
+      "default": {
+        "value": 3.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "fallback for minor languages"
+      },
+      "python": {
+        "value": 3.8,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "tokenizer run on ceph Python"
+      }
+    },
+    "params": {
+      "expansion": {
+        "value": 1.4,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "rgw-go product Go over replaced C++"
+      },
+      "test_ratio": {
+        "value": 0.9,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "rgw-go test Go over product Go"
+      },
+      "overhead": {
+        "value": 3.1,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "output tokens over surviving Go"
+      },
+      "uncached_per_output": {
+        "value": 0.008,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "rgw-go uncached input ratio"
+      },
+      "cache_write_per_output": {
+        "value": 25.3,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "rgw-go cache write ratio"
+      },
+      "cache_read_per_output": {
+        "value": 1249,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "rgw-go cache read ratio"
+      },
+      "source_read_passes": {
+        "value": 2.5,
+        "measured": true,
+        "source": "calibration.yaml",
+        "reason": "rgw-go reads of the replaced source"
+      },
+      "difficulty": {
+        "config": {
+          "value": 0.1,
+          "measured": false,
+          "source": "assumption",
+          "reason": "config is mostly copied"
+        },
+        "glue": {
+          "value": 0.5,
+          "measured": false,
+          "source": "assumption",
+          "reason": "glue is thin"
+        },
+        "standard": {
+          "value": 1,
+          "measured": false,
+          "source": "assumption",
+          "reason": "the calibration baseline"
+        },
+        "hard": {
+          "value": 1.5,
+          "measured": false,
+          "source": "assumption",
+          "reason": "subtle invariants"
+        },
+        "extreme": {
+          "value": 2,
+          "measured": false,
+          "source": "assumption",
+          "reason": "wire and disk formats"
+        }
+      },
+      "rust_factor": {
+        "value": 1.15,
+        "measured": false,
+        "source": "assumption",
+        "reason": "borrow checker friction"
+      },
+      "wasm_overhead": {
+        "value": 1.25,
+        "measured": false,
+        "source": "assumption",
+        "reason": "no threads or sockets"
+      },
+      "clean_break_discount": {
+        "value": 0.8,
+        "measured": false,
+        "source": "assumption",
+        "reason": "no compatibility shims"
+      },
+      "long_cache_write_share": {
+        "value": 0.5,
+        "measured": false,
+        "source": "assumption",
+        "reason": "half the writes outlive five minutes"
+      },
+      "long_context_share": {
+        "uncached": {
+          "value": 0.2,
+          "measured": false,
+          "source": "assumption",
+          "reason": "share of uncached input above the threshold"
+        },
+        "cache_write": {
+          "value": 0.2,
+          "measured": false,
+          "source": "assumption",
+          "reason": "share of cache writes above the threshold"
+        },
+        "cache_read": {
+          "value": 0.3,
+          "measured": false,
+          "source": "assumption",
+          "reason": "share of cache reads above the threshold"
+        },
+        "output": {
+          "value": 0.2,
+          "measured": false,
+          "source": "assumption",
+          "reason": "share of output above the threshold"
+        }
+      },
+      "model_efficiency": {
+        "gpt-6-astra": {
+          "value": 1.1,
+          "measured": false,
+          "source": "assumption",
+          "reason": "no measurement yet"
+        },
+        "opus-5-5": {
+          "value": 1,
+          "measured": true,
+          "source": "calibration.yaml",
+          "reason": "the calibration model"
+        }
+      },
+      "sloc_equivalent_bytes_per_line": {
+        "value": 40,
+        "measured": false,
+        "source": "assumption",
+        "reason": "typical C++ line"
+      },
+      "adjacent_uplift": {
+        "uncached": {
+          "value": 0.1,
+          "measured": false,
+          "source": "assumption",
+          "reason": "docs and CI"
+        },
+        "cache_write": {
+          "value": 0.1,
+          "measured": false,
+          "source": "assumption",
+          "reason": "docs and CI"
+        },
+        "cache_read": {
+          "value": 0.1,
+          "measured": false,
+          "source": "assumption",
+          "reason": "docs and CI"
+        },
+        "output": {
+          "value": 0.1,
+          "measured": false,
+          "source": "assumption",
+          "reason": "docs and CI"
+        }
+      }
+    },
+    "toggles": {
+      "include_adjacent": false,
+      "clean_break": false
+    },
+    "scenarios": {
+      "calibrated": {
+        "label": "Calibrated",
+        "description": "The rgw-go measurement applied as measured.",
+        "overrides": {},
+        "scale": {},
+        "toggles": {}
+      },
+      "naive": {
+        "label": "Naive",
+        "description": "One pass over the source.",
+        "overrides": {
+          "difficulty.hard": 1,
+          "overhead": 1,
+          "test_ratio": 0
+        },
+        "scale": {},
+        "toggles": {}
+      },
+      "pessimistic": {
+        "label": "Pessimistic",
+        "description": "Hard code is harder and adjacent work counts.",
+        "overrides": {
+          "difficulty.extreme": 3,
+          "long_context_share.cache_read": 0.5
+        },
+        "scale": {
+          "overhead": 1.25
+        },
+        "toggles": {
+          "include_adjacent": true
+        }
+      }
+    },
+    "default_scenario": "calibrated"
+  },
+  "calibration": {
+    "project": "rgw-go",
+    "measured_on": "2026-11-13",
+    "tokens": {
+      "output": 45010000,
+      "cache_read": 56213600000
+    },
+    "sizes": [
+      {
+        "lang": "go",
+        "kind": "product",
+        "bytes": 1200000
+      },
+      {
+        "lang": "go",
+        "kind": "test",
+        "bytes": 800000
+      }
+    ]
+  }
+}
