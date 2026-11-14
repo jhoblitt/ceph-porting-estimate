@@ -79,14 +79,27 @@ test: ## Run every suite with the race detector
 .PHONY: check
 check: generate-check fmt-check vet lint fix-check tidy-check test ## The local gate
 
+# The data under data/. Outside the go-conventions contract above, which
+# `check` keeps to: its `test` gate covers the data through the internal/cli
+# spec that runs `cephest check` on data/.
+.PHONY: data-check
+data-check: ## Validate the data files with cephest check
+	go run ./cmd/cephest check
+
 # The report site under site/ (Vite, Svelte, TypeScript). Outside the
 # go-conventions contract above.
 SITE_DIR := site
 SITE_REPORT := $(SITE_DIR)/src/generated/report.json
+# npm ci writes this file, so it stands for node_modules installed from the
+# current lockfile.
+SITE_DEPS := $(SITE_DIR)/node_modules/.package-lock.json
+
+$(SITE_DEPS): $(SITE_DIR)/package-lock.json
+	cd $(SITE_DIR) && npm ci --ignore-scripts
 
 .PHONY: site-install
 site-install: ## Install the site's npm dependencies from the lockfile
-	cd $(SITE_DIR) && npm ci
+	cd $(SITE_DIR) && npm ci --ignore-scripts
 
 .PHONY: site-data
 site-data: ## Roll the counts and data up into the site's report.json
@@ -98,9 +111,9 @@ site-dev-data: ## Use the test fixture as the site's report.json (no Go side nee
 	cp $(SITE_DIR)/src/lib/__fixtures__/report.json $(SITE_REPORT)
 
 .PHONY: site-build
-site-build: site-data ## Build the site into site/dist from freshly rolled-up data
+site-build: $(SITE_DEPS) site-data ## Build the site into site/dist from freshly rolled-up data
 	cd $(SITE_DIR) && npm run build
 
 .PHONY: site-test
-site-test: ## Typecheck and unit-test the site
+site-test: $(SITE_DEPS) ## Typecheck and unit-test the site
 	cd $(SITE_DIR) && npm run typecheck && npm test
