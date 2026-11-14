@@ -57,7 +57,6 @@ describe('round trip through the hash', () => {
     ['dependency path', { path: ['dependencies', 'rocksdb'] }],
     ['overrides', { overrides: { overhead: 3.75, 'adjacent_uplift.output': 0 } }],
     ['tiny and huge numbers', { overrides: { overhead: 1e-7, cache_read_per_output: 2e21 } }],
-    ['negative numbers', { overrides: { clean_break_discount: -0.5 } }],
   ] satisfies [string, Partial<AppState>][])('preserves %s', (_name, patch) => {
     const state = { ...defaults, ...patch };
     expect(stateFromHash(hashFromState(state), report)).toEqual(state);
@@ -206,6 +205,65 @@ describe('overrides', () => {
 
   it('keeps the valid overrides beside dropped ones', () => {
     expect(stateFromHash('#/?o.overhead=x&o.expansion=1.2', report).overrides).toEqual({ expansion: 1.2 });
+  });
+});
+
+describe('overrides are canonical', () => {
+  it('clamps a value from a link to what the model uses', () => {
+    expect(stateFromHash('#/?o.clean_break_discount=-0.5&o.long_context_share.output=1.5', report).overrides).toEqual({
+      clean_break_discount: 0,
+      'long_context_share.output': 1,
+    });
+  });
+
+  it("drops overrides equal to the scenario's values on load", () => {
+    expect(
+      stateFromHash('#/?scenario=pessimistic&o.difficulty.hard=2&o.toggles.include_adjacent=1&o.toggles.clean_break=0', report)
+        .overrides,
+    ).toEqual({});
+  });
+
+  it('drops an override that the new scenario makes equal when the scenario changes', () => {
+    const { loc } = fakeLocation('');
+    const store = createStateStore(report, loc);
+    store.set({ ...get(store), overrides: { 'difficulty.hard': 2, expansion: 1.5 } });
+    expect(get(store).overrides).toEqual({ 'difficulty.hard': 2, expansion: 1.5 });
+    store.set({ ...get(store), scenario: 'pessimistic' });
+    expect(get(store).overrides).toEqual({ expansion: 1.5 });
+    expect(loc.read()).not.toContain('difficulty.hard');
+    store.destroy();
+  });
+});
+
+describe('toggle overrides', () => {
+  it.each([
+    ['calibrated', { 'toggles.include_adjacent': 1 }],
+    ['pessimistic', { 'toggles.include_adjacent': 0 }],
+    ['pessimistic', { 'toggles.include_adjacent': 0, 'toggles.clean_break': 1, overhead: 2 }],
+  ])('round-trip under %s: %j', (scenario, overrides) => {
+    const state = { ...defaults, scenario, overrides };
+    expect(stateFromHash(hashFromState(state), report)).toEqual(state);
+  });
+
+  it('reads them from a pasted link', () => {
+    expect(stateFromHash('#/?o.toggles.clean_break=1', report).overrides).toEqual({ 'toggles.clean_break': 1 });
+  });
+
+  it.each(['2', '0.5', '-1', 'true', 'on', '', '1e0x'])('drops the value %j, which is neither 0 nor 1', (value) => {
+    expect(stateFromHash(`#/?o.toggles.clean_break=${encodeURIComponent(value)}`, report).overrides).toEqual({});
+  });
+
+  it('drops toggles the report does not have', () => {
+    expect(stateFromHash('#/?o.toggles.nope=1&o.toggles=1&o.toggles.__proto__=1', report).overrides).toEqual({});
+  });
+
+  it('survives a write through the store', () => {
+    const { loc } = fakeLocation('');
+    const store = createStateStore(report, loc);
+    store.set({ ...get(store), overrides: { 'toggles.include_adjacent': 1 } });
+    expect(get(store).overrides).toEqual({ 'toggles.include_adjacent': 1 });
+    expect(loc.read()).toContain('o.toggles.include_adjacent=1');
+    store.destroy();
   });
 });
 

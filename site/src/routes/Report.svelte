@@ -1,32 +1,32 @@
-<!-- The estimate. The views (headline figures, matrix, treemap, table, sliders) mount in #views. -->
+<!--
+  The estimate, in the order a reader asks: what it costs (Summary), how much
+  that moves (ScenarioRange, Matrix), why (CostByCategory, the 8b explorer
+  and dependency slots, Assumptions). Every view reads one Derived.
+-->
 <script lang="ts">
-  import { DEPENDENCIES_COMPONENT_ID, type Report, TARGET_LABELS } from '../lib/report';
-  import type { AppState } from '../lib/state';
+  import Assumptions from '../components/Assumptions.svelte';
+  import CostByCategory from '../components/CostByCategory.svelte';
+  import Dependencies from '../components/Dependencies.svelte';
+  import Explorer from '../components/Explorer.svelte';
+  import Matrix from '../components/Matrix.svelte';
+  import ScenarioRange from '../components/ScenarioRange.svelte';
   import SelectionControls from '../components/SelectionControls.svelte';
+  import Summary from '../components/Summary.svelte';
+  import { Derived } from '../lib/derived.svelte';
+  import type { Report } from '../lib/report';
+  import type { AppState, WriteOptions } from '../lib/state';
 
   interface Props {
     report: Report;
     selection: AppState;
-    onselect: (next: AppState) => void;
+    onselect: (next: AppState, opts?: WriteOptions) => void;
   }
 
   let { report, selection, onselect }: Props = $props();
 
-  const model = $derived(report.models.find((m) => m.id === selection.model));
-  const scenario = $derived(report.assumptions.scenarios[selection.scenario]);
-  const pathNames = $derived.by(() => {
-    const [componentId, featureId] = selection.path;
-    if (componentId === undefined) return [];
-    const component = report.components.find((c) => c.id === componentId);
-    if (component) {
-      const feature = component.features.find((f) => f.id === featureId);
-      return feature ? [component.name, feature.name] : [component.name];
-    }
-    if (componentId !== DEPENDENCIES_COMPONENT_ID) return [];
-    const dependency = report.dependencies.find((d) => d.id === featureId);
-    return dependency ? ['Dependencies', dependency.name] : ['Dependencies'];
-  });
-  const overrideCount = $derived(Object.keys(selection.overrides).length);
+  // App mounts this with the one report it loaded, which is never replaced.
+  // svelte-ignore state_referenced_locally
+  const d = new Derived(report, () => selection);
 </script>
 
 <div class="intro">
@@ -36,37 +36,18 @@
   </p>
 </div>
 
-<SelectionControls {report} {selection} onchange={onselect} />
+<SelectionControls {report} {selection} onchange={onselect} changed={d.changedCount} />
 
-<section id="views" class="views" aria-label="Estimate">
-  <dl class="selection">
-    <div>
-      <dt>Target</dt>
-      <dd>{TARGET_LABELS[selection.target]}</dd>
-    </div>
-    <div>
-      <dt>Model</dt>
-      <dd>{model?.name ?? selection.model}</dd>
-    </div>
-    <div>
-      <dt>Scenario</dt>
-      <dd>{scenario?.label ?? selection.scenario}</dd>
-    </div>
-    <div>
-      <dt>Showing</dt>
-      <dd>{['ceph', ...pathNames].join(' › ')}</dd>
-    </div>
-    <div>
-      <dt>Components</dt>
-      <dd class="num">{report.components.length}</dd>
-    </div>
-    <div>
-      <dt>Adjusted assumptions</dt>
-      <dd class="num">{overrideCount}</dd>
-    </div>
-  </dl>
-  <p class="pending">The cost views are on their way.</p>
-</section>
+<Summary {d} />
+<ScenarioRange {d} {selection} {onselect} />
+<Matrix {d} {selection} {onselect} />
+<CostByCategory {d} />
+
+<!-- Slots for Task 8b: the explorer and the dependency table. -->
+<Explorer {d} {selection} {onselect} />
+<Dependencies {d} {selection} {onselect} />
+
+<Assumptions {d} {selection} {onselect} />
 
 <style>
   .intro h1 {
@@ -77,45 +58,5 @@
     margin: 0;
     font-size: var(--text-lg);
     color: var(--text-muted);
-  }
-
-  .views {
-    padding: var(--space-6);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
-
-  .selection {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-    gap: var(--space-5);
-    margin: 0 0 var(--space-5);
-  }
-
-  dt {
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-  }
-
-  dd {
-    margin: 0;
-    font-size: var(--text-lg);
-    font-weight: 600;
-  }
-
-  .pending {
-    margin: 0;
-    color: var(--text-muted);
-  }
-
-  @media (max-width: 719px) {
-    .views {
-      padding: var(--space-5);
-    }
-
-    .selection {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

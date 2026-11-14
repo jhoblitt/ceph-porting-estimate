@@ -3,7 +3,9 @@
 // their symbols are docs/cost-model.md's.
 
 export { cephSloc, estimate, existingTestRatio, matrix } from './model/estimate';
-export { describeParams, resolveParams } from './model/params';
+export { sumTokens } from './model/cost';
+export { clamp as clampParam, describeParams, isShare, resolveParams } from './model/params';
+export { CATEGORIES, type Category } from './model/types';
 export type {
   CephSloc,
   Cost,

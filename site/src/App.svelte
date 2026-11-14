@@ -57,7 +57,7 @@
   {:else if $selection.route === 'calibration'}
     <Calibration />
   {:else}
-    <Report {report} selection={$selection} onselect={(next) => selection.set(next)} />
+    <Report {report} selection={$selection} onselect={(next, opts) => selection.set(next, opts)} />
   {/if}
 </main>
 

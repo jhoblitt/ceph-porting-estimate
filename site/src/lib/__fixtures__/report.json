@@ -4,11 +4,17 @@
     "rev": "ec322a5b1f0d6c4e8a7b39d2f5c1e08a64b7d913",
     "commit_date": "2026-11-13T09:41:27Z"
   },
+  "groups": [
+    { "id": "rados", "name": "RADOS core", "description": "The object store itself: OSDs, monitors and BlueStore." },
+    { "id": "rgw", "name": "Object gateway (RGW)", "description": "The S3 and Swift gateway." },
+    { "id": "tests", "name": "Tests and QA", "description": "The qa/ suites." }
+  ],
   "components": [
     {
       "id": "rgw",
       "name": "RADOS Gateway",
       "description": "S3 and Swift object gateway over RADOS.",
+      "group": "rgw",
       "root": ["src/rgw"],
       "features": [
         {
@@ -58,6 +64,7 @@
       "id": "osd",
       "name": "OSD",
       "description": "Object storage daemon, peering, recovery and the classic backend.",
+      "group": "rados",
       "root": ["src/osd", "src/os"],
       "features": [
         {
@@ -105,6 +112,7 @@
       "id": "qa",
       "name": "Integration suites",
       "description": "Teuthology tasks, workunits and suite YAML under qa/.",
+      "group": "tests",
       "root": ["qa"],
       "features": [
         {

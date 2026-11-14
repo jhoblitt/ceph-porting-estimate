@@ -7,23 +7,24 @@ import type { ParamInfo, Params, Tokens } from './types';
 const TOGGLE_IDS: readonly ToggleId[] = ['include_adjacent', 'clean_break'];
 const TOGGLE_PATHS = new Map<string, ToggleId>(TOGGLE_IDS.map((id) => [`toggles.${id}`, id]));
 
+// What a reader sees for each param; docs/cost-model.md gives the symbols.
 const LABELS = new Map<string, string>([
-  ['expansion', 'Expansion E'],
-  ['test_ratio', 'Test ratio T'],
-  ['overhead', 'Overhead H'],
-  ['uncached_per_output', 'Uncached input per output token u'],
-  ['cache_write_per_output', 'Cache writes per output token w'],
-  ['cache_read_per_output', 'Cache reads per output token r'],
-  ['source_read_passes', 'Source read passes p'],
-  ['difficulty', 'Difficulty D'],
-  ['rust_factor', 'Rust factor'],
-  ['wasm_overhead', 'WASM overhead'],
-  ['clean_break_discount', 'Clean-break discount C'],
-  ['long_cache_write_share', 'Long-TTL cache-write share λ'],
-  ['long_context_share', 'Long-context share σ'],
-  ['model_efficiency', 'Model efficiency M'],
-  ['sloc_equivalent_bytes_per_line', 'Bytes per dependency line B'],
-  ['adjacent_uplift', 'Adjacent uplift A'],
+  ['expansion', 'Target code tokens per source token'],
+  ['test_ratio', 'Test code per product code in the finished port'],
+  ['overhead', 'Output tokens per token of finished code'],
+  ['uncached_per_output', 'Uncached input tokens per output token'],
+  ['cache_write_per_output', 'Cache-write tokens per output token'],
+  ['cache_read_per_output', 'Cache-read tokens per output token'],
+  ['source_read_passes', 'Extra uncached reads of the source'],
+  ['difficulty', 'Difficulty'],
+  ['rust_factor', 'Rust effort relative to Go'],
+  ['wasm_overhead', 'WASM effort relative to Rust'],
+  ['clean_break_discount', 'Share of output kept with a clean break'],
+  ['long_cache_write_share', 'Share of cache writes at the longer lifetime'],
+  ['long_context_share', 'Billed at long-context prices'],
+  ['model_efficiency', 'Token use relative to the calibration model'],
+  ['sloc_equivalent_bytes_per_line', 'Bytes per line of dependency work'],
+  ['adjacent_uplift', 'Work around the port, per token of the port'],
 ]);
 
 function isQuantity(node: unknown): node is Quantity {
@@ -82,10 +83,14 @@ function scenarioValues(baseline: Map<string, Quantity>, scenario: Scenario): Ma
   return values;
 }
 
-/** Every param is at least 0; a share (λ, σ) is also at most 1. */
-function clamp(path: string, value: number): number {
-  const share = path === 'long_cache_write_share' || path.startsWith('long_context_share.');
-  return share ? Math.min(1, Math.max(0, value)) : Math.max(0, value);
+/** True for a share (λ, σ), which the model holds between 0 and 1. */
+export function isShare(path: string): boolean {
+  return path === 'long_cache_write_share' || path.startsWith('long_context_share.');
+}
+
+/** Every param is at least 0; a share is also at most 1. */
+export function clamp(path: string, value: number): number {
+  return isShare(path) ? Math.min(1, Math.max(0, value)) : Math.max(0, value);
 }
 
 function bytesPerToken(data: Report['assumptions']['bytes_per_token']): Record<string, number> {

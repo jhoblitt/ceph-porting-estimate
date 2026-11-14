@@ -9,12 +9,26 @@ describe('parseReport', () => {
     expect(Object.keys(report.assumptions.scenarios).sort()).toEqual(['calibrated', 'naive', 'pessimistic']);
   });
 
+  it('carries the groups and each component group', () => {
+    const report = parseReport(fixture);
+    expect(report.groups.map((g) => g.id)).toEqual(['rados', 'rgw', 'tests']);
+    expect(report.components.map((c) => [c.id, c.group])).toEqual([
+      ['rgw', 'rgw'],
+      ['osd', 'rados'],
+      ['qa', 'tests'],
+    ]);
+  });
+
   it.each([
     ['not an object', []],
     ['no ceph rev', { ...fixture, ceph: { repo: 'ceph/ceph' } }],
     ['a component without an id', { ...fixture, components: [{ features: [] }] }],
     ['a feature without an id', { ...fixture, components: [{ id: 'x', features: [{}] }] }],
     ['no models', { ...fixture, models: [] }],
+    ['no groups', { ...fixture, groups: undefined }],
+    ['a group without an id', { ...fixture, groups: [{ name: 'x' }] }],
+    ['a component without a group', { ...fixture, components: [{ id: 'x', features: [] }] }],
+    ['a component in an unknown group', { ...fixture, components: [{ id: 'x', group: 'nope', features: [] }] }],
     ['no scenarios', { ...fixture, assumptions: { params: {} } }],
   ])('rejects a report with %s', (_name, raw) => {
     expect(() => parseReport(raw)).toThrow(/^report\.json: /);
