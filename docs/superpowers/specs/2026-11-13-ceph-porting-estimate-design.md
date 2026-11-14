@@ -1,5 +1,22 @@
 # Ceph porting estimate — design
 
+> **Status: historical.** This is the design as written before the estimate
+> was built and its calibration re-anchored. Where it differs from
+> [`docs/cost-model.md`](../../cost-model.md), the data under `data/` or the
+> published pages, those are authoritative. The largest differences:
+>
+> - Four scenarios, each with a role, not three: an optimistic (low) and a
+>   pessimistic (high) scenario take rgw-go's phase 1 and phase 2 rates and
+>   the two ends of the coverage range, and the naive single pass is a
+>   reference point, not a lower bound.
+> - Four models, not three: Kimi K3 was added.
+> - The calibration was re-anchored: coverage is a classification of the
+>   ported source by bytes, and the difficulty scale is normalised to
+>   average 1 over what rgw-go ported.
+> - The rgw-go figures quoted here are early ones; the measured test ratio,
+>   which counts tooling, and the size of the source rgw-go ports are in
+>   `data/calibration.yaml`.
+
 Date: 2026-11-13. Status: approved by the owner 2026-11-14.
 
 ## Intent
