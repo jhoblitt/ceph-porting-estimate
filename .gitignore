@@ -1,0 +1,7 @@
+/bin/
+/dist/
+coverage.out
+
+# Local agent scratch and harness state.
+/.superpowers/
+/.claude/
