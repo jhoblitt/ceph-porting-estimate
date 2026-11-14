@@ -58,7 +58,7 @@ func addFeature(s *data.Set, componentID string, f data.Feature) {
 // validFeature is a feature carrying every field the schema requires.
 func validFeature(id string, globs ...string) data.Feature {
 	return data.Feature{
-		ID: id, Name: id, Globs: globs,
+		ID: id, Name: id, Description: id, Why: id, Globs: globs,
 		Scope: data.ScopeShown, Kind: data.KindProduct, Difficulty: data.DifficultyGlue,
 	}
 }

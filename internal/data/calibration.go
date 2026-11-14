@@ -12,9 +12,10 @@ import (
 // source gives. Derived values are written to four or five significant
 // figures, well inside derivedTolerancePct; mixTolerancePct bounds how far
 // the difficulty scale's mean over rgw-go's mix may sit from 1;
-// reportedTolerancePct is for the few figures calibration.yaml records to
-// three significant figures, whose rounding alone can exceed
-// derivedTolerancePct.
+// reportedTolerancePct is for the few figures calibration.yaml records so
+// coarsely that their rounding alone exceeds derivedTolerancePct (marked †
+// in docs/cost-model.md). A figure whose rounding stays inside
+// derivedTolerancePct is checked at it, however few figures it is written to.
 const (
 	derivedTolerancePct  = 0.1
 	mixTolerancePct      = 0.5
@@ -48,7 +49,7 @@ func validateCalibration(p *Problems, s *Set) {
 	c.checkPort(a, sz)
 	c.checkSanity(s.Models)
 	c.checkCoverage(a, sz)
-	c.checkDifficulty(a)
+	c.checkDifficulty(a, s.Components)
 	c.checkPhases(a)
 	c.checkLongContext(a)
 }
