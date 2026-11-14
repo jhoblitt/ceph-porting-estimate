@@ -4,19 +4,19 @@ bytes_per_token:
   cpp: {value: 3.2, measured: true, source: calibration.yaml, reason: tokenizer run on ceph C++}
   python: {value: 3.8, measured: true, source: calibration.yaml, reason: tokenizer run on ceph Python}
 params:
-  expansion: {value: 1.4, measured: true, source: calibration.yaml, reason: rgw-go product Go over replaced C++}
+  expansion: {value: 1.9048, measured: false, source: calibration.yaml, reason: rgw-go product Go over replaced C++}
   test_ratio: {value: 0.9, measured: true, source: calibration.yaml, reason: rgw-go test Go over product Go}
-  overhead: {value: 3.1, measured: true, source: calibration.yaml, reason: output tokens over surviving Go}
-  uncached_per_output: {value: 0.008, measured: true, source: calibration.yaml, reason: rgw-go uncached input ratio}
-  cache_write_per_output: {value: 25.3, measured: true, source: calibration.yaml, reason: rgw-go cache write ratio}
-  cache_read_per_output: {value: 1249, measured: true, source: calibration.yaml, reason: rgw-go cache read ratio}
+  overhead: {value: 4, measured: true, source: calibration.yaml, reason: output tokens over surviving Go}
+  uncached_per_output: {value: 0.01, measured: true, source: calibration.yaml, reason: rgw-go uncached input ratio}
+  cache_write_per_output: {value: 25, measured: true, source: calibration.yaml, reason: rgw-go cache write ratio}
+  cache_read_per_output: {value: 1250, measured: true, source: calibration.yaml, reason: rgw-go cache read ratio}
   source_read_passes: {value: 2.5, measured: true, source: calibration.yaml, reason: rgw-go reads of the replaced source}
   difficulty:
-    config: {value: 0.1, measured: false, source: assumption, reason: config is mostly copied}
-    glue: {value: 0.5, measured: false, source: assumption, reason: glue is thin}
-    standard: {value: 1, measured: false, source: assumption, reason: the calibration baseline}
-    hard: {value: 1.5, measured: false, source: assumption, reason: subtle invariants}
-    extreme: {value: 2, measured: false, source: assumption, reason: wire and disk formats}
+    config: {value: 0.09091, measured: false, source: assumption, reason: config is mostly copied}
+    glue: {value: 0.4545, measured: false, source: assumption, reason: glue is thin}
+    standard: {value: 0.9091, measured: false, source: assumption, reason: the calibration baseline}
+    hard: {value: 1.3636, measured: false, source: assumption, reason: subtle invariants}
+    extreme: {value: 1.8182, measured: false, source: assumption, reason: wire and disk formats}
   rust_factor: {value: 1.15, measured: false, source: assumption, reason: borrow checker friction}
   wasm_overhead: {value: 1.25, measured: false, source: assumption, reason: no threads or sockets}
   clean_break_discount: {value: 0.8, measured: false, source: assumption, reason: no compatibility shims}
@@ -39,16 +39,19 @@ toggles: {include_adjacent: false, clean_break: false}
 scenarios:
   naive:
     label: Naive
+    role: reference
     description: One pass over the source.
     overrides: {test_ratio: 0, overhead: 1, difficulty.hard: 1}
     toggles: {}
   calibrated:
     label: Calibrated
+    role: central
     description: The rgw-go measurement applied as measured.
   pessimistic:
     label: Pessimistic
+    role: high
     description: Hard code is harder and adjacent work counts.
-    overrides: {difficulty.extreme: 3, long_context_share.cache_read: 0.5}
-    scale: {overhead: 1.25}
+    overrides: {difficulty.extreme: 3, expansion: 2.381, long_context_share.uncached: 0.5, long_context_share.cache_write: 0.5, long_context_share.cache_read: 0.5, long_context_share.output: 0.5}
+    scale: {overhead: 1.25, cache_read_per_output: 1.1, cache_write_per_output: 1.2}
     toggles: {include_adjacent: true}
 default_scenario: calibrated

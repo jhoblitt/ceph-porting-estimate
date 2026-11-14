@@ -87,6 +87,26 @@ Every quantity in `assumptions.yaml` carries a `source` and a `reason`, and
 committed: the site computes them in the browser from the rolled-up
 `report.json`, which is build output.
 
+The scenario presets in `assumptions.yaml` are listed in the order the
+report presents them, and each has a `role`: `low`, `central`, `high` or
+`reference`. `check` requires one `central` scenario, which must be
+`default_scenario`, at most one of each other role, and a scenario named
+`calibrated`; there may be any number of others.
+
+`calibration.yaml` is free-form for display, but every number in
+`assumptions.yaml` that is a copy or a function of it is checked: `check`
+recomputes the calibrated parameters, the difficulty scale, the scenario
+values taken from rgw-go (the phase-derived scales, the expansion at a
+coverage end and the long-context shares) and the derived figures
+`calibration.yaml` records, and fails, naming the key and both values, on
+any that has drifted. A scenario that copies one of these values must be
+named in the matching mapping in `calibration.yaml` (`phases.scenario_phase`,
+`coverage.scenario_end`, `long_context_scenarios`), or `check` fails.
+After changing coverage, a bytes-per-token value, a relative difficulty, a
+phase row or rgw-go's prompt-size shares, recompute every value `check`
+names, in both files, until it passes;
+[`docs/cost-model.md`](docs/cost-model.md) lists each rule.
+
 After any edit, validate the data; CI runs the same check, and `go test`
 fails on invalid data too:
 

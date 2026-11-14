@@ -58,18 +58,24 @@ type Feature struct {
 // Dependency is a dependencies.yaml entry with the size of its submodules.
 type Dependency struct {
 	data.Dependency
-	// SubmoduleSize is nil when the dependency lists no submodule.
+	// SubmoduleSize totals the listed submodules and every submodule nested
+	// under them; nil when the dependency lists no submodule.
 	SubmoduleSize *SubmoduleSize `json:"submodule_size"`
+	// SubmoduleOwn totals the listed submodules' own files only; nil when
+	// SubmoduleSize is.
+	SubmoduleOwn *SubmoduleSize `json:"submodule_own"`
 }
 
-// SubmoduleSize totals a dependency's listed submodules and every
-// submodule nested under them. A submodule the counter could not check out
-// counts zero.
+// SubmoduleSize totals the files of a set of submodules: a dependency's
+// listed submodules, with or without the submodules nested under them. A
+// submodule the counter could not check out counts zero.
 type SubmoduleSize struct {
 	// Available is true when every listed submodule was checked out; an
 	// unavailable nested one does not clear it.
 	Available bool `json:"available"`
 	data.Counts
+	// UnavailableNested counts the nested submodules that could not be
+	// checked out; 0 for a total without nested submodules.
 	UnavailableNested int `json:"unavailable_nested"`
 }
 
@@ -127,23 +133,24 @@ func newReport(s *data.Set, langs []map[string]data.Counts, unclassified map[str
 	for _, d := range s.Dependencies {
 		rd := Dependency{Dependency: d}
 		if len(d.Submodules) > 0 {
-			rd.SubmoduleSize = submoduleSize(d.Submodules, s.SLOC.Submodules)
+			rd.SubmoduleSize = submoduleSize(d.Submodules, s.SLOC.Submodules, true)
+			rd.SubmoduleOwn = submoduleSize(d.Submodules, s.SLOC.Submodules, false)
 		}
 		r.Dependencies = append(r.Dependencies, rd)
 	}
 	return r
 }
 
-// submoduleSize sums the rows listed and the rows nested under a listed
-// path, counting each row once. A listed path with no row is unavailable;
-// data.Validate reports it.
-func submoduleSize(listed []string, rows []data.Submodule) *SubmoduleSize {
+// submoduleSize sums the rows listed and, withNested, the rows nested under
+// a listed path, counting each row once. A listed path with no row is
+// unavailable; data.Validate reports it.
+func submoduleSize(listed []string, rows []data.Submodule, withNested bool) *SubmoduleSize {
 	size := &SubmoduleSize{Available: true}
 	found := 0
 	for i := range rows {
 		r := &rows[i]
 		top := slices.Contains(listed, r.Path)
-		nested := !top && slices.ContainsFunc(listed, func(l string) bool {
+		nested := withNested && !top && slices.ContainsFunc(listed, func(l string) bool {
 			return strings.HasPrefix(r.Path, l+"/")
 		})
 		switch {

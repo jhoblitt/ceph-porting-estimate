@@ -60,6 +60,9 @@ func Load(fsys fs.FS) (*Set, error) {
 	if err != nil {
 		return nil, err
 	}
+	if s.Assumptions.scenarioOrder, err = mappingKeys(fsys, AssumptionsFile, "scenarios"); err != nil {
+		return nil, err
+	}
 
 	s.Groups = taxonomy.Groups
 	s.Components = taxonomy.Components
@@ -138,6 +141,26 @@ func decodeJSON(fsys fs.FS, name string, v any) error {
 		return fmt.Errorf("parsing %s: %w", name, err)
 	}
 	return nil
+}
+
+// mappingKeys returns, in file order, the keys of the mapping under key in
+// name's top-level mapping; none when key is absent or not a mapping.
+func mappingKeys(fsys fs.FS, name, key string) ([]string, error) {
+	var doc yaml.Node
+	if err := decodeYAML(fsys, name, &doc); err != nil {
+		return nil, err
+	}
+	top := doc.Content[0]
+	for i := 0; i+1 < len(top.Content); i += 2 {
+		if v := top.Content[i+1]; top.Content[i].Value == key && v.Kind == yaml.MappingNode {
+			keys := make([]string, 0, len(v.Content)/2)
+			for j := 0; j < len(v.Content); j += 2 {
+				keys = append(keys, v.Content[j].Value)
+			}
+			return keys, nil
+		}
+	}
+	return nil, nil
 }
 
 func loadCalibration(fsys fs.FS) (json.RawMessage, error) {

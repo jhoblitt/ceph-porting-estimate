@@ -306,6 +306,28 @@ var _ = Describe("Build", func() {
 			"boost": nil,
 		}))
 	})
+
+	It("sizes each dependency's own submodules apart from anything nested under them", func() {
+		r := rollup.Build(s)
+		Expect(r.Problems).To(BeEmpty())
+		own := map[string]*rollup.SubmoduleSize{}
+		for _, d := range r.Report.Dependencies {
+			own[d.ID] = d.SubmoduleOwn
+		}
+		Expect(own).To(Equal(map[string]*rollup.SubmoduleSize{
+			// src/rocksdb alone: neither the nested folly nor the nested
+			// gtest, nor src/rocksdb_tools.
+			"rocksdb": {
+				Available: true,
+				Counts:    data.Counts{Files: 12, Code: 5300, Comment: 520, Blank: 410, Bytes: 209000},
+			},
+			"seastar": {
+				Available: false,
+				Counts:    data.Counts{Files: 4, Code: 800, Comment: 60, Blank: 50, Bytes: 25000},
+			},
+			"boost": nil,
+		}))
+	})
 })
 
 var _ = Describe("WriteUnclassified", func() {
