@@ -26,7 +26,6 @@ var _ = Describe("Run", func() {
 		func(name string) {
 			Expect(run(name)).To(MatchError("not implemented"), "subcommand %q", name)
 		},
-		Entry("count", "count"),
 		Entry("check", "check"),
 		Entry("rollup", "rollup"),
 	)

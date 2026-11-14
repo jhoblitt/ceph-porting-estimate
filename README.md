@@ -21,10 +21,22 @@ go build -o bin/cephest ./cmd/cephest
 
 ## Usage
 
-`cephest` has three subcommands, none implemented yet: `count` counts
-source lines per file in a Ceph checkout, `check` validates the hand-edited
-data files, and `rollup` combines both into the report's `report.json`.
-Run `cephest --help` for flags.
+`cephest` has three subcommands: `count` counts source lines per file in a
+Ceph checkout, `check` validates the hand-edited data files, and `rollup`
+combines both into the report's `report.json`. Only `count` is implemented
+so far. Run `cephest --help` for flags.
+
+`count` reads the commit through git objects only, so the checkout's working
+tree may be dirty, and counts each submodule whose pinned commit is present
+under `.git/modules`:
+
+```sh
+cephest count --repo ~/github/ceph --rev <sha> --out data/generated/sloc.json
+```
+
+Lines are classified as code, comment or blank by the language rules of
+[scc](https://github.com/boyter/scc) v3.7.0; which language a file is, and
+so its bucket in `sloc.json`, is `cephest`'s own table.
 
 ## Development
 
