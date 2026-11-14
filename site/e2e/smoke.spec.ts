@@ -10,12 +10,18 @@ const REPO = 'https://github.com/jhoblitt/ceph-porting-estimate';
 /** Console errors and uncaught exceptions on the page, checked after every test. */
 let problems: string[] = [];
 
-test.beforeEach(({ page }) => {
-  problems = [];
+function watch(page: Page): void {
   page.on('console', (m) => {
     if (m.type() === 'error') problems.push(`console: ${m.text()}`);
   });
   page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+}
+
+test.beforeEach(({ page, context }) => {
+  problems = [];
+  watch(page);
+  // A page a test opens itself is watched too.
+  context.on('page', watch);
 });
 
 test.afterEach(() => {
@@ -110,12 +116,15 @@ test('moving a slider changes the headline and the URL, and that URL restores it
   await again.close();
 });
 
-test('an unknown model in the URL falls back to the defaults', async ({ page }) => {
+test('an unknown model in the URL falls back to the defaults', async ({ page, context }) => {
   await open(page);
   const defaults = await headlineValue(page);
-  await open(page, '#/?model=no-such-model');
-  await expect(headline(page)).toHaveAttribute('value', defaults);
-  await expect(page).toHaveURL(/model=opus-5-5/);
+  // Loaded fresh, as a shared link is, not as a hash change on a loaded page.
+  const fresh = await context.newPage();
+  await open(fresh, '#/?model=no-such-model');
+  await expect(headline(fresh)).toHaveAttribute('value', defaults);
+  await expect(fresh).toHaveURL(/model=opus-5-5/);
+  await fresh.close();
 });
 
 for (const route of ['methods', 'calibration']) {
