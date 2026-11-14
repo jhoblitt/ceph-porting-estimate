@@ -4,11 +4,39 @@ import { describe, expect, it, vi } from 'vitest';
 import fixture from '../lib/__fixtures__/report.json';
 import { Derived } from '../lib/derived.svelte';
 import { usd } from '../lib/format';
+import { labelRows } from '../lib/placement';
 import { type Report, type ScenarioRole, parseReport } from '../lib/report';
 import { type AppState, defaultState } from '../lib/state';
 import ScenarioRange from './ScenarioRange.svelte';
 
 const report = parseReport(fixture);
+
+/** Gives every element a measured size jsdom cannot; returns the undo. */
+function stubSize(prop: 'clientWidth' | 'offsetWidth', size: (el: HTMLElement) => number): () => void {
+  // Only HTMLElement.prototype's own descriptor is replaced; the undo puts it back, or removes the stub
+  // so the inherited one (clientWidth lives on Element.prototype) shows through again.
+  const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop);
+  Object.defineProperty(HTMLElement.prototype, prop, {
+    configurable: true,
+    get(this: HTMLElement) {
+      return size(this);
+    },
+  });
+  return () => {
+    if (own) Object.defineProperty(HTMLElement.prototype, prop, own);
+    else delete (HTMLElement.prototype as unknown as Record<string, unknown>)[prop];
+  };
+}
+
+// The chart measures its labels; jsdom has no ResizeObserver and lays nothing out.
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
 
 function setup(patch: Partial<AppState> = {}, r: Report = report) {
   const selection: AppState = { ...defaultState(r), ...patch };
@@ -33,12 +61,35 @@ describe('ScenarioRange', () => {
     expect(label).toContain('(selected)');
   });
 
-  it('raises every other figure label, left to right, so close labels do not overlap', () => {
+  it('places every figure label on the axis until it can be measured', () => {
+    // jsdom lays nothing out, so every width is 0.
     const { container } = setup();
-    const labels = [...container.querySelectorAll<HTMLElement>('.plot .figure')].sort(
-      (a, b) => Number.parseFloat(a.style.left) - Number.parseFloat(b.style.left),
-    );
-    expect(labels.map((l) => l.classList.contains('raised'))).toEqual([false, true, false]);
+    const labels = [...container.querySelectorAll<HTMLElement>('.plot .figure')];
+    expect(labels).toHaveLength(3);
+    expect(labels.map((l) => l.style.getPropertyValue('--row'))).toEqual(['0', '0', '0']);
+  });
+
+  it('raises the labels labelRows raises, from their measured widths and the plot width', () => {
+    // A narrow plot and wide labels, so neighbours collide.
+    const PLOT = 120;
+    const LABEL = 60;
+    const restore = [
+      stubSize('clientWidth', (el) => (el.classList.contains('plot') ? PLOT : 0)),
+      stubSize('offsetWidth', (el) => (el.classList.contains('figure') ? LABEL : 0)),
+    ];
+    try {
+      const { container } = setup();
+      const labels = [...container.querySelectorAll<HTMLElement>('.plot .figure')];
+      const want = labelRows(
+        labels.map((l, i) => ({ id: String(i), center: (Number.parseFloat(l.style.left) / 100) * PLOT, width: LABEL })),
+      );
+      const rows = labels.map((l) => Number(l.style.getPropertyValue('--row')));
+      expect(rows).toEqual(labels.map((_, i) => want.get(String(i))));
+      expect(Math.max(...rows)).toBeGreaterThan(0);
+      expect(container.querySelector<HTMLElement>('.plot')?.style.getPropertyValue('--rows')).toBe(String(Math.max(...rows) + 1));
+    } finally {
+      for (const r of restore) r();
+    }
   });
 
   it('keeps every scenario selectable, the reference one included', async () => {
