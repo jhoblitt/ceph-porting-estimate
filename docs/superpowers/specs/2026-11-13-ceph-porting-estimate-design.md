@@ -172,6 +172,9 @@ large each one is next to the work its strategy costs.
 
 ## The cost model
 
+[`docs/cost-model.md`](../../cost-model.md) is the current specification of
+the cost model and supersedes the formulas in this section.
+
 Per feature, target and model:
 
 1. **Source tokens** = bytes ÷ bytes-per-token for the language.

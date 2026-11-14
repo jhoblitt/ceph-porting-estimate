@@ -1,0 +1,78 @@
+# Files that sit directly in src/ (and three small directories) and belong to
+# no component directory: the daemons' main() functions, two libraries built
+# from single files, and a few small tools.
+components:
+  - id: entrypoints
+    group: common
+    name: Daemon entry points and single-file libraries
+    description: main() for the daemons, libcephfs's C API, libcephsqlite, and small tools that live directly in src/
+    root: [src/]
+    features:
+      - id: daemon-mains
+        name: Daemon main() functions
+        description: Start-up, argument handling and daemonisation for ceph-osd, ceph-mon, ceph-mds and ceph-mgr
+        globs:
+          - src/ceph_osd.cc
+          - src/ceph_mon.cc
+          - src/ceph_mds.cc
+          - src/ceph_mgr.cc
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: Each wires global init, messengers and the store before handing over to its daemon class; start-up ordering matters but the logic is linear.
+      - id: libcephfs-api
+        name: libcephfs C API and FUSE entry points
+        description: The libcephfs C API over the userspace client, plus ceph-fuse and the ceph-syn load generator
+        globs:
+          - src/libcephfs.cc
+          - src/ceph_fuse.cc
+          - src/ceph_syn.cc
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: A wide but thin C surface over src/client; the difficulty lives in the client, which is costed in its own component.
+      - id: libcephsqlite
+        name: libcephsqlite
+        description: SQLite VFS that stores a database in RADOS, with its striper
+        globs:
+          - src/libcephsqlite.cc
+          - src/SimpleRADOSStriper.cc
+          - src/SimpleRADOSStriper.h
+        scope: headline
+        kind: product
+        difficulty: standard
+        why: A self-contained VFS with exclusive-lock handling on RADOS objects; used by mgr modules for persistent state.
+      - id: small-tools
+        name: Small tools and shared one-offs
+        description: krbd sysfs mapping helper, librados-config, the NVMe-oF monitor client main, and two tiny shared files
+        globs:
+          - src/krbd.cc
+          - src/librados-config.cc
+          - src/ceph_nvmeof_monitor_client.cc
+          - src/perf_histogram.h
+          - src/ceph_ver.c
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Thin wrappers and helpers with no protocol or persistence logic of their own.
+      - id: ha-scripts
+        name: Resource agent and object clean-up script
+        description: The OCF resource agent for mapping RBD images under Pacemaker, and a boto bucket clean-up script
+        globs:
+          - src/ocf/rbd.in
+          - src/objsync/boto_del.py
+        scope: headline
+        kind: product
+        difficulty: glue
+        why: Standalone operational scripts.
+      - id: build-files
+        name: Build and configuration fragments
+        description: CMake and ignore files for src/ocf, and the Jaeger tracing sample config
+        globs:
+          - src/ocf/CMakeLists.txt
+          - src/ocf/.gitignore
+          - src/jaegertracing/config.yml
+        scope: not-ported
+        kind: config
+        difficulty: config
+        why: Build plumbing and a sample configuration; nothing to port.

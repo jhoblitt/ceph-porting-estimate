@@ -1,0 +1,33 @@
+# The areas the report groups components under. A component names its area
+# with `group: <id>`. Order here is the order the report shows them in.
+groups:
+  - id: rados
+    name: RADOS core
+    description: The object store itself - OSDs, monitors, the manager daemon, the messenger, CRUSH, erasure coding, BlueStore and the client library
+  - id: crimson
+    name: Crimson
+    description: The Seastar-based OSD and its SeaStore object store
+  - id: rgw
+    name: Object gateway (RGW)
+    description: The S3 and Swift gateway, its storage drivers and radosgw-admin
+  - id: cephfs
+    name: CephFS
+    description: The metadata server, the userspace client, and the CephFS tools and mirror daemon
+  - id: rbd
+    name: Block (RBD)
+    description: librbd, rbd-mirror, the rbd tools and the NVMe-oF monitor client
+  - id: management
+    name: Management and orchestration
+    description: The Python manager modules, the dashboard, cephadm, ceph-volume and monitoring
+  - id: common
+    name: Common libraries and bindings
+    description: Shared C++ infrastructure, public headers, language bindings and daemon entry points
+  - id: tools
+    name: Tools and scripts
+    description: Command-line tools and operational scripts
+  - id: tests
+    name: Tests and QA
+    description: Unit and integration tests under src/test, and the qa/ suites
+  - id: docs
+    name: Documentation and packaging
+    description: Documentation, packaging and build files, none of which is ported
