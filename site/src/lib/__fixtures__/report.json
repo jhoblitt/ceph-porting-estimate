@@ -21,8 +21,8 @@
           "difficulty": "hard",
           "why": "Wide protocol surface with byte-compatible on-RADOS formats.",
           "langs": {
-            "C++": { "files": 412, "code": 186204, "comment": 21877, "blank": 30551, "bytes": 8123590 },
-            "Python": { "files": 6, "code": 1210, "comment": 140, "blank": 260, "bytes": 51322 }
+            "cpp": { "files": 412, "code": 186204, "comment": 21877, "blank": 30551, "bytes": 8123590 },
+            "python": { "files": 6, "code": 1210, "comment": 140, "blank": 260, "bytes": 51322 }
           }
         },
         {
@@ -35,7 +35,7 @@
           "difficulty": "extreme",
           "why": "Distributed state machines with years of edge-case fixes.",
           "langs": {
-            "C++": { "files": 58, "code": 41388, "comment": 3011, "blank": 6104, "bytes": 1902114 }
+            "cpp": { "files": 58, "code": 41388, "comment": 3011, "blank": 6104, "bytes": 1902114 }
           }
         },
         {
@@ -48,8 +48,8 @@
           "difficulty": "standard",
           "why": "Ported once as code; no test ratio applies.",
           "langs": {
-            "C++": { "files": 97, "code": 52310, "comment": 2204, "blank": 8890, "bytes": 2210448 },
-            "Python": { "files": 11, "code": 4022, "comment": 310, "blank": 802, "bytes": 160337 }
+            "cpp": { "files": 97, "code": 52310, "comment": 2204, "blank": 8890, "bytes": 2210448 },
+            "python": { "files": 11, "code": 4022, "comment": 310, "blank": 802, "bytes": 160337 }
           }
         }
       ]
@@ -70,7 +70,7 @@
           "difficulty": "extreme",
           "why": "Core consistency logic; a defect loses data.",
           "langs": {
-            "C++": { "files": 236, "code": 148920, "comment": 17204, "blank": 21877, "bytes": 6730015 }
+            "cpp": { "files": 236, "code": 148920, "comment": 17204, "blank": 21877, "bytes": 6730015 }
           }
         },
         {
@@ -83,7 +83,7 @@
           "difficulty": "extreme",
           "why": "On-disk format compatibility and allocator correctness.",
           "langs": {
-            "C++": { "files": 121, "code": 97644, "comment": 9120, "blank": 12408, "bytes": 4402871 }
+            "cpp": { "files": 121, "code": 97644, "comment": 9120, "blank": 12408, "bytes": 4402871 }
           }
         },
         {
@@ -96,7 +96,7 @@
           "difficulty": "config",
           "why": "Replaced by the target language's own build.",
           "langs": {
-            "CMake": { "files": 2, "code": 188, "comment": 12, "blank": 30, "bytes": 7311 }
+            "cmake": { "files": 2, "code": 188, "comment": 12, "blank": 30, "bytes": 7311 }
           }
         }
       ]
@@ -117,8 +117,8 @@
           "difficulty": "standard",
           "why": "Ported at normal cost; the harness itself is out of scope.",
           "langs": {
-            "Python": { "files": 402, "code": 98204, "comment": 9874, "blank": 17330, "bytes": 4120554 },
-            "Bourne Shell": { "files": 611, "code": 30112, "comment": 4021, "blank": 5873, "bytes": 1060227 }
+            "python": { "files": 402, "code": 98204, "comment": 9874, "blank": 17330, "bytes": 4120554 },
+            "shell": { "files": 611, "code": 30112, "comment": 4021, "blank": 5873, "bytes": 1060227 }
           }
         },
         {
@@ -131,7 +131,7 @@
           "difficulty": "config",
           "why": "Low-cost carry-over of declarative YAML.",
           "langs": {
-            "YAML": { "files": 9180, "code": 61022, "comment": 410, "blank": 2210, "bytes": 1508332 }
+            "yaml": { "files": 9180, "code": 61022, "comment": 410, "blank": 2210, "bytes": 1508332 }
           }
         },
         {
@@ -144,7 +144,7 @@
           "difficulty": "glue",
           "why": "Follows the dashboard, which stays outside the headline.",
           "langs": {
-            "TypeScript": { "files": 88, "code": 6120, "comment": 210, "blank": 940, "bytes": 221904 }
+            "typescript": { "files": 88, "code": 6120, "comment": 210, "blank": 940, "bytes": 221904 }
           }
         }
       ]
@@ -211,10 +211,10 @@
   "assumptions": {
     "bytes_per_token": {
       "default": { "value": 4, "measured": false, "source": "assumption", "reason": "Typical for source code across tokenizers." },
-      "C++": { "value": 3.6, "measured": false, "source": "assumption", "reason": "Dense punctuation and templates." },
-      "Python": { "value": 4, "measured": false, "source": "assumption", "reason": "Close to the default." },
-      "Go": { "value": 3.9, "measured": false, "source": "assumption", "reason": "Needed to compute the expansion from rgw-go." },
-      "YAML": { "value": 4.5, "measured": false, "source": "assumption", "reason": "Repetitive keys tokenize well." }
+      "cpp": { "value": 3.6, "measured": false, "source": "assumption", "reason": "Dense punctuation and templates." },
+      "python": { "value": 4, "measured": false, "source": "assumption", "reason": "Close to the default." },
+      "go": { "value": 3.9, "measured": false, "source": "assumption", "reason": "Needed to compute the expansion from rgw-go." },
+      "yaml": { "value": 4.5, "measured": false, "source": "assumption", "reason": "Repetitive keys tokenize well." }
     },
     "params": {
       "expansion": { "value": 1.62, "measured": true, "source": "data/calibration.yaml", "reason": "rgw-go product Go tokens per replaced C++ token." },
