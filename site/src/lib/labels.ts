@@ -97,13 +97,13 @@ export interface ChainText {
 }
 
 export const CHAIN_TEXT: Record<ChainKey, ChainText> = {
-  source: { label: 'Source tokens', note: 'The feature’s code as the model reads it.' },
-  difficulty: { label: 'Difficulty', note: 'Work per line for this difficulty class, relative to standard code.' },
+  source: { label: 'Source tokens', note: 'The size the work starts from, in tokens as the model reads them.' },
+  difficulty: { label: 'Difficulty', note: 'Work per line for this difficulty class.' },
   target: { label: 'Target language', note: 'Work in the target language relative to Go.' },
   expansion: { label: 'Expansion', note: 'Tokens of new code written per source token.' },
-  newTests: { label: 'New tests', note: 'Tests still to write, for product code only.' },
-  overhead: { label: 'Overhead', note: 'Output per token of surviving code: reviews, rework and dead ends.' },
+  newTests: { label: 'New tests', note: 'One plus the new tests still to write once existing tests are credited; 1 for tests and configuration.' },
+  overhead: { label: 'Overhead', note: 'Output per token of code that survives; above 1 for reviews, rework and dead ends.' },
   modelEfficiency: { label: 'Model efficiency', note: 'Tokens this model needs relative to the measured one.' },
   cleanBreak: { label: 'Clean break', note: 'Output kept when compatibility is dropped; 1× when the switch is off.' },
-  adjacent: { label: 'Work around the port', note: 'Defect reproduction, review and upstream work.' },
+  adjacent: { label: 'Work around the port', note: 'Defect reproduction, review and upstream work, added while that switch is on.' },
 };

@@ -212,6 +212,8 @@
       <FeatureDetail
         report={d.report}
         params={d.params}
+        paramInfo={d.paramInfo}
+        overrides={d.overrides}
         target={d.target}
         estimate={feature}
         source={featureSource}

@@ -12,9 +12,11 @@
     steps: ChainStep[];
     /** Names the difficulty step's class, e.g. "hard". */
     difficulty: string;
+    /** What the difficulty factor is relative to, from the data. */
+    difficultyNote: string;
   }
 
-  let { steps, difficulty }: Props = $props();
+  let { steps, difficulty, difficultyNote }: Props = $props();
 </script>
 
 <table class="chain">
@@ -32,7 +34,7 @@
       <tr>
         <th scope="row">
           <span class="label">{text.label}{s.key === 'difficulty' ? ` (${difficulty})` : ''}</span>
-          <span class="note">{text.note}</span>
+          <span class="note">{s.key === 'difficulty' ? difficultyNote : text.note}</span>
         </th>
         <td class="factor">{s.factor === null ? '' : `× ${decimal(s.factor)}`}</td>
         <td class="value"><Amount value={s.value} kind="tokens" spellExact /></td>
