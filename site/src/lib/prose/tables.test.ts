@@ -42,8 +42,37 @@ function complete(): Report {
     d.submodule_size = { available: true, unavailable_nested: 0, files: 2, code: 2000, comment: 0, blank: 0, bytes: 70_000 };
     (d as unknown as Record<string, unknown>)['submodule_own'] = { ...d.submodule_size, code: 1000 };
   }
+  (r.models.at(-1) as Model).price_sources = PRICE_SOURCES;
   return r;
 }
+
+/** A model's prices read from two pages, as models.yaml's price_sources gives them. */
+const PRICE_SOURCES: NonNullable<Model['price_sources']> = [
+  { prices: ['input', 'cache_write_short', 'cache_write_long', 'cache_read'], source: 'https://example.com/caching', read_on: '2026-11-14' },
+  { prices: ['output'], source: 'https://example.com/pricing', read_on: '2026-11-13', note: 'Not on the caching page.' },
+];
+
+describe('price sources', () => {
+  const r = complete();
+  const f = proseFacts(r);
+  const name = (r.models.at(-1) as Model).name;
+
+  it('lists each page with the prices it gave, and points the price row at it', () => {
+    expect(f.hasPriceSources).toBe(true);
+    expect(facts.hasPriceSources).toBe(false);
+    const rows = buildTable('price-sources', r, f).rows.map((row) => row.cells);
+    expect(rows.map((c) => c.map(text))).toEqual([
+      [name, 'input, short-tier cache write, long-tier cache write, and cache read', 'example.com/caching, 2026-11-14', ''],
+      [name, 'output', 'example.com/pricing, 2026-11-13', 'Not on the caching page.'],
+    ]);
+    expect(rows[1]?.[2]).toMatchObject({ href: 'https://example.com/pricing' });
+    expect(column('prices', 6, r).at(-1)).toMatch(/, two pages: see where each price was read, below$/);
+  });
+
+  it('is not a table when no model has more than one page', () => {
+    expect(() => buildTable('price-sources', report, facts)).toThrow(/no model lists price_sources/);
+  });
+});
 
 describe('buildTable', () => {
   it.each(Object.keys(TABLES))('builds %s from a complete fixture with a cell per column', (id) => {
@@ -103,6 +132,7 @@ describe('the bindings table', () => {
   it("names what bindings leave in the estimate page's words, and points at each entry's plan", () => {
     const t = buildTable('bindings-by-target', report, facts);
     expect(t.caption).toBe('Dependencies each target uses through bindings');
+    expect(t.columns.map((c) => c.label)).toEqual(['Target', 'Used through bindings']);
     expect(t.note).toContain('is in its plan, in the estimate page');
     expect(t.caption + (t.note ?? '')).not.toMatch(/C or C\+\+ library|its note/);
   });
@@ -114,13 +144,22 @@ describe('the scenarios table', () => {
     const central = report.assumptions.scenarios[report.assumptions.default_scenario]?.label;
     expect(changes[`${central} (baseline)`]).toBe('Nothing: this is the baseline.');
     const pessimistic = changes['Pessimistic'] ?? '';
-    expect(pessimistic.startsWith('Target code tokens per source token 1.62 → 1.85; Difficulty: hard 1.5 → 2; Difficulty: extreme 2 → 3; ')).toBe(true);
+    expect(pessimistic.startsWith('Target code tokens per source token 1.62 → 1.8514; Difficulty: hard 1.5 → 2; Difficulty: extreme 2 → 3; ')).toBe(true);
     const scaled = pessimistic.indexOf('Output tokens per token of finished code × 1.20;');
     expect(changes['Optimistic']).toContain('Output tokens per token of finished code × 0.871;');
     const switched = pessimistic.indexOf('Include the work around the port: on');
     expect(scaled).toBeGreaterThan(0);
     expect(switched).toBeGreaterThan(scaled);
     expect(changes['Naive']).not.toContain('Difficulty: standard');
+  });
+
+  it('prints a replaced value to the precision the parameter table prints it', () => {
+    const naive = buildTable('scenarios', report, facts).rows.find((r) => text(r.cells[0]) === 'Naive');
+    const params = Object.fromEntries(buildTable('params', report, facts).rows.map((r) => [text(r.cells[0]), text(r.cells[1])]));
+    for (const label of ['Cache-read tokens per output token', 'Output tokens per token of finished code']) {
+      expect(params[label]).toMatch(/\d/);
+      expect(text(naive?.cells[4])).toContain(`${label} ${params[label]} → `);
+    }
   });
 });
 

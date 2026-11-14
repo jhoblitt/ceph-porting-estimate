@@ -251,6 +251,12 @@ export interface ProseFacts {
   subagents: { note: number; port: number } | null;
   /** Both counts are given and differ. */
   subagentsDiffer: boolean;
+  /** The review role's agent count and the session's count of review passes; null unless the data gives both. */
+  reviewCounts: { agents: number; passes: number } | null;
+  /** Both counts are given and differ. */
+  reviewCountsDiffer: boolean;
+  /** Some model says which page each of its prices was read from. */
+  hasPriceSources: boolean;
 }
 
 const LONG_CONTEXT_CATEGORIES: readonly TokenCategory[] = ['uncached', 'cache_write', 'cache_read', 'output'];
@@ -659,6 +665,19 @@ export function subagentCounts(c: Calibration): { note: number; port: number } |
 }
 
 /**
+ * The two review counts the data records: the agents in the role row the
+ * review share prices (its scope, "review (N agents)") and the session's
+ * count of review passes. Null unless both are found.
+ */
+export function reviewCounts(c: Calibration): { agents: number; passes: number } | null {
+  const scope = (c as { derived: { sanity_opus_5_5_usd?: { review_share?: { role_scope?: unknown } } } }).derived
+    .sanity_opus_5_5_usd?.review_share?.role_scope;
+  const agents = countIn(typeof scope === 'string' ? scope : undefined, /\((\d[\d,]*) agents\)/);
+  const passes = c.measurement.review_passes;
+  return agents === null || typeof passes !== 'number' ? null : { agents, passes };
+}
+
+/**
  * The model rgw-go was measured on, which every quoted figure uses. A report
  * whose calibration.measurement.model_id is missing or names no priced model
  * cannot be described (cephest check rejects it too), so this throws.
@@ -726,6 +745,7 @@ export function proseFacts(report: Report): ProseFacts {
   const E = calibration.derived.expansion;
   const prompt = calibration.measurement_detail;
   const subagents = subagentCounts(calibration);
+  const reviews = reviewCounts(calibration);
   const reads = goReadEarly(calibration);
   const lateRead = (test && reads.find((r) => r.phase === test.late)) ?? null;
 
@@ -818,5 +838,8 @@ export function proseFacts(report: Report): ProseFacts {
     backTestLateReadFar: lateRead !== null && lateRead.days > 1,
     subagents,
     subagentsDiffer: subagents !== null && subagents.note !== subagents.port,
+    reviewCounts: reviews,
+    reviewCountsDiffer: reviews !== null && reviews.agents !== reviews.passes,
+    hasPriceSources: report.models.some((m) => (m.price_sources?.length ?? 0) > 0),
   };
 }

@@ -115,6 +115,19 @@ export interface Model {
   /** Display labels for the two cache-write lifetimes, e.g. "5m" and "1h". */
   cache_write_ttl: { short: string; long: string };
   long_context: LongContextPrices | null;
+  /** When the prices came from more than one page: which page gave each, and when it was read. */
+  price_sources?: PriceSource[];
+}
+
+/** The page one or more of a model's prices were read from. */
+export interface PriceSource {
+  /** usd_per_mtok keys. */
+  prices: (keyof Prices)[];
+  source: string;
+  /** YYYY-MM-DD */
+  read_on: string;
+  /** What a reader should know about reading these prices there. */
+  note?: string;
 }
 
 export interface Params {

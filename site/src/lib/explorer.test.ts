@@ -12,6 +12,7 @@ import {
   largestRow,
   perLineRange,
   requiredMode,
+  rootLines,
   sortRows,
   widerMode,
 } from './explorer';
@@ -154,6 +155,22 @@ describe('explorerLevel at the root', () => {
     const rgw = level.groups[1]!.rows[0]!;
     expect(report.components[0]!.features.map((f) => f.id)).toContain('rgw-lua');
     expect(rgw.features).toBe(3);
+  });
+});
+
+describe('rootLines', () => {
+  it("splits the root's lines into Ceph's own and the dependency work, which add up to the total", () => {
+    const own = cephSloc(root);
+    const deps = component('dependencies').headline.sloc.code;
+    expect(deps).toBeGreaterThan(0);
+    const headline = rootLines(explorerLevel(report, root, null, 'headline'));
+    expect(headline).toEqual({ ceph: own.headline.code, dependencies: deps });
+    const all = explorerLevel(report, root, null, 'all');
+    expect(rootLines(all)).toEqual({ ceph: all.total.code - deps, dependencies: deps });
+  });
+
+  it('has nothing to split at a component', () => {
+    expect(rootLines(explorerLevel(report, root, 'rgw', 'headline'))).toBeNull();
   });
 });
 

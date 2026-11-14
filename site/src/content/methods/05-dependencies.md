@@ -11,7 +11,7 @@ Only bindings and port work is costed. Each such entry states the lines of work 
 
 ::: dependency-totals
 
-Bindings keep existing code. Used through bindings means a port built to this estimate still relies on existing code that it does not rewrite, reached across a language boundary; which code that is, and what the port replaces, is in each entry's plan on the estimate page. So "ported to Go" here means Ceph's own code in Go, still reaching that code where it uses bindings: for Go that puts cgo on the call path, and, for RocksDB, C++ shims for the interfaces Ceph implements inside it.
+Bindings keep existing code. Used through bindings means a port built to this estimate still relies on existing code that it does not rewrite, reached across a language boundary; which code that is, and what the port replaces, is in each entry's plan on the estimate page. So "ported to Go" here means Ceph's own code in Go, with the code each bindings entry keeps still in use and a language boundary between the two: for Go that puts cgo on the call path, and, for RocksDB, C++ shims for the interfaces Ceph implements inside it.
 
 ::: bindings-by-target
 

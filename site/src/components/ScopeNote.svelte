@@ -36,8 +36,9 @@
       <dd>
         <Amount value={scope.ceph.headline.code} kind="count" unit="lines" /> lines of Ceph's own code{#if dependencyLines > 0},
           plus work equal to <Amount value={dependencyLines} kind="count" unit="lines" /> lines on the
-          {scope.dependenciesWithWork === 1 ? 'dependency' : `${scope.dependenciesWithWork} dependencies`} that need bindings
-          or a port for {TARGET_LABELS[d.target]}{/if}.
+          {scope.dependenciesWithWork === 1
+            ? 'dependency whose bindings or port leaves work'
+            : `${scope.dependenciesWithWork} dependencies whose bindings or port leave work`} for {TARGET_LABELS[d.target]}{/if}.
       </dd>
     </div>
     {#if scope.shown.length > 0}

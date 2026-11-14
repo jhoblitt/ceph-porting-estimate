@@ -1,6 +1,6 @@
 ## From measurement to parameters
 
-Each calibrated parameter is one division. The input ratios divide each input category of the port row above by its output; the overhead divides that output by the Go measured in git; the test ratio and the expansion divide sizes measured in git; the adjacent-work uplifts divide the adjacent rows by the port row; and the cache-lifetime split, the long-context shares and the phase table that the scenarios' phase scales divide come from the second aggregation described under [Prompt sizes and cache lifetimes](#/calibration?section=prompt-sizes-and-cache-lifetimes) and in [Gaps](#/calibration?section=gaps). Tokens of Go are bytes ÷ {{assumptions.bytes_per_token.go.value | decimal}}, the Go bytes-per-token assumption.
+Each calibrated parameter is one division. The input ratios divide each input category of the port row above by its output; the overhead divides that output by the Go measured in git; the test ratio and the expansion divide sizes measured in git; the adjacent-work uplifts divide the adjacent rows by the port row; and the cache-lifetime split, the long-context shares and the phase table, which the scenarios' phase scales are taken from, come from the second aggregation described under [Prompt sizes and cache lifetimes](#/calibration?section=prompt-sizes-and-cache-lifetimes) and in [Gaps](#/calibration?section=gaps). Tokens of Go are bytes ÷ {{assumptions.bytes_per_token.go.value | decimal}}, the Go bytes-per-token assumption.
 
 ::: derived-ratios
 
