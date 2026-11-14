@@ -1,0 +1,74 @@
+/*
+ * Design tokens. Each colour is one light-dark() pair, so the theme toggle
+ * only sets color-scheme. Values are the dataviz reference palette's
+ * surfaces, inks and blue ramp; text pairs clear WCAG AA on both surfaces.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces */
+  --page: light-dark(#f9f9f7, #0d0d0d);
+  --surface: light-dark(#fcfcfb, #1a1a19);
+
+  /* Ink. --text-faint is for axis ticks and large text only (3.4:1 on light). */
+  --text: light-dark(#0b0b0b, #f0efec);
+  --text-muted: light-dark(#52514e, #c3c2b7);
+  --text-faint: #898781;
+
+  /* Lines. --border-strong outlines controls: >= 3:1 on both surfaces. */
+  --border: light-dark(rgb(11 11 11 / 0.1), rgb(255 255 255 / 0.1));
+  --border-strong: #898781;
+  --grid: light-dark(#e1e0d9, #2c2c2a);
+  --baseline: light-dark(#c3c2b7, #383835);
+
+  /* Accent: links, the selected control, focus. Text-safe on both surfaces. */
+  --accent: light-dark(#256abf, #6da7ec);
+  --accent-ink: light-dark(#ffffff, #0b0b0b);
+  --accent-wash: light-dark(rgb(37 106 191 / 0.1), rgb(109 167 236 / 0.14));
+  --focus: var(--accent);
+
+  /*
+   * Sequential scale for cost intensity, low → high. One hue; light mode runs
+   * light → dark and dark mode flips the anchor, so low values recede into
+   * the surface in both.
+   */
+  --seq-1: light-dark(#cde2fb, #0d366b);
+  --seq-2: light-dark(#9ec5f4, #184f95);
+  --seq-3: light-dark(#6da7ec, #256abf);
+  --seq-4: light-dark(#3987e5, #3987e5);
+  --seq-5: light-dark(#256abf, #6da7ec);
+  --seq-6: light-dark(#184f95, #9ec5f4);
+  --seq-7: light-dark(#0d366b, #cde2fb);
+
+  /* Type */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-num: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --leading: 1.6;
+
+  /* Space and shape */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --radius-sm: 4px;
+  --radius: 8px;
+  --content-max: 72rem;
+  --measure: 68ch;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
