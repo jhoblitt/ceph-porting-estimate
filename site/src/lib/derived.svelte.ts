@@ -68,6 +68,14 @@ export interface ScenarioTotal {
   cost: Cost;
 }
 
+/** How far the reader's changes move the headline from the same scenario as published. */
+export interface PublishedDifference {
+  /** The headline in US dollars under the current scenario as published. */
+  published: number;
+  /** The headline's change from it as a fraction (0.1 is 10% more); null when the published figure is $0. */
+  change: number | null;
+}
+
 export interface ToggleInfo {
   id: ToggleId;
   /** The override key, e.g. `toggles.clean_break`. */
@@ -228,6 +236,14 @@ export class Derived {
         cost: isCustom ? custom : preset,
       };
     });
+  });
+
+  /** The headline against the current scenario as published; undefined while nothing is changed. */
+  readonly fromPublished: PublishedDifference | undefined = $derived.by(() => {
+    if (!this.customised) return undefined;
+    const published = (this.#presets.get(this.scenarioId) as Cost).usd;
+    const change = published > 0 ? (this.root.headline.usd - published) / published : null;
+    return { published, change };
   });
 
   readonly toggles: ToggleInfo[] = $derived.by(() => {

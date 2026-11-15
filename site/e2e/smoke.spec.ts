@@ -116,6 +116,180 @@ test('moving a slider changes the headline and the URL, and that URL restores it
   await again.close();
 });
 
+function estimateBar(page: Page): Locator {
+  return page.locator('[data-estimate-bar]');
+}
+
+/**
+ * Asserts that the bar is showing and the focused element is wholly below
+ * it and on screen. A hidden bar sits above the viewport with its bottom at
+ * 0, where any element would clear it, so "showing" is part of the claim.
+ */
+async function expectFocusClear(page: Page, step: string): Promise<void> {
+  const c = await page.evaluate(() => {
+    const barEl = document.querySelector<HTMLElement>('[data-estimate-bar]')!;
+    const el = document.activeElement as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    return {
+      shown: barEl.dataset['shown'],
+      barBottom: barEl.getBoundingClientRect().bottom,
+      top: rect.top,
+      bottom: rect.bottom,
+      viewport: window.innerHeight,
+      name: `${el.tagName} ${el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 40) ?? ''}`,
+    };
+  });
+  const what = `${step}: ${c.name}`;
+  expect(c.shown, `${what}: the bar is shown`).toBe('true');
+  expect(c.top, what).toBeGreaterThanOrEqual(c.barBottom);
+  expect(c.bottom, what).toBeLessThanOrEqual(c.viewport);
+}
+
+/** Waits for the bar to finish sliding in, so what it covers is measured at its full height. */
+async function barAtRest(page: Page): Promise<void> {
+  await expect(estimateBar(page)).toBeInViewport();
+  await expect.poll(async () => (await estimateBar(page).boundingBox())?.y).toBe(0);
+}
+
+/** Scrolls so that `target`'s top sits just under the top of the viewport, where the bar is. */
+async function tuckUnderBar(target: Locator): Promise<void> {
+  await target.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - 4));
+}
+
+for (const [width, height] of [
+  [1280, 900],
+  [390, 844],
+] as const) {
+  test(`at ${width}px the estimate stays on screen while a work-pattern slider is dragged, and leaves with the hero back`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height });
+    await open(page);
+    const bar = estimateBar(page);
+    await expect(bar).toBeHidden();
+    const published = await headlineValue(page);
+
+    const group = page.locator('details[data-group]').filter({ has: page.getByRole('heading', { name: 'The work pattern' }) });
+    const slider = group.locator('input[type="range"]').first();
+    await slider.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await expect(bar).toBeInViewport();
+    const figure = bar.locator('.figure data');
+    await expect(figure).toHaveAttribute('value', published);
+    await expect(bar.locator('.change')).toHaveCount(0);
+
+    // Drag with the mouse, as the owner did: the figure follows before the button is released.
+    const box = (await slider.boundingBox())!;
+    const position = Number(await slider.inputValue()) / Number(await slider.getAttribute('max'));
+    const x = box.x + 8 + position * (box.width - 16);
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + box.width / 4, y, { steps: 5 });
+    await expect(figure).not.toHaveAttribute('value', published);
+    await page.mouse.up();
+
+    await barAtRest(page);
+    await expect(slider).toBeInViewport();
+    const sliderTop = (await slider.boundingBox())!.y;
+    const barBottom = (await bar.boundingBox())!.y + (await bar.boundingBox())!.height;
+    expect(sliderTop).toBeGreaterThanOrEqual(barBottom);
+    const now = await figure.getAttribute('value');
+    await expect(headline(page)).toHaveAttribute('value', now!);
+    await expect(figure).toHaveText((await headline(page).textContent())!);
+    await expect(bar.locator('.change')).toHaveText(/^\+\S+% vs\. published$/);
+    await expect(bar.getByRole('button', { name: 'Reset all (1)' })).toBeVisible();
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(headline(page)).toBeInViewport();
+    await expect(bar).toBeHidden();
+  });
+
+  test(`at ${width}px a control tabbed to in the assumptions panel is never under the estimate bar`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await open(page);
+    const panel = page.locator('#assumptions');
+    const controls = panel.locator('a[href], button, input, summary').filter({ visible: true });
+    const steps = 8;
+
+    // From above: the panel's first control starts under the bar.
+    await tuckUnderBar(controls.first());
+    await barAtRest(page);
+    await page.locator('#assumptions-title').evaluate((el: HTMLElement) => el.focus({ preventScroll: true }));
+    for (let i = 0; i < steps; i++) {
+      await page.keyboard.press('Tab');
+      await expectFocusClear(page, `tab ${i + 1}`);
+    }
+
+    // From below: the controls above the focused one start under the bar.
+    const last = controls.nth(steps);
+    await tuckUnderBar(controls.nth(steps - 1));
+    await last.evaluate((el: HTMLElement) => el.focus({ preventScroll: true }));
+    await barAtRest(page);
+    for (let i = 0; i < steps; i++) {
+      await page.keyboard.press('Shift+Tab');
+      await expectFocusClear(page, `shift-tab ${i + 1}`);
+    }
+  });
+}
+
+test('at 390px, with a change shown, the bar shortens the scenario before any model name', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  const models = await page.getByRole('region', { name: 'Selection' }).locator('input[name="model"]').evaluateAll((inputs) =>
+    inputs.map((i) => (i as HTMLInputElement).value),
+  );
+  expect(models.length).toBeGreaterThan(1);
+  for (const model of models) {
+    // A fresh load, so the change and the reset are both on the bar: its widest state.
+    await page.goto(`./#/?model=${encodeURIComponent(model)}&o.overhead=8`);
+    await expect(headline(page)).toBeVisible();
+    await page.locator('#explorer').scrollIntoViewIfNeeded();
+    await barAtRest(page);
+    const bar = estimateBar(page);
+    await expect(bar.locator('.change')).toBeVisible();
+    await expect(bar.getByRole('button', { name: /^Reset all/ })).toBeVisible();
+    const cut = await bar.locator('.model').evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(cut, `${model}: the model's name is whole`).toBe(false);
+    const lines = await bar.locator('.line').count();
+    expect(lines).toBe(2);
+    for (const line of await bar.locator('.line').all()) {
+      // One row each: no taller than its tallest control.
+      expect((await line.boundingBox())!.height).toBeLessThanOrEqual(26);
+    }
+  }
+});
+
+test('the estimate bar resets every change and leads back to the headline', async ({ page }) => {
+  await open(page, '#/?o.overhead=8');
+  const changed = await headlineValue(page);
+  await page.locator('#assumptions').scrollIntoViewIfNeeded();
+  const bar = estimateBar(page);
+  await expect(bar.locator('.figure data')).toHaveAttribute('value', changed);
+  await bar.getByRole('button', { name: 'Reset all (1)' }).click();
+  await expect(page).not.toHaveURL(/o\.overhead=/);
+  await expect(bar.locator('.change')).toHaveCount(0);
+  await expect(bar.getByRole('button', { name: 'Back to the estimate' })).toBeFocused();
+  await expect(bar.locator('.figure data')).not.toHaveAttribute('value', changed);
+
+  await bar.getByRole('button', { name: 'Back to the estimate' }).click();
+  await expect(headline(page)).toBeInViewport();
+  await expect(page.locator('#summary-title')).toBeFocused();
+  await expect(bar).toBeHidden();
+});
+
+test('when the bar hides with focus in it, focus goes to the headline rather than the page', async ({ page }) => {
+  await open(page);
+  await page.locator('#assumptions').scrollIntoViewIfNeeded();
+  const bar = estimateBar(page);
+  await barAtRest(page);
+  await bar.getByRole('button', { name: 'Back to the estimate' }).focus();
+  // Home scrolls the page, not the bar: the hero comes back and the bar goes inert.
+  await page.keyboard.press('Home');
+  await expect(headline(page)).toBeInViewport();
+  await expect(bar).toBeHidden();
+  await expect(page.locator('#summary-title')).toBeFocused();
+});
+
 test('an unknown model in the URL falls back to the defaults', async ({ page, context }) => {
   await open(page);
   const defaults = await headlineValue(page);
@@ -132,6 +306,9 @@ for (const route of ['methods', 'calibration']) {
     await page.goto(`./#/${route}`);
     await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Pages' }).locator('[aria-current="page"]')).toBeVisible();
+    // The estimate bar belongs to the estimate page alone.
+    await page.getByRole('contentinfo').scrollIntoViewIfNeeded();
+    await expect(estimateBar(page)).toHaveCount(0);
   });
 
   test(`at 390px the ${route} page renders, and its contents open and lead to a section`, async ({ page }) => {

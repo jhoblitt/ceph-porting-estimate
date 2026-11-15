@@ -1,12 +1,14 @@
 <!--
   The estimate, in the order a reader asks: what it costs (Summary), how much
   that moves (ScenarioRange, Matrix), why (CostByCategory, the 8b explorer
-  and dependency slots, Assumptions). Every view reads one Derived.
+  and dependency slots, Assumptions). Every view reads one Derived. While
+  the hero figure is off screen, EstimateBar keeps the estimate in view.
 -->
 <script lang="ts">
   import Assumptions from '../components/Assumptions.svelte';
   import CostByCategory from '../components/CostByCategory.svelte';
   import Dependencies from '../components/Dependencies.svelte';
+  import EstimateBar from '../components/EstimateBar.svelte';
   import Explorer from '../components/Explorer.svelte';
   import Matrix from '../components/Matrix.svelte';
   import ScenarioRange from '../components/ScenarioRange.svelte';
@@ -15,6 +17,7 @@
   import { Derived } from '../lib/derived.svelte';
   import type { Report } from '../lib/report';
   import type { AppState, WriteOptions } from '../lib/state';
+  import { watchScrolledPast } from '../lib/viewport';
 
   interface Props {
     report: Report;
@@ -27,7 +30,15 @@
   // App mounts this with the one report it loaded, which is never replaced.
   // svelte-ignore state_referenced_locally
   const d = new Derived(report, () => selection);
+
+  let hero = $state<HTMLElement>();
+  let heroPassed = $state(false);
+  $effect(() => {
+    if (hero) return watchScrolledPast(hero, (past) => (heroPassed = past));
+  });
 </script>
+
+<EstimateBar {d} {selection} {onselect} show={heroPassed} />
 
 <div class="intro">
   <h1>Porting estimate</h1>
@@ -36,7 +47,7 @@
   </p>
 </div>
 
-<Summary {d} {selection}>
+<Summary {d} {selection} bind:hero>
   {#snippet controls()}
     <SelectionControls {report} {selection} onchange={onselect} changed={d.changedCount} />
   {/snippet}
