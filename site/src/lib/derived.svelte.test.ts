@@ -132,6 +132,67 @@ describe('Derived', () => {
     expect(d.customised).toBe(false);
   });
 
+  describe('fromPublished', () => {
+    /** The current scenario as published, computed apart from the Derived under test. */
+    const published = (scenario = 'calibrated') =>
+      estimate(report, 'go', 'opus-5-5', resolveParams(report, scenario)).headline.usd;
+
+    it('reports no difference with nothing changed', () => {
+      const { d } = setup();
+      expect(d.fromPublished).toBeUndefined();
+    });
+
+    it('gives the published figure and a positive change for a change that raises the figure', () => {
+      const { d, set } = setup();
+      set({ overrides: { overhead: 20 } });
+      const p = published();
+      expect(d.fromPublished?.published).toBe(p);
+      expect(d.fromPublished?.change).toBeGreaterThan(0);
+      expect(d.fromPublished?.change).toBeCloseTo((d.root.headline.usd - p) / p, 12);
+    });
+
+    it('gives a negative change for a change that lowers the figure', () => {
+      const { d } = setup({ overrides: { overhead: 1 } });
+      const p = published();
+      expect(d.fromPublished?.change).toBeLessThan(0);
+      expect(d.fromPublished?.change).toBeCloseTo((d.root.headline.usd - p) / p, 12);
+    });
+
+    it('gives no change, but still a difference, for a change that leaves the figure as it was', () => {
+      // The discount acts only while the clean break is on, and the scenario has it off.
+      const { d } = setup({ overrides: { clean_break_discount: 0.5 } });
+      expect(d.customised).toBe(true);
+      expect(d.fromPublished).toEqual({ published: published(), change: 0 });
+    });
+
+    it('measures the selected target and model against their own published figure, and follows a new selection', () => {
+      const { d, set } = setup({ target: 'rust', model: 'fable-5-2', overrides: { overhead: 20 } });
+      const own = (target: 'rust' | 'wasm', model: string) =>
+        estimate(report, target, model, resolveParams(report, 'calibrated')).headline.usd;
+      expect(d.fromPublished?.published).toBe(own('rust', 'fable-5-2'));
+      expect(d.fromPublished?.published).not.toBe(published());
+      expect(d.fromPublished?.change).toBeCloseTo((d.root.headline.usd - own('rust', 'fable-5-2')) / own('rust', 'fable-5-2'), 12);
+      set({ target: 'wasm', model: 'gpt-6-astra' });
+      expect(d.fromPublished?.published).toBe(own('wasm', 'gpt-6-astra'));
+      expect(d.fromPublished?.change).toBeCloseTo((d.root.headline.usd - own('wasm', 'gpt-6-astra')) / own('wasm', 'gpt-6-astra'), 12);
+    });
+
+    it('measures a reference scenario against itself as published', () => {
+      const { d } = setup({ scenario: 'naive', overrides: { overhead: 20 } });
+      const p = published('naive');
+      expect(d.fromPublished?.published).toBe(p);
+      expect(d.fromPublished?.change).toBeCloseTo((d.root.headline.usd - p) / p, 12);
+    });
+
+    it('gives no percentage against a published figure of $0', () => {
+      const naive = report.assumptions.scenarios['naive']!;
+      const zeroed = { ...naive, overrides: { ...naive.overrides, expansion: 0, source_read_passes: 0 } };
+      const other = { ...report, assumptions: { ...report.assumptions, scenarios: { ...report.assumptions.scenarios, zeroed } } };
+      const d = new Derived(other, () => ({ ...defaultState(other), scenario: 'zeroed', overrides: { overhead: 20 } }));
+      expect(d.fromPublished).toEqual({ published: 0, change: null });
+    });
+  });
+
   it('reports each toggle with its scenario value and the value in effect', () => {
     const { d, set } = setup({ scenario: 'pessimistic' });
     expect(d.toggles).toEqual([

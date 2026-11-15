@@ -16,9 +16,11 @@
   interface Props {
     d: Derived;
     selection: AppState;
+    /** The hero figure's element, for the page to watch whether it is scrolled past. */
+    hero?: HTMLElement | undefined;
   }
 
-  let { d, selection }: Props = $props();
+  let { d, selection, hero = $bindable() }: Props = $props();
 
   /** Below this, "scaled up N times" would not read as a scale-up; say "extrapolated" instead. */
   const MIN_SCALE_UP = 1.5;
@@ -58,7 +60,7 @@
       cost about
     {/if}
   </span>
-  <span class="hero"><Amount value={headline.usd} kind="usd" /></span>
+  <span class="hero" bind:this={hero}><Amount value={headline.usd} kind="usd" /></span>
   <span class="tail">
     in model API charges, under the <strong>{d.scenario.label}</strong> scenario{#if changed > 0}{' '}with
       {changed === 1 ? 'one assumption' : `${changed} assumptions`} changed{/if}.

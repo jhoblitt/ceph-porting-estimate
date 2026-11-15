@@ -20,9 +20,11 @@
     selection: AppState;
     /** The selection controls, after the answer: beside it on a wide screen, under it on a narrow one. */
     controls: Snippet;
+    /** The hero figure's element (Headline). */
+    hero?: HTMLElement | undefined;
   }
 
-  let { d, selection, controls }: Props = $props();
+  let { d, selection, controls, hero = $bindable() }: Props = $props();
 
   const headline = $derived(d.root.headline);
 
@@ -38,11 +40,11 @@
 </script>
 
 <section class="summary" aria-labelledby="summary-title">
-  <h2 id="summary-title" class="visually-hidden">The estimate</h2>
+  <h2 id="summary-title" class="visually-hidden" tabindex="-1">The estimate</h2>
 
   <div class="top">
     <div class="answer-block">
-      <Headline {d} {selection} />
+      <Headline {d} {selection} bind:hero />
     </div>
 
     <!-- After the answer in the document, so on a phone the figure and what it leaves out come first. -->

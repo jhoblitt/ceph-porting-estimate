@@ -12,3 +12,16 @@ export function revealAssumptions(doc: Document = document): void {
   heading?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   heading?.focus({ preventScroll: true });
 }
+
+/** Scrolls back to the estimate's answer, at the top of the report, and focuses its heading. */
+export function revealEstimate(doc: Document = document): void {
+  const heading = doc.getElementById('summary-title');
+  const reduce = doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  (heading?.closest('section') ?? heading)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  focusEstimate(doc);
+}
+
+/** Focuses the estimate's heading where it is, without scrolling: for focus that must leave something going away. */
+export function focusEstimate(doc: Document = document): void {
+  doc.getElementById('summary-title')?.focus({ preventScroll: true });
+}
