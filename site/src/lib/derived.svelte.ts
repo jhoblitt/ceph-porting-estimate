@@ -18,6 +18,8 @@ import {
   resolveParams,
 } from './model';
 import { shares, totalTokens } from './categories';
+import { compactReport, sameHeadline } from './compact';
+import { type Effect, paramEffects } from './effects';
 import { linearTicks } from './scale';
 import {
   DEPENDENCIES_COMPONENT_ID,
@@ -38,18 +40,15 @@ import {
   scaleUp,
   scenarioRange,
   testCodeShare,
-  toggleOf,
   zeroingParams,
 } from './interpret';
 
-/** Why a param says something beside its control. */
+/** Why a param says something beside its control, besides its effect (paramEffects). */
 export type ParamNote =
   /** On its own, 0 here makes the headline $0. */
   | { kind: 'zeroes' }
   /** At or below `threshold` it has no effect: the test ratio against the tests Ceph already has. */
-  | { kind: 'below'; threshold: number }
-  /** It acts only while this switch is on, and the switch is off. */
-  | { kind: 'switch'; toggle: ToggleId };
+  | { kind: 'below'; threshold: number };
 
 /** The headline cost of the current target and model under one scenario. */
 export interface ScenarioTotal {
@@ -112,6 +111,7 @@ function headlineCost(root: GroupEstimate): Cost {
 export class Derived {
   readonly report: Report;
   readonly #selection: () => AppState;
+  readonly #compact: Report;
 
   /**
    * @param selection returns the current selection; reading it must be
@@ -120,6 +120,7 @@ export class Derived {
   constructor(report: Report, selection: () => AppState) {
     this.report = report;
     this.#selection = selection;
+    this.#compact = compactReport(report);
   }
 
   readonly target: Target = $derived.by(() => this.#selection().target);
@@ -352,11 +353,6 @@ export class Derived {
   /** Params that say something beside their control, by dotted path. */
   readonly paramNotes: Map<string, ParamNote> = $derived.by(() => {
     const notes = new Map<string, ParamNote>();
-    const toggles = new Map(this.toggles.map((t) => [t.id as string, t]));
-    for (const p of this.paramInfo) {
-      const toggle = toggles.get(toggleOf(p.path) ?? '');
-      if (toggle && !toggle.value) notes.set(p.path, { kind: 'switch', toggle: toggle.id });
-    }
     const testRatio = this.values.get('test_ratio');
     if (testRatio !== undefined && testRatio <= this.existingTestRatio) {
       notes.set('test_ratio', { kind: 'below', threshold: this.existingTestRatio });
@@ -369,4 +365,29 @@ export class Derived {
     }
     return notes;
   });
+
+  /**
+   * The report the slider effects are probed on: its compactReport, which
+   * gives the same headline for a fraction of the work, unless the two
+   * disagree at the current params, when it is the full report. The guard
+   * looks only here, not at the probe ends; compact.ts says what else checks
+   * the two agree.
+   */
+  readonly #effectsReport: Report = $derived.by(() => {
+    const compact = this.#compact;
+    const fast = estimate(compact, this.target, this.modelId, this.params).headline.usd;
+    return sameHeadline(fast, this.root.headline.usd) ? compact : this.report;
+  });
+
+  /** What each param's slider does to the headline across its range, by dotted path. */
+  readonly paramEffects: Map<string, Effect> = $derived.by(() =>
+    paramEffects({
+      report: this.#effectsReport,
+      scenarioId: this.scenarioId,
+      target: this.target,
+      modelId: this.modelId,
+      overrides: this.overrides,
+      info: this.paramInfo,
+    }),
+  );
 }

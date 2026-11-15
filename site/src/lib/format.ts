@@ -80,6 +80,14 @@ export function percent(x: number): string {
   return signed(x * 100, (abs) => twoSignificant.format(abs), '', '%');
 }
 
+/** The smallest fraction `percent` prints as a figure (0.01%); below it, the short forms say "<0.01%". */
+export const PERCENT_FLOOR = TINY / 100;
+
+/** True for a change other than 0 that `signedPercent` prints as "<+0.01%" or ">−0.01%" rather than a figure. */
+export function belowPercentFloor(x: number): boolean {
+  return x !== 0 && Math.abs(x) * 100 < TINY;
+}
+
 /**
  * A change as a fraction, with its sign, through `percent`: +3.6%, −31%, 0%.
  * A change too small for `percent` to print reads "<+0.01%" or ">−0.01%".
@@ -87,7 +95,7 @@ export function percent(x: number): string {
 export function signedPercent(x: number): string {
   if (!Number.isFinite(x)) return DASH;
   if (x === 0) return '0%';
-  if (Math.abs(x) * 100 < TINY) return x > 0 ? '<+0.01%' : `>${MINUS}0.01%`;
+  if (belowPercentFloor(x)) return x > 0 ? '<+0.01%' : `>${MINUS}0.01%`;
   return `${x > 0 ? '+' : MINUS}${percent(Math.abs(x))}`;
 }
 

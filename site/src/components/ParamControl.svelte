@@ -1,9 +1,11 @@
 <!--
   One adjustable assumption: its value as a slider and a number box, where
   the value comes from, what it rests on (behind the "i"), a line when the
-  value zeroes the estimate or does nothing where it is, and a reset once it
-  differs from the scenario. A multiplier's slider is a log track from a
-  quarter of its baseline to four times it, with the baseline marked.
+  value zeroes the estimate or does nothing where it is, a subdued look and
+  a line when moving it cannot change the estimate or too little to print,
+  and a reset once it differs from the scenario. A multiplier's slider is a
+  log track from a quarter of its baseline to four times it, with the
+  baseline marked.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -19,14 +21,24 @@
     badge: string;
     /** Said beside the control, e.g. that the value has no effect where it is. */
     note?: string | undefined;
+    /**
+     * What moving it does to the headline: `none` subdues the control, which
+     * stays operable; `small` and `none` come with `effectNote`.
+     */
+    effect?: 'none' | 'small' | 'live';
+    /** Why it has no effect, or how far it moves the estimate when that is too little to print. */
+    effectNote?: string | undefined;
     /** `live` while a slider is being dragged, so the caller can coalesce history entries. */
     onchange: (value: number, live: boolean) => void;
     onreset: () => void;
   }
 
-  let { info, value, badge, note, onchange, onreset }: Props = $props();
+  let { info, value, badge, note, effect = 'live', effectNote, onchange, onreset }: Props = $props();
 
   const id = $props.id();
+  const describedBy = $derived(
+    [note ? `${id}-note` : '', effectNote ? `${id}-effect` : ''].filter((x) => x !== '').join(' ') || undefined,
+  );
   /**
    * The track as it was when a gesture began, held until it ends: the track
    * widens to reach the value, so recomputing it mid-drag would move the
@@ -73,7 +85,7 @@
   }
 </script>
 
-<div class="param" class:changed data-param-path={info.path}>
+<div class="param" class:changed data-param-path={info.path} data-effect={effect}>
   <div class="head">
     <label id="{id}-label" for="{id}-number">{info.label}</label>
     <span class="badge" class:measured={info.measured}>{badge}</span>
@@ -101,7 +113,7 @@
         type="range"
         aria-labelledby="{id}-label"
         aria-valuetext={paramValue(value)}
-        aria-describedby={note ? `${id}-note` : undefined}
+        aria-describedby={describedBy}
         min="0"
         max={SLIDER_STEPS}
         step="1"
@@ -123,12 +135,15 @@
       step="any"
       min="0"
       value={shown}
-      aria-describedby={note ? `${id}-note` : undefined}
+      aria-describedby={describedBy}
       onchange={type}
     />
   </div>
   {#if note}
     <p class="param-note" id="{id}-note">{note}</p>
+  {/if}
+  {#if effectNote}
+    <p class="param-note effect-note" id="{id}-effect">{effectNote}</p>
   {/if}
   {#if changed}
     <div class="reset">
@@ -147,6 +162,65 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
+  }
+
+  /*
+   * No effect as things are set: drawn back, not disabled. It stays
+   * operable, so its ink keeps text contrast and its track and thumb keep
+   * control contrast; the note says why, so colour is not the only sign.
+   */
+  .param[data-effect='none'] {
+    border-style: dashed;
+    background: var(--page);
+  }
+
+  .param[data-effect='none'] label,
+  .param[data-effect='none'] .number {
+    color: var(--text-muted);
+  }
+
+  /*
+   * Drawn flat in grey. The native track's unfilled part is under 3:1 on a
+   * light background, and a subdued slider at one end of its range is all
+   * unfilled, so this one draws its own: a --border-strong line (>= 3:1 on
+   * both pages) and a --text-muted thumb, 16px wide as the baseline mark
+   * assumes.
+   */
+  .param[data-effect='none'] input[type='range'] {
+    appearance: none;
+    height: 16px;
+    background: transparent;
+  }
+
+  .param[data-effect='none'] input[type='range']::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+  }
+
+  .param[data-effect='none'] input[type='range']::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+  }
+
+  .param[data-effect='none'] input[type='range']::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+    border: 2px solid var(--page);
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+
+  .param[data-effect='none'] input[type='range']::-moz-range-thumb {
+    box-sizing: border-box;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--page);
+    border-radius: 50%;
+    background: var(--text-muted);
   }
 
   .param.changed {

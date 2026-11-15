@@ -116,6 +116,86 @@ test('moving a slider changes the headline and the URL, and that URL restores it
   await again.close();
 });
 
+// Each slider's data-effect against what its two ends do to the headline: none
+// leaves the value as it was, small changes the value but not the printed
+// text, live changes the text. Each read of the page is one round trip.
+for (const [name, hash] of [
+  ['the default selection', ''],
+  ['WASM with GPT-6 Astra, Pessimistic', '#/?target=wasm&model=gpt-6-astra&scenario=pessimistic'],
+] as const) {
+  test(`for ${name}, every slider's effect is what its two ends do to the headline`, async ({ page }) => {
+    // 9.2 s and 10.9 s for the two selections on the machine this was written on, with the
+    // whole suite running in parallel: about three times that, for a slower CI runner.
+    test.setTimeout(35_000);
+    await open(page, hash);
+    const read = () => headline(page).evaluate((el) => ({ value: el.getAttribute('value') ?? '', text: el.textContent ?? '' }));
+    const start = await read();
+    const paths = await page.locator('[data-param-path]').evaluateAll((els) => els.map((e) => e.getAttribute('data-param-path')!));
+    expect(paths.length).toBeGreaterThan(0);
+    const reset = page.locator('#assumptions button.reset-all');
+    const seen = { none: 0, small: 0, live: 0 };
+    for (const path of paths) {
+      const param = page.locator(`[data-param-path="${path}"]`);
+      const slider = param.locator('input[type="range"]');
+      const number = param.locator('input[type="number"]');
+      const control = () =>
+        param.evaluate((el) => {
+          const range = el.querySelector<HTMLInputElement>('input[type="range"]')!;
+          return {
+            effect: el.getAttribute('data-effect') as 'none' | 'small' | 'live',
+            position: range.value,
+            min: range.min,
+            max: range.max,
+            number: el.querySelector<HTMLInputElement>('input[type="number"]')!.value,
+          };
+        });
+      const { effect } = await control();
+      const ends: { value: string; text: string }[] = [];
+      for (const key of ['End', 'Home'] as const) {
+        const before = await control();
+        await slider.press(key);
+        // A slider whose thumb already sits at this end has nowhere to go. Any other
+        // must take the key: the number box shows the new value once the page has
+        // applied it, and only then is the headline read.
+        if (before.position !== (key === 'End' ? before.max : before.min)) {
+          await expect(number, `${path}: ${key} moves it`).not.toHaveValue(before.number);
+        }
+        ends.push(await read());
+      }
+      const valueMoved = ends.some((e) => e.value !== start.value);
+      const textMoved = ends.some((e) => e.text !== start.text);
+      const what = `${path} (${effect}): ends ${JSON.stringify(ends)}, start ${JSON.stringify(start)}`;
+      if (effect === 'none') expect(valueMoved, what).toBe(false);
+      else if (effect === 'small') expect(valueMoved && !textMoved, what).toBe(true);
+      else expect(textMoved, what).toBe(true);
+      seen[effect] += 1;
+      if (await reset.isEnabled()) await reset.click();
+      await expect(headline(page)).toHaveAttribute('value', start.value);
+    }
+    // Both selections have sliders in every state, so none of the three checks above went unexercised.
+    expect(seen.none > 0 && seen.small > 0 && seen.live > 0, JSON.stringify(seen)).toBe(true);
+  });
+}
+
+test('at 390px a greyed-out slider and a small-effect slider show their notes, and nothing overflows', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  await expect(page.locator('#assumptions .inert-count')).toContainText(/Greyed-out sliders \(\d+ of the \d+ below\) have no effect on this estimate/);
+  for (const effect of ['none', 'small']) {
+    const param = page.locator(`#assumptions [data-effect="${effect}"]`).first();
+    await param.scrollIntoViewIfNeeded();
+    const note = param.locator('.effect-note');
+    await expect(param).toBeInViewport();
+    await expect(note).toBeInViewport();
+    await expect(note).not.toBeEmpty();
+    for (const input of await param.locator('input').all()) {
+      await expect(input).toHaveAttribute('aria-describedby', new RegExp(`\\b${await note.getAttribute('id')}\\b`));
+    }
+    expect(await param.evaluate((el) => el.scrollWidth <= el.clientWidth), `${effect}: the control fits its box`).toBe(true);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
 function estimateBar(page: Page): Locator {
   return page.locator('[data-estimate-bar]');
 }
