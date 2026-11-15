@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PERCENT_FLOOR,
+  belowPercentFloor,
   count,
   countExact,
   decimal,
@@ -319,6 +321,13 @@ describe('signedPercent', () => {
 
   it.each(NON_FINITE)('prints a dash for %s', (n) => {
     expect(signedPercent(n)).toBe('—');
+  });
+
+  it('says a change is below its floor exactly when it prints one of the bound forms', () => {
+    expect(percent(PERCENT_FLOOR)).toBe('0.01%');
+    for (const x of [0, 1e-9, -1e-9, 0.00009, -0.00009, PERCENT_FLOOR, -PERCENT_FLOOR, 0.00011, 0.0029, -0.5]) {
+      expect(belowPercentFloor(x), `${x}`).toBe(/^[<>]/.test(signedPercent(x)));
+    }
   });
 });
 

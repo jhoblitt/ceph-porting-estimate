@@ -16,13 +16,14 @@ const info: ParamInfo = {
 };
 
 // The track runs from 1 to 16 on a log scale, so position 750 of 1000 is 16^0.75 = 8.
-function setup(value = 4, note?: string) {
+function setup(value = 4, note?: string, effect?: { effect: 'none' | 'small' | 'live'; effectNote?: string }) {
   const onchange = vi.fn<(value: number, live: boolean) => void>();
   const { container } = render(ParamControl, {
     info,
     value,
     badge: 'Measured on rgw-go',
     ...(note === undefined ? {} : { note }),
+    ...effect,
     onchange,
     onreset: vi.fn(),
   });
@@ -90,5 +91,39 @@ describe('ParamControl', () => {
     const note = container.querySelector('.param-note')!;
     expect(note.textContent).toBe('Has no effect while the clean break is off.');
     expect(box.getAttribute('aria-describedby')).toBe(note.id);
+  });
+
+  it('says it is live by default, with nothing added', () => {
+    const { container, slider } = setup();
+    expect(container.querySelector('[data-param-path]')?.getAttribute('data-effect')).toBe('live');
+    expect(container.querySelector('.param-note')).toBeNull();
+    expect(slider.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('subdues a control without effect and says why, keeping it operable', async () => {
+    const reason = 'No effect on a Go estimate; it applies to Rust and WASM estimates.';
+    const { container, slider, box, onchange } = setup(4, undefined, { effect: 'none', effectNote: reason });
+    const param = container.querySelector<HTMLElement>('[data-param-path]')!;
+    expect(param.dataset['effect']).toBe('none');
+    const note = container.querySelector('.effect-note')!;
+    expect(note.textContent).toBe(reason);
+    for (const input of [slider, box]) {
+      expect(input.getAttribute('aria-describedby')).toBe(note.id);
+      expect(input.hasAttribute('disabled')).toBe(false);
+      expect(input.hasAttribute('aria-disabled')).toBe(false);
+    }
+    await fireEvent.input(slider, { target: { value: '750' } });
+    expect(onchange).toHaveBeenCalledWith(8, false);
+  });
+
+  it('ties both notes to both inputs when it has a note and a small effect', () => {
+    const { container, slider, box } = setup(4, 'At 0 this alone makes the estimate $0.', {
+      effect: 'small',
+      effectNote: 'Across its range this moves the estimate by up to +0.17%, too little to change the printed figure.',
+    });
+    expect(container.querySelector<HTMLElement>('[data-param-path]')?.dataset['effect']).toBe('small');
+    const ids = [...container.querySelectorAll('.param-note')].map((n) => n.id);
+    expect(ids).toHaveLength(2);
+    for (const input of [slider, box]) expect(input.getAttribute('aria-describedby')).toBe(ids.join(' '));
   });
 });

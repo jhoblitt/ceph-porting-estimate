@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './__fixtures__/report.json';
 import { Derived } from './derived.svelte';
+import { type Effect, paramEffects } from './effects';
 import { testCodeShare } from './interpret';
 import { describeParams, estimate, matrix, resolveParams } from './model';
 import { parseReport } from './report';
@@ -367,10 +368,33 @@ describe('Derived', () => {
     expect(d.paramNotes.get('expansion')).toEqual({ kind: 'zeroes' });
     expect(d.existingTestRatio).toBeGreaterThan(0.1);
     expect(d.paramNotes.get('test_ratio')).toEqual({ kind: 'below', threshold: d.existingTestRatio });
-    expect(d.paramNotes.get('clean_break_discount')).toEqual({ kind: 'switch', toggle: 'clean_break' });
     expect(d.paramNotes.has('overhead')).toBe(false);
-    set({ overrides: { 'toggles.clean_break': 1 } });
-    expect(d.paramNotes.has('clean_break_discount')).toBe(false);
+  });
+
+  it("gives each slider its effect on the headline, as the full report's model does, and follows the selection", () => {
+    const { d, set } = setup();
+    // The derived layer evaluates a compact report, so a small effect's reach may differ in its last bits.
+    const rounded = (effects: Map<string, Effect>) =>
+      [...effects].map(([path, e]) =>
+        e.kind === 'small' ? [path, { ...e, from: e.from.toPrecision(9), to: e.to.toPrecision(9) }] : [path, e],
+      );
+    const onFull = (s: Partial<AppState>) => {
+      const sel = { ...defaultState(report), ...s };
+      return paramEffects({
+        report,
+        scenarioId: sel.scenario,
+        target: sel.target,
+        modelId: sel.model,
+        overrides: sel.overrides,
+        info: describeParams(report, sel.scenario),
+      });
+    };
+    expect(rounded(d.paramEffects)).toEqual(rounded(onFull({})));
+    expect(d.paramEffects.get('clean_break_discount')).toEqual({ kind: 'none', reason: { kind: 'switch', toggle: 'clean_break' } });
+    const next = { target: 'wasm' as const, model: 'gpt-6-astra', scenario: 'pessimistic', overrides: { 'toggles.clean_break': 1 } };
+    set(next);
+    expect(rounded(d.paramEffects)).toEqual(rounded(onFull(next)));
+    expect(d.paramEffects.get('clean_break_discount')?.kind).toBe('live');
   });
 
   it('gives each component shown outside the headline its cost', () => {

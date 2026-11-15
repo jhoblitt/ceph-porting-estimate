@@ -35,6 +35,30 @@ const proseMarkdown: Plugin = {
   },
 };
 
+/**
+ * The problems `check` finds in the report this build ships, running the
+ * site's own modules through Vite's SSR loader, so the check runs the code
+ * the browser runs.
+ */
+async function checkReport(
+  check: (load: (path: string) => Promise<unknown>, raw: unknown) => Promise<string[]>,
+): Promise<string[]> {
+  const server = await createServer({
+    root: fileURLToPath(new URL('.', import.meta.url)),
+    configFile: false,
+    logLevel: 'silent',
+    appType: 'custom',
+    server: { middlewareMode: true, hmr: false, ws: false },
+    optimizeDeps: { noDiscovery: true, include: [] },
+    plugins: [proseMarkdown],
+  });
+  try {
+    return await check((path) => server.ssrLoadModule(path), JSON.parse(readFileSync(reportJson, 'utf8')));
+  } finally {
+    await server.close();
+  }
+}
+
 // The prose pages render in the browser from report.json, and
 // calibration.yaml is free-form, so a renamed key or a removed group would
 // leave a blank page behind a green build. Render them against the report
@@ -45,26 +69,35 @@ const checkProse: Plugin = {
   apply: 'build',
   async buildStart() {
     if (!existsSync(reportJson)) return; // requireReport says so
-    const server = await createServer({
-      root: fileURLToPath(new URL('.', import.meta.url)),
-      configFile: false,
-      logLevel: 'silent',
-      appType: 'custom',
-      server: { middlewareMode: true, hmr: false, ws: false },
-      optimizeDeps: { noDiscovery: true, include: [] },
-      plugins: [proseMarkdown],
+    const problems = await checkReport(async (load, raw) => {
+      const check = (await load('/src/lib/prose/check.ts')) as { checkGeneratedReport(raw: unknown): string[] };
+      return check.checkGeneratedReport(raw);
     });
-    let problems: string[];
-    try {
-      const check = (await server.ssrLoadModule('/src/lib/prose/check.ts')) as {
-        checkGeneratedReport(raw: unknown): string[];
-      };
-      problems = check.checkGeneratedReport(JSON.parse(readFileSync(reportJson, 'utf8')));
-    } finally {
-      await server.close();
-    }
     if (problems.length > 0) {
       this.error(`the prose pages do not render against src/generated/report.json:\n  ${problems.join('\n  ')}`);
+    }
+  },
+};
+
+// Whether a slider moves the estimate is the model's to say; why it does
+// not is a rule's. Hold the two together on the data this build ships, for
+// every target, model, scenario and setting of the switches, so a change to
+// either that leaves a slider subdued without a reason, or a reason on a
+// slider that moves the estimate, fails the build.
+const checkSliderEffects: Plugin = {
+  name: 'check-slider-effects',
+  apply: 'build',
+  async buildStart() {
+    if (!existsSync(reportJson)) return; // requireReport says so
+    const problems = await checkReport(async (load, raw) => {
+      const { parseReport } = (await load('/src/lib/report.ts')) as { parseReport(raw: unknown): unknown };
+      const { checkEffectReasons } = (await load('/src/lib/effects.ts')) as {
+        checkEffectReasons(report: unknown): string[];
+      };
+      return checkEffectReasons(parseReport(raw));
+    });
+    if (problems.length > 0) {
+      this.error(`the slider effects and their reasons disagree on src/generated/report.json:\n  ${problems.join('\n  ')}`);
     }
   },
 };
@@ -73,7 +106,14 @@ export default defineConfig({
   base: '/ceph-porting-estimate/',
   // Under vitest, svelteTesting resolves Svelte's client build, so component
   // tests can mount, and cleans up after each test.
-  plugins: [proseMarkdown, svelte(), requireReport, checkProse, ...(process.env['VITEST'] ? [svelteTesting()] : [])],
+  plugins: [
+    proseMarkdown,
+    svelte(),
+    requireReport,
+    checkProse,
+    checkSliderEffects,
+    ...(process.env['VITEST'] ? [svelteTesting()] : []),
+  ],
   define: {
     // Formatted at runtime by lib/version.ts; an empty string means a dev build.
     __APP_VERSION__: JSON.stringify(process.env['APP_VERSION'] ?? ''),

@@ -10,8 +10,10 @@
 <script lang="ts">
   import { groupParams, provenance, toggleText } from '../lib/assumptions';
   import type { Derived, ParamNote, ToggleInfo } from '../lib/derived.svelte';
-  import { paramValue } from '../lib/format';
+  import { type Effect, smallReach } from '../lib/effects';
+  import { PERCENT_FLOOR, countExact, list, paramValue, percent, signedPercent } from '../lib/format';
   import { withOverride, withoutOverride } from '../lib/overrides';
+  import { TARGET_LABELS } from '../lib/report';
   import { type AppState, type WriteOptions, hashFromState } from '../lib/state';
   import ParamControl from './ParamControl.svelte';
   import Section from './Section.svelte';
@@ -46,10 +48,46 @@
         return 'At 0 this alone makes the estimate $0.';
       case 'below':
         return `At or below ${paramValue(note.threshold)}, the tests Ceph already has per unit of product code, this has no effect: existing tests are taken to replace new ones.`;
-      case 'switch':
-        return `No effect while “${toggleText(note.toggle).label}” is off.`;
     }
   }
+
+  const labelOf = (path: string) => d.paramInfo.find((p) => p.path === path)?.label ?? path;
+  const modelName = (id: string) => d.report.models.find((m) => m.id === id)?.name ?? id;
+
+  /** The line beside a slider without effect, or with too little to print; none for a live one. */
+  function effectText(effect: Effect | undefined): string | undefined {
+    if (!effect || effect.kind === 'live') return undefined;
+    if (effect.kind === 'small') {
+      const r = smallReach(effect.from, effect.to);
+      const reach =
+        r.kind === 'within'
+          ? `by less than ${percent(PERCENT_FLOOR)}`
+          : r.kind === 'up-to'
+            ? `by up to ${signedPercent(r.change)}`
+            : `from ${signedPercent(r.from)} to ${signedPercent(r.to)}`;
+      return `Across its range this moves the estimate ${reach}, too little to change the printed figure.`;
+    }
+    const r = effect.reason;
+    switch (r.kind) {
+      case 'target':
+        return `No effect on a ${TARGET_LABELS[r.target]} estimate; it applies to ${list(r.appliesTo.map((t) => TARGET_LABELS[t]))} estimates.`;
+      case 'long-context':
+        return `No effect with ${modelName(r.model)}, whose price sheet has no long-context prices.`;
+      case 'other-model':
+        return `No effect on this estimate; it changes the ${modelName(r.model)} row in the comparison of models.`;
+      case 'switch':
+        return `No effect while “${toggleText(r.toggle).label}” is off.`;
+      case 'difficulty':
+        return 'No effect: no work in this estimate is of this difficulty.';
+      case 'moot':
+        return `No effect while ${list(r.by.map((p) => `“${labelOf(p)}”`))} ${r.by.length === 1 ? 'is' : 'are'} 0.`;
+      case 'other':
+        return 'No effect on this estimate with the other values as they are now.';
+    }
+  }
+
+  const sliders = $derived(d.paramEffects.size);
+  const inert = $derived([...d.paramEffects.values()].filter((e) => e.kind === 'none').length);
 </script>
 
 <Section id="assumptions" title="Assumptions">
@@ -75,6 +113,14 @@
       Reset all{changed > 0 ? ` (${changed})` : ''}
     </button>
   </div>
+
+  {#if inert > 0}
+    <!-- Figures for both counts, not cardinal: they are one comparison, and "ten of the 29" would read as a slip. -->
+    <p class="inert-count">
+      Greyed-out sliders ({countExact(inert)} of the {countExact(sliders)} below) have no effect on this estimate with the
+      current selection and values. Each says why, and each can still be changed.
+    </p>
+  {/if}
 
   <fieldset class="toggles">
     <legend>Switches</legend>
@@ -108,6 +154,8 @@
             value={d.values.get(info.path) ?? info.scenario}
             badge={provenance(info, project)}
             note={noteText(d.paramNotes.get(info.path))}
+            effect={d.paramEffects.get(info.path)?.kind ?? 'live'}
+            effectNote={effectText(d.paramEffects.get(info.path))}
             onchange={(v, live) => setOverrides(withOverride(d.overrides, info.path, v, info.scenario), live)}
             onreset={() => setOverrides(withoutOverride(d.overrides, info.path))}
           />
@@ -119,6 +167,12 @@
 
 <style>
   .measured-means {
+    margin: 0 0 var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+
+  .inert-count {
     margin: 0 0 var(--space-4);
     font-size: var(--text-sm);
     color: var(--text-muted);
